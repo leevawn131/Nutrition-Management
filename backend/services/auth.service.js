@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
 
 // Helper to validate email format
@@ -64,6 +65,91 @@ const registerUser = async ({ email, password }) => {
   return newUser;
 };
 
+/**
+ * Authenticate user and issue JWT Access Token
+ * @param {Object} data - { email, password }
+ * @returns {Promise<Object>} { user, accessToken }
+ */
+const loginUser = async ({ email, password }) => {
+  // 1. Validate required inputs
+  if (!email || typeof email !== 'string' || !email.trim()) {
+    const error = new Error('Email không được để trống');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!password || typeof password !== 'string') {
+    const error = new Error('Mật khẩu không được để trống');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // 2. Normalize email
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // 3. Find user by email
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user) {
+    // Generic authentication error - do not reveal if email exists
+    const error = new Error('Email hoặc mật khẩu không chính xác');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  // 4. Compare password with stored hash
+  const isMatch = await bcrypt.compare(password, user.password_hash);
+  if (!isMatch) {
+    // Generic authentication error - do not reveal which credential failed
+    const error = new Error('Email hoặc mật khẩu không chính xác');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  // 5. Generate JWT Access Token
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    const error = new Error('JWT secret chưa được cấu hình');
+    error.statusCode = 500;
+    throw error;
+  }
+
+  const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
+  const payload = {
+    id: user._id,
+  };
+
+  const accessToken = jwt.sign(payload, secret, { expiresIn });
+
+  return {
+    user,
+    accessToken,
+  };
+};
+
+/**
+ * Get current authenticated user profile
+ * @param {string} userId - User ObjectId string
+ * @returns {Promise<Object>} User document
+ */
+const getCurrentUser = async (userId) => {
+  if (!userId) {
+    const error = new Error('User ID không hợp lệ');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    const error = new Error('Không tìm thấy thông tin người dùng');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return user;
+};
+
 module.exports = {
   registerUser,
+  loginUser,
+  getCurrentUser,
 };
