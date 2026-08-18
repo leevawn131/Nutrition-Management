@@ -20,6 +20,10 @@ app.get('/', (req, res) => {
   res.send('API Quản lý dinh dưỡng đang hoạt động!');
 });
 
+// Routes
+const authRoutes = require('./routes/auth.routes');
+app.use('/api/auth', authRoutes);
+
 // Lắng nghe cổng
 app.listen(PORT, () => {
   console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);

@@ -13,8 +13,10 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "expressjs": "^1.0.1",
     "mongoose": "^9.9.2"
   },
   "devDependencies": {
