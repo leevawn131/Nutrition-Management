@@ -1,20 +1,19 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import {
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppLogo } from '@/components/ui/app-logo';
 import { authService } from '@/services/auth.service';
@@ -92,16 +91,8 @@ export default function LoginScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } catch {}
         }
-        Alert.alert(
-          'Đăng nhập thành công',
-          `Chào mừng ${response.data.user.email} đã trở lại!`,
-          [
-            {
-              text: 'Bắt đầu',
-              onPress: () => router.replace('/(tabs)'),
-            },
-          ]
-        );
+        // Navigate immediately to avoid being blocked by platform-specific Alert behavior.
+        router.replace('/(tabs)');
       }
     } catch (error: any) {
       setErrorMessage(error.message || 'Đăng nhập không thành công. Vui lòng kiểm tra lại.');
