@@ -1,23 +1,23 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { FontAwesome6, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
   Alert,
   Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons, FontAwesome6 } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 
-import { AppLogo } from '@/components/ui/app-logo';
 import { QuickActionsModal } from '@/components/home/quick-actions-modal';
+import { AppLogo } from '@/components/ui/app-logo';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
-import { userService, HealthMetrics } from '@/services/user.service';
+import { HealthMetrics, userService } from '@/services/user.service';
 import { User } from '@/types/auth.types';
 
 export default function HomeScreen() {
@@ -344,6 +344,32 @@ export default function HomeScreen() {
                 {user?.weight_kg ? `(${user.weight_kg}kg)` : ''}
               </Text>
             </Text>
+          </View>
+        </View>
+
+        {/* 8. DAILY PLAN SECTION */}
+        <View style={styles.planSection}>
+          <View style={styles.planHeader}>
+            <Text style={styles.planTitle}>Kế hoạch hôm nay</Text>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/(tabs)/diary')}>
+              <Text style={styles.planLink}>Chi tiết</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.planEmptyCard}>
+            <View style={styles.planIconContainer}>
+              <MaterialCommunityIcons name="calendar-check" size={48} color="#94A3B8" />
+            </View>
+
+            <Text style={styles.planEmptyTitle}>Hôm nay bạn chưa có kế hoạch</Text>
+            <Text style={styles.planEmptyText}>
+              Lên kế hoạch bữa ăn và hoạt động để bắt đầu ngày mới.
+            </Text>
+
+            <TouchableOpacity style={styles.planButton} activeOpacity={0.85} onPress={() => router.push('/(tabs)/diary')}>
+              <Text style={styles.planButtonText}>Lên kế hoạch</Text>
+              <Ionicons name="chevron-forward" size={18} color="#10B981" />
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -701,5 +727,73 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: '#64748B',
+  },
+  planSection: {
+    marginTop: 20,
+  },
+  planHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  planTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.3,
+  },
+  planLink: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#34D399',
+  },
+  planEmptyCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  planIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  planEmptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  planEmptyText: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  planButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  planButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#10B981',
   },
 });
