@@ -73,7 +73,7 @@ db.users.insertMany([
   {
     _id: uAdminId,
     email: "admin@nutrition.app",
-    password_hash: "$2a$10$wN30iG5/m8vA5O8j2Cj7q.uO8L6YfP4Z5F7gD0W1N6N.rYqN3jOye", // password: Admin@123456
+    password_hash: "$2b$10$0ztLa/cxRt1bGPnz79RLHOKzSync9fkakA9A3FUewylinkV/eY/uO", // password: Admin@123456
     full_name: "Quản trị viên Hệ thống",
     avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb",
     gender: "male",
@@ -98,7 +98,7 @@ db.users.insertMany([
   {
     _id: uUser1Id,
     email: "nguyenvanan@gmail.com",
-    password_hash: "$2a$10$e7K4V5mS5Qo.4M6bK6U0p.U9M4fF4Q3Z4D5eG1P2O5Q.rWqO1iPyu", // password: User1@123
+    password_hash: "$2b$10$4tGD2XRASaObXidQnx4s8OyvvPqkrhqILpz4hURLVuG/RD1hfQN/m", // password: User1@123
     full_name: "Nguyễn Văn An",
     avatar_url: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
     gender: "male",
@@ -123,7 +123,7 @@ db.users.insertMany([
   {
     _id: uUser2Id,
     email: "tranthibich@gmail.com",
-    password_hash: "$2a$10$a1B2c3D4e5F6g7H8i9J0k.L1M2N3O4P5Q6R7S8T9U0V1W2X3Y4Z5a",
+    password_hash: "$2b$10$oUMLn6o0Gqr91b1z7mc61OxjCZuWMiNS6.AF96PREg9sARlRqfUXe", // password: User2@123
     full_name: "Trần Thị Bích",
     avatar_url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
     gender: "female",
@@ -148,7 +148,7 @@ db.users.insertMany([
   {
     _id: uUser3Id,
     email: "lehoangnam@gmail.com",
-    password_hash: "$2a$10$b2C3d4E5f6G7h8I9j0K1l.M2N3O4P5Q6R7S8T9U0V1W2X3Y4Z5a6B",
+    password_hash: "$2b$10$G3nfcsWeQnHhhTz0.jZ4Rug5Gf5QBZvlaWx59w/Y7XQkrgdc7yC/y", // password: User3@123
     full_name: "Lê Hoàng Nam",
     avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d",
     gender: "male",
@@ -173,7 +173,7 @@ db.users.insertMany([
   {
     _id: uUser4Id,
     email: "phamtomailinh@gmail.com",
-    password_hash: "$2a$10$c3D4e5F6g7H8i9J0k1L2m.N3O4P5Q6R7S8T9U0V1W2X3Y4Z5a6B7C",
+    password_hash: "$2b$10$rdi4B7Vt4plxW5Bu3ett0eeZVaXUi1/eUXCR/kgGRvgVa9yY9Dkx2", // password: User4@123
     full_name: "Phạm Mai Linh",
     avatar_url: "https://images.unsplash.com/photo-1517841905240-472988babdf9",
     gender: "female",
