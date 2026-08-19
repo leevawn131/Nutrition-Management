@@ -8,13 +8,14 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function DiaryScreen() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(19);
+  const [selectedWeek, setSelectedWeek] = useState<'prev' | 'current' | 'next'>('current');
   const [displayMode, setDisplayMode] = useState('Tất cả');
   const [displayModeVisible, setDisplayModeVisible] = useState(false);
 
@@ -28,360 +29,216 @@ export default function DiaryScreen() {
     { day: 'CN', date: 23, weekend: true },
   ];
 
-  const displayModes = ['Đã ghi nhận', 'Chưa hoàn thành', 'Tất cả', 'Chỉ hoạt động', 'Chỉ bữa ăn'];
+  const displayModes = ['Tất cả', 'Đã ghi nhận', 'Chưa hoàn thành', 'Chỉ hoạt động', 'Chỉ bữa ăn'];
 
   const selectedDay = diaryDays.find((item) => item.date === selectedDate) ?? diaryDays[2];
 
-  const renderDiaryScreen = () => (
-    <SafeAreaView style={styles.diarySafeArea} edges={['top', 'left', 'right']}>
+  const getDayName = (day: string) => {
+    switch (day) {
+      case 'T2': return 'thứ hai';
+      case 'T3': return 'thứ ba';
+      case 'T4': return 'thứ tư';
+      case 'T5': return 'thứ năm';
+      case 'T6': return 'thứ sáu';
+      case 'T7': return 'thứ bảy';
+      case 'CN': return 'chủ nhật';
+      default: return 'thứ tư';
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView style={styles.diaryContainer} contentContainerStyle={styles.diaryContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.diaryHeader}>
-          <Text style={styles.diaryTitle}>Nhật ký của bạn</Text>
-          <View style={styles.diaryHeaderActions}>
-            <TouchableOpacity style={styles.diaryIconButton}>
-              <Ionicons name="paper-plane-outline" size={22} color="#64748B" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.diaryIconButton} onPress={() => router.push('/habit-analysis')} accessibilityLabel="Xem phân tích thói quen">
-              <Ionicons name="bar-chart-outline" size={24} color="#64748B" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.diaryWeekPicker}>
-          <TouchableOpacity style={styles.diaryWeekCell}>
-            <Text style={styles.diaryWeekLabel}>Tuần trước</Text>
-            <Text style={styles.diaryWeekDate}>10/08 - 16/08</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.diaryWeekCell, styles.diaryWeekCellActive]}>
-            <Text style={[styles.diaryWeekLabel, styles.diaryActiveText]}>Tuần này</Text>
-            <Text style={[styles.diaryWeekDate, styles.diaryActiveText]}>17/08 - 23/08</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.diaryWeekCell, styles.diaryWeekCellDisabled]}>
-            <Text style={styles.diaryWeekLabel}>Tuần sau</Text>
-            <Text style={styles.diaryWeekDate}>24/08 - 30/08</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.diaryDayPicker}>
-          {diaryDays.map((item) => (
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Nhật ký của bạn</Text>
+          <View style={styles.headerActions}>
             <TouchableOpacity
-              key={item.date}
-              style={[styles.diaryDayCell, selectedDate === item.date && styles.diaryDayCellActive]}
-              onPress={() => setSelectedDate(item.date)}>
-              <Text style={[styles.diaryDayLabel, item.weekend && styles.diaryWeekendText, selectedDate === item.date && styles.diaryActiveText]}>{item.day}</Text>
-              <Text style={[styles.diaryDayDate, item.weekend && styles.diaryWeekendText, selectedDate === item.date && styles.diaryActiveText]}>{item.date}</Text>
+              style={styles.iconButton}
+              activeOpacity={0.7}
+              accessibilityLabel="Điều hướng hoặc chia sẻ">
+              <Ionicons name="paper-plane-outline" size={20} color="#64748B" />
             </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.diarySummary}>
-          <Text style={styles.diarySummaryTitle}>thứ tư, {selectedDay.date} tháng 8, 2026{selectedDay.date === 19 ? ' · Hôm nay' : ''}</Text>
-          <View style={styles.diarySummaryRow}>
-            <MaterialCommunityIcons name="silverware-fork-knife" size={22} color="#F59E0B" />
-            <Text style={styles.diarySummaryLabel}>Bữa ăn đã ghi</Text>
-            <View style={styles.mealDots}>
-              {[0, 1, 2, 3].map((dot) => <View key={dot} style={styles.mealDot} />)}
-            </View>
-            <Text style={styles.diarySummaryValue}>0/4</Text>
-          </View>
-          <View style={styles.diarySummaryRow}>
-            <MaterialCommunityIcons name="dumbbell" size={22} color="#49C99B" />
-            <Text style={styles.diarySummaryLabel}>Vận động</Text>
-            <View style={styles.diaryActivityLine} />
-            <Text style={styles.diarySummaryMuted}>--</Text>
+            <TouchableOpacity
+              style={styles.iconButton}
+              activeOpacity={0.7}
+              onPress={() => router.push('/habit-analysis')}
+              accessibilityLabel="Xem phân tích thói quen">
+              <Ionicons name="bar-chart-outline" size={22} color="#64748B" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.diaryEventsHeader}>
-          <Text style={styles.diaryEventsTitle}>Sự kiện trong ngày</Text>
-          <TouchableOpacity onPress={() => setDisplayModeVisible(true)} style={styles.diaryFilterButton}>
-            <Text style={styles.diaryFilterText}>{displayMode}</Text>
-            <Ionicons name="chevron-down" size={18} color="#F59E0B" />
+        {/* Week Selector */}
+        <View style={styles.weekPicker}>
+          <TouchableOpacity
+            style={[styles.weekCell, selectedWeek === 'prev' && styles.weekCellActive]}
+            activeOpacity={0.7}
+            onPress={() => setSelectedWeek('prev')}>
+            <Text style={[styles.weekLabel, selectedWeek === 'prev' && styles.activeText]}>
+              Tuần trước
+            </Text>
+            <Text style={[styles.weekDate, selectedWeek === 'prev' && styles.activeText]}>
+              10/08 - 16/08
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.weekCell, selectedWeek === 'current' && styles.weekCellActive]}
+            activeOpacity={0.7}
+            onPress={() => setSelectedWeek('current')}>
+            <Text style={[styles.weekLabel, selectedWeek === 'current' && styles.activeText]}>
+              Tuần này
+            </Text>
+            <Text style={[styles.weekDate, selectedWeek === 'current' && styles.activeText]}>
+              17/08 - 23/08
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.weekCell, selectedWeek === 'next' && styles.weekCellActive, selectedWeek !== 'next' && styles.weekCellDisabled]}
+            activeOpacity={0.7}
+            onPress={() => setSelectedWeek('next')}>
+            <Text style={[styles.weekLabel, selectedWeek === 'next' && styles.activeText]}>
+              Tuần sau
+            </Text>
+            <Text style={[styles.weekDate, selectedWeek === 'next' && styles.activeText]}>
+              24/08 - 30/08
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.diaryEmptyState}>
-          <View style={styles.diaryEmptyIcon}>
+        {/* Day Picker */}
+        <View style={styles.dayPicker}>
+          {diaryDays.map((item) => {
+            const isSelected = selectedDate === item.date;
+            return (
+              <TouchableOpacity
+                key={item.date}
+                style={[styles.dayCell, isSelected && styles.dayCellActive]}
+                activeOpacity={0.7}
+                onPress={() => setSelectedDate(item.date)}>
+                <Text
+                  style={[
+                    styles.dayLabel,
+                    item.weekend && styles.weekendText,
+                    isSelected && styles.activeText,
+                  ]}>
+                  {item.day}
+                </Text>
+                <Text
+                  style={[
+                    styles.dayDate,
+                    item.weekend && styles.weekendText,
+                    isSelected && styles.activeText,
+                  ]}>
+                  {item.date}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Selected Day Summary */}
+        <View style={styles.summarySection}>
+          <Text style={styles.summaryTitle}>
+            {getDayName(selectedDay.day)}, {selectedDay.date} tháng 8, 2026
+            {selectedDay.date === 19 ? ' · Hôm nay' : ''}
+          </Text>
+
+          <View style={styles.summaryRow}>
+            <MaterialCommunityIcons
+              name="silverware-fork-knife"
+              size={20}
+              color="#F59E0B"
+            />
+            <Text style={styles.summaryLabel}>Bữa ăn đã ghi</Text>
+            <View style={styles.mealDots}>
+              {[0, 1, 2, 3].map((dot) => (
+                <View key={dot} style={styles.mealDot} />
+              ))}
+            </View>
+            <Text style={styles.summaryValue}>0/4</Text>
+          </View>
+
+          <View style={styles.summaryRow}>
+            <MaterialCommunityIcons name="dumbbell" size={20} color="#49C99B" />
+            <Text style={styles.summaryLabel}>Vận động</Text>
+            <View style={styles.activityLine} />
+            <Text style={styles.summaryMuted}>--</Text>
+          </View>
+        </View>
+
+        {/* Events in Day */}
+        <View style={styles.eventsHeader}>
+          <Text style={styles.eventsTitle}>Sự kiện trong ngày</Text>
+          <TouchableOpacity
+            onPress={() => setDisplayModeVisible(true)}
+            style={styles.filterButton}
+            activeOpacity={0.7}>
+            <Text style={styles.filterText}>{displayMode}</Text>
+            <Ionicons name="caret-down" size={14} color="#F59E0B" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Empty State */}
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIconContainer}>
             <Ionicons name="document-text-outline" size={38} color="#64748B" />
           </View>
-          <Text style={styles.diaryEmptyTitle}>Chưa có dữ liệu hôm nay</Text>
-          <Text style={styles.diaryEmptyText}>Nhấn nút &quot;+&quot; ở thanh dưới để ghi lại bữa ăn và hoạt động.</Text>
+          <Text style={styles.emptyTitle}>Chưa có dữ liệu hôm nay</Text>
+          <Text style={styles.emptySubtitle}>
+            Nhấn nút &quot;+&quot; ở thanh dưới để ghi lại bữa ăn và hoạt động.
+          </Text>
         </View>
       </ScrollView>
 
-      <Modal visible={displayModeVisible} transparent animationType="fade" onRequestClose={() => setDisplayModeVisible(false)}>
-        <View style={styles.displayModalBackdrop}>
-          <View style={styles.displaySheet}>
-            <Text style={styles.displaySheetTitle}>Chế độ hiển thị</Text>
+      {/* Filter Modal */}
+      <Modal
+        visible={displayModeVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDisplayModeVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Chế độ hiển thị</Text>
             {displayModes.map((mode) => (
               <TouchableOpacity
                 key={mode}
-                style={[styles.displayOption, displayMode === mode && styles.displayOptionActive]}
-                onPress={() => { setDisplayMode(mode); setDisplayModeVisible(false); }}>
-                <Text style={[styles.displayOptionText, displayMode === mode && styles.displayOptionTextActive]}>{mode}</Text>
+                style={[
+                  styles.modalOption,
+                  displayMode === mode && styles.modalOptionActive,
+                ]}
+                onPress={() => {
+                  setDisplayMode(mode);
+                  setDisplayModeVisible(false);
+                }}>
+                <Text
+                  style={[
+                    styles.modalOptionText,
+                    displayMode === mode && styles.modalOptionTextActive,
+                  ]}>
+                  {mode}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
-          <TouchableOpacity style={styles.displayCancel} onPress={() => setDisplayModeVisible(false)}>
-            <Text style={styles.displayCancelText}>Hủy</Text>
+          <TouchableOpacity
+            style={styles.modalCancelButton}
+            onPress={() => setDisplayModeVisible(false)}>
+            <Text style={styles.modalCancelText}>Hủy</Text>
           </TouchableOpacity>
         </View>
       </Modal>
     </SafeAreaView>
   );
-
-  return renderDiaryScreen();
-
 }
 
 const styles = StyleSheet.create({
-  diarySafeArea: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  diaryContainer: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  diaryContent: {
-    paddingHorizontal: 32,
-    paddingBottom: 36,
-  },
-  diaryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 16,
-    paddingBottom: 18,
-  },
-  diaryTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#10294B',
-  },
-  diaryHeaderActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  diaryIconButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#F5F6F8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  diaryWeekPicker: {
-    flexDirection: 'row',
-    backgroundColor: '#F5F5F9',
-    borderRadius: 18,
-    padding: 4,
-    marginBottom: 16,
-  },
-  diaryWeekCell: {
-    flex: 1,
-    minHeight: 86,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    paddingHorizontal: 2,
-  },
-  diaryWeekCellActive: {
-    backgroundColor: '#49C99B',
-  },
-  diaryWeekCellDisabled: {
-    opacity: 0.45,
-  },
-  diaryWeekLabel: {
-    fontSize: 15,
-    color: '#64748B',
-    marginBottom: 7,
-  },
-  diaryWeekDate: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#10294B',
-  },
-  diaryActiveText: {
-    color: '#FFFFFF',
-  },
-  diaryDayPicker: {
-    flexDirection: 'row',
-    backgroundColor: '#F5F5F9',
-    borderRadius: 18,
-    padding: 4,
-    marginBottom: 28,
-  },
-  diaryDayCell: {
-    flex: 1,
-    minHeight: 92,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-  },
-  diaryDayCellActive: {
-    backgroundColor: '#49C99B',
-  },
-  diaryDayLabel: {
-    fontSize: 14,
-    color: '#64748B',
-    marginBottom: 7,
-  },
-  diaryDayDate: {
-    fontSize: 25,
-    fontWeight: '800',
-    color: '#10294B',
-  },
-  diaryWeekendText: {
-    color: '#F3B8B8',
-  },
-  diarySummary: {
-    borderTopWidth: 1,
-    borderTopColor: '#F0F1F3',
-    paddingTop: 36,
-    paddingBottom: 48,
-  },
-  diarySummaryTitle: {
-    fontSize: 23,
-    fontWeight: '800',
-    color: '#10294B',
-    marginBottom: 34,
-  },
-  diarySummaryRow: {
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
-  },
-  diarySummaryLabel: {
-    fontSize: 18,
-    color: '#64748B',
-  },
-  mealDots: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 8,
-    marginLeft: 12,
-  },
-  mealDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    backgroundColor: '#F1F2F5',
-  },
-  diarySummaryValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#10294B',
-  },
-  diaryActivityLine: {
-    flex: 1,
-    height: 10,
-    borderRadius: 6,
-    backgroundColor: '#F1F2F5',
-    marginLeft: 20,
-  },
-  diarySummaryMuted: {
-    fontSize: 18,
-    color: '#CBD0D6',
-  },
-  diaryEventsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 58,
-  },
-  diaryEventsTitle: {
-    fontSize: 27,
-    fontWeight: '800',
-    color: '#10294B',
-  },
-  diaryFilterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  diaryFilterText: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#F59E0B',
-  },
-  diaryEmptyState: {
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
-  diaryEmptyIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#F5F6F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 30,
-  },
-  diaryEmptyTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#10294B',
-    marginBottom: 22,
-  },
-  diaryEmptyText: {
-    fontSize: 19,
-    lineHeight: 29,
-    textAlign: 'center',
-    color: '#64748B',
-  },
-  displayModalBackdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.38)',
-    padding: 16,
-  },
-  displaySheet: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    overflow: 'hidden',
-  },
-  displaySheetTitle: {
-    fontSize: 25,
-    fontWeight: '800',
-    color: '#10294B',
-    textAlign: 'center',
-    paddingVertical: 28,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  displayOption: {
-    minHeight: 74,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  displayOptionActive: {
-    backgroundColor: '#E5F7F0',
-  },
-  displayOptionText: {
-    fontSize: 23,
-    color: '#10294B',
-  },
-  displayOptionTextActive: {
-    color: '#49C99B',
-  },
-  displayCancel: {
-    height: 108,
-    marginTop: 16,
-    borderRadius: 24,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  displayCancelText: {
-    fontSize: 23,
-    color: '#10294B',
-  },
   safeArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -391,7 +248,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   content: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    paddingTop: 10,
     paddingBottom: 40,
   },
   header: {
@@ -399,571 +257,244 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
-    marginBottom: 16,
+    marginBottom: 8,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
+  title: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#10294B',
+    letterSpacing: -0.5,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F5F6F8',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  headerDate: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  spacer: {
-    width: 40,
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  segmentedControl: {
-    flexDirection: 'row',
-    backgroundColor: '#F1F1F3',
-    borderRadius: 24,
-    padding: 4,
-  },
-  segmentedControlSmall: {
-    flexDirection: 'row',
-    backgroundColor: '#F1F1F3',
-    borderRadius: 24,
-    padding: 4,
-  },
-  tab: {
-    minWidth: 72,
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 20,
-  },
-  tabActive: {
-    backgroundColor: '#D1FAE5',
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  tabTextActive: {
-    color: '#10B981',
-  },
-  calendarScroll: {
-    marginBottom: 20,
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
-  },
-  calendarRow: {
-    flexDirection: 'row',
-    gap: 8,
   },
   weekPicker: {
     flexDirection: 'row',
-    backgroundColor: '#F5F5F9',
-    borderRadius: 18,
+    backgroundColor: '#F5F6F9',
+    borderRadius: 16,
     padding: 4,
-    marginBottom: 20,
+    marginBottom: 12,
   },
-  weekItem: {
+  weekCell: {
     flex: 1,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 92,
-    paddingHorizontal: 4,
-    borderRadius: 16,
+    borderRadius: 13,
   },
-  weekItemSelected: {
+  weekCellActive: {
     backgroundColor: '#49C99B',
+  },
+  weekCellDisabled: {
+    opacity: 0.55,
   },
   weekLabel: {
     fontSize: 13,
     color: '#64748B',
-    marginBottom: 6,
+    marginBottom: 4,
+    fontWeight: '500',
   },
-  weekRange: {
+  weekDate: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontWeight: '700',
+    color: '#10294B',
   },
-  weekTextSelected: {
+  activeText: {
     color: '#FFFFFF',
   },
-  calendarItem: {
-    width: 56,
-    alignItems: 'center',
+  dayPicker: {
+    flexDirection: 'row',
+    backgroundColor: '#F5F6F9',
+    borderRadius: 16,
+    padding: 4,
+    marginBottom: 26,
+  },
+  dayCell: {
+    flex: 1,
     paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
   },
-  calendarItemToday: {
-    backgroundColor: '#10B981',
+  dayCellActive: {
+    backgroundColor: '#49C99B',
   },
-  calendarItemSelected: {
-    backgroundColor: '#D1FAE5',
-  },
-  calendarLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
+  dayLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
     marginBottom: 4,
   },
-  calendarLabelWeekend: {
-    color: '#EF4444',
-  },
-  calendarDate: {
+  dayDate: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#10294B',
   },
-  calendarDateToday: {
-    color: '#FFFFFF',
+  weekendText: {
+    color: '#F87171',
   },
-  calendarDateWeekend: {
-    color: '#EF4444',
+  summarySection: {
+    borderTopWidth: 1,
+    borderTopColor: '#F0F1F3',
+    paddingTop: 24,
+    paddingBottom: 28,
   },
-  nutritionSection: {
+  summaryTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#10294B',
     marginBottom: 20,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 12,
-  },
-  weekAverage: {
-    fontSize: 13,
-    color: '#A1A1AA',
-    marginTop: -4,
-    marginBottom: 14,
-  },
-  calorieCard: {
+  summaryRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     marginBottom: 16,
   },
-  calorieValue: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#EF4444',
-  },
-  calorieLabel: {
+  summaryLabel: {
     fontSize: 16,
-    color: '#94A3B8',
-    marginLeft: 4,
+    color: '#64748B',
+    marginLeft: 10,
+    fontWeight: '500',
   },
-  macrosRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  macroItem: {
+  mealDots: {
     flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    marginLeft: 14,
   },
-  macroLabel: {
-    fontSize: 13,
+  mealDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 4,
+    backgroundColor: '#F1F2F5',
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#10294B',
+    marginLeft: 10,
+  },
+  activityLine: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#F1F2F5',
+    marginLeft: 18,
+    marginRight: 10,
+  },
+  summaryMuted: {
+    fontSize: 16,
+    color: '#CBD0D6',
     fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 6,
   },
-  macroBar: {
-    height: 4,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 2,
-    marginBottom: 6,
-  },
-  macroBarEmpty: {
-    height: '100%',
-    backgroundColor: '#E2E8F0',
-    borderRadius: 2,
-  },
-  macroValue: {
-    fontSize: 12,
-    color: '#EF4444',
-    fontWeight: '700',
-  },
-  scoreSection: {
-    marginBottom: 20,
-  },
-  scoreHeader: {
+  eventsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 36,
   },
-  infoIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 10,
-  },
-  scoreValue: {
-    fontSize: 32,
+  eventsTitle: {
+    fontSize: 20,
     fontWeight: '800',
-    color: '#EF4444',
+    color: '#10294B',
   },
-  scoreMax: {
-    fontSize: 16,
-    color: '#94A3B8',
-    marginLeft: 4,
-  },
-  scoreBadge: {
-    marginLeft: 'auto',
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#EF4444',
-  },
-  scoreBar: {
+  filterButton: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
-  scoreBarFill: {
-    flex: 1,
-    height: 8,
-    backgroundColor: '#EF4444',
-    borderRadius: 2,
-  },
-  scoreBarEmpty: {
-    flex: 1,
-    height: 8,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 2,
-  },
-  diversitySection: {
-    marginBottom: 20,
-  },
-  diversityHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  diversityRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 10,
-  },
-  diversityValue: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  diversityMax: {
-    fontSize: 16,
-    color: '#94A3B8',
-    marginLeft: 4,
-  },
-  diversityBadge: {
-    marginLeft: 'auto',
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#EF4444',
-  },
-  mealPlanSection: {
-    marginBottom: 20,
-  },
-  mealPlanHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  exploreBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#10B981',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    gap: 6,
-  },
-  exploreBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  mealGroup: {
-    marginBottom: 16,
-  },
-  mealGroupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  mealGroupTitle: {
+  filterText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#F59E0B',
   },
-  addBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
+  emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
   },
-  emptyMealState: {
-    alignItems: 'center',
-    paddingVertical: 28,
-  },
-  emptyMealIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#F1F5F9',
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F5F6F9',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-    position: 'relative',
-  },
-  emptyMealHeart: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: '#10B981',
-    borderRadius: 12,
-    padding: 4,
-  },
-  emptyMealTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  emptyMealText: {
-    fontSize: 13,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  /* Activity Styles */
-  activityHeaderSection: {
-    marginBottom: 20,
-  },
-  activityTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  activityIcons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  iconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activityLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  activityLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  accelerateBtn: {
-    backgroundColor: '#FED7AA',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  accelerateBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#D97706',
-  },
-  activityValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 10,
-  },
-  activityValue: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  activityUnit: {
-    fontSize: 14,
-    color: '#94A3B8',
-    marginLeft: 4,
-  },
-  activityProgressBar: {
-    height: 8,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 4,
-    marginBottom: 8,
-    overflow: 'hidden',
-  },
-  activityProgressFill: {
-    height: '100%',
-    width: '0%',
-    backgroundColor: '#10B981',
-    borderRadius: 4,
-  },
-  activityRemainText: {
-    fontSize: 13,
-    color: '#64748B',
-  },
-  activityTargetDays: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 22,
-    marginBottom: 10,
-  },
-  activityTargetDay: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 8,
-  },
-  activityTargetBar: {
-    width: '100%',
-    height: 8,
-    borderWidth: 2,
-    borderColor: '#E2E5E8',
-    borderRadius: 5,
-  },
-  activityTargetBarDone: {
-    borderColor: '#D6DCE1',
-    backgroundColor: '#FFFFFF',
-  },
-  activityTargetLabel: {
-    fontSize: 12,
-    color: '#A1A1AA',
-  },
-  activityTargetHint: {
-    fontSize: 13,
-    color: '#A1A1AA',
-    marginBottom: 16,
-  },
-  activityStatsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 20,
-  },
-  activityStatCard: {
-    width: '48%',
-    minHeight: 108,
-    borderRadius: 18,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  activityStatCardWide: {
-    width: '100%',
-    minHeight: 92,
-    borderRadius: 18,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  activityStatIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  activityStatTextWrap: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
-  activityStatLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 6,
-    textAlign: 'left',
-  },
-  activityStatValue: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#0F172A',
-    textAlign: 'left',
-  },
-  activityInDaySection: {
-    marginBottom: 20,
-  },
-  activityInDayHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  activityActionBtns: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  emptyActivityState: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  emptyActivityIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  emptyActivityTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  emptyActivityText: {
-    fontSize: 13,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 18,
     marginBottom: 18,
   },
-  addActivityBtn: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#10294B',
+    marginBottom: 10,
   },
-  addActivityBtnText: {
-    fontSize: 14,
+  emptySubtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    color: '#64748B',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    padding: 16,
+  },
+  modalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#10294B',
+    textAlign: 'center',
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  modalOption: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalOptionActive: {
+    backgroundColor: '#E6FAF2',
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: '#10294B',
+    fontWeight: '500',
+  },
+  modalOptionTextActive: {
+    color: '#49C99B',
     fontWeight: '700',
-    color: '#FFFFFF',
+  },
+  modalCancelButton: {
+    marginTop: 12,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#10294B',
   },
 });
-
