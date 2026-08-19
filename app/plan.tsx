@@ -59,6 +59,28 @@ function MealPlan({ viewMode }: { viewMode: ViewMode }) {
     <View style={styles.macrosRow}>{[['Đường bột', '213g'], ['Chất đạm', '74g'], ['Chất béo', '38g']].map(([label, target]) => <View key={label} style={styles.macro}><Text style={styles.macroLabel}>{label}</Text><View style={styles.progressTrack} /><Text style={styles.macroValue}>0g / {target}</Text></View>)}</View>
     <Metric title="Điểm dinh dưỡng" value="1" suffix="/10" status="Thấp" filled /><Metric title="Độ đa dạng thực phẩm" value="0" suffix="/10" status="Thấp" />
     <View style={styles.planHeader}><Text style={styles.sectionTitle}>Thực đơn của bạn</Text><TouchableOpacity style={styles.exploreButton}><MaterialCommunityIcons name="chef-hat" size={18} color="#FFFFFF" /><Text style={styles.exploreText}>Khám phá thực đơn mẫu</Text></TouchableOpacity></View>
+    <View style={styles.mealGroups}>
+      {['Bữa sáng', 'Bữa trưa', 'Bữa tối', 'Đồ ăn thêm trong ngày'].map((meal) => (
+        <View key={meal} style={styles.mealGroup}>
+          <View style={styles.mealGroupHeader}>
+            <Text style={styles.mealGroupTitle}>{meal}</Text>
+            <TouchableOpacity style={styles.mealAddButton}>
+              <Ionicons name="add" size={22} color="#64748B" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.mealEmpty}>
+            <View style={styles.mealEmptyIcon}>
+              <MaterialCommunityIcons name="silverware-fork-knife" size={34} color="#CBD5E1" />
+              <View style={styles.mealHeart}><MaterialCommunityIcons name="heart" size={15} color="#FCD34D" /></View>
+            </View>
+            <View style={styles.mealEmptyCopy}>
+              <Text style={styles.mealEmptyTitle}>Chưa có món ăn</Text>
+              <Text style={styles.mealEmptyText}>Thêm món để đạt mục tiêu dinh dưỡng</Text>
+            </View>
+          </View>
+        </View>
+      ))}
+    </View>
   </View>;
 }
 
@@ -73,6 +95,21 @@ function ActivityPlan({ viewMode }: { viewMode: ViewMode }) {
     <View style={styles.calorieRow}><Text style={styles.activityValue}>0</Text><Text style={styles.calorieUnit}>/ 150 phút</Text></View><View style={styles.activityTrack} /><Text style={styles.remain}>Còn 150 phút · 5 ngày còn lại trong tuần</Text>
     {viewMode === 'week' && <View style={styles.targetDays}>{['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((day) => <View key={day} style={styles.targetDay}><View style={styles.targetBar} /><Text style={styles.targetLabel}>{day}</Text></View>)}</View>}
     <View style={styles.statsGrid}><Stat icon="list-outline" color="#10B981" bg="#E8FBF4" label="Hoạt động" value="0" /><Stat icon="time-outline" color="#EF6C6C" bg="#FFF1F1" label={viewMode === 'week' ? 'Phút dự kiến' : 'Dự kiến'} value={viewMode === 'week' ? '0' : '0 phút'} /><Stat icon="flame-outline" color="#F59E0B" bg="#FFF7E9" label="Kcal dự kiến" value="0" /><Stat icon={viewMode === 'week' ? 'dumbbell' : 'water'} color="#3B82F6" bg="#EEF4FF" label={viewMode === 'week' ? 'Buổi kháng lực' : 'Nước (ml)'} value={viewMode === 'week' ? '0/2' : '0'} /></View>
+    <View style={styles.activityDaySection}>
+      <View style={styles.activityDayHeader}>
+        <Text style={styles.sectionTitle}>Hoạt động trong ngày</Text>
+        <View style={styles.actionIcons}>
+          <TouchableOpacity style={styles.iconButton}><Ionicons name="swap-horizontal-outline" size={21} color="#64748B" /></TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton}><Ionicons name="add" size={22} color="#64748B" /></TouchableOpacity>
+        </View>
+      </View>
+      <View style={styles.activityEmpty}>
+        <View style={styles.activityEmptyIcon}><MaterialCommunityIcons name="heart-outline" size={46} color="#CBD5E1" /></View>
+        <Text style={styles.activityEmptyTitle}>Chưa có hoạt động nào</Text>
+        <Text style={styles.activityEmptyText}>Chưa có hoạt động nào được lên kế hoạch. Hãy thêm hoạt động hoặc tạo thói quen mới.</Text>
+        <TouchableOpacity style={styles.addActivityButton}><Text style={styles.addActivityText}>Thêm hoạt động</Text></TouchableOpacity>
+      </View>
+    </View>
   </View>;
 }
 
@@ -89,5 +126,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }, sectionTitle: { fontSize: 23, fontWeight: '800', color: '#10294B' }, actionIcons: { flexDirection: 'row', gap: 8 }, iconButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F5F6F8', alignItems: 'center', justifyContent: 'center' },
   calorieRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 12 }, calorie: { fontSize: 44, fontWeight: '800', color: '#EF5555' }, calorieUnit: { marginLeft: 5, fontSize: 19, color: '#A1A8B2' }, average: { fontSize: 14, color: '#A1A8B2', marginBottom: 16 }, macrosRow: { flexDirection: 'row', gap: 14, marginBottom: 26 }, macro: { flex: 1 }, macroLabel: { fontSize: 15, color: '#10294B', marginBottom: 8 }, progressTrack: { height: 7, borderRadius: 4, backgroundColor: '#E2E5E8', marginBottom: 7 }, macroValue: { fontSize: 13, color: '#EF5555' },
   metric: { marginBottom: 26 }, metricTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }, metricTitle: { fontSize: 19, color: '#475569' }, metricValueRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 9 }, metricValue: { fontSize: 33, fontWeight: '800', color: '#EF5555' }, metricSuffix: { fontSize: 17, color: '#A1A8B2', marginLeft: 3 }, metricStatus: { marginLeft: 'auto', fontSize: 17, fontWeight: '700', color: '#EF5555' }, scoreTrack: { flexDirection: 'row', gap: 4 }, scoreSegment: { flex: 1, height: 8, backgroundColor: '#E0E4E8', borderRadius: 3 }, scoreFilled: { backgroundColor: '#EF5555' }, planHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }, exploreButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#49C99B', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 11 }, exploreText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  mealGroups: { marginTop: 24 }, mealGroup: { marginBottom: 22 }, mealGroupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }, mealGroupTitle: { fontSize: 18, fontWeight: '700', color: '#10294B' }, mealAddButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }, mealEmpty: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4 }, mealEmptyIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: '#F5F6F8', alignItems: 'center', justifyContent: 'center', position: 'relative', marginRight: 14 }, mealHeart: { position: 'absolute', right: -2, bottom: 0, width: 23, height: 23, borderRadius: 12, backgroundColor: '#49C99B', alignItems: 'center', justifyContent: 'center' }, mealEmptyCopy: { flex: 1 }, mealEmptyTitle: { fontSize: 16, fontWeight: '700', color: '#10294B', marginBottom: 4 }, mealEmptyText: { fontSize: 13, color: '#64748B' },
   activityLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }, activityLabel: { fontSize: 15, fontWeight: '700', color: '#10294B' }, boost: { backgroundColor: '#FFF0ED', color: '#EF6C5B', fontSize: 15, fontWeight: '700', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18 }, activityValue: { fontSize: 52, fontWeight: '800', color: '#10294B' }, activityTrack: { height: 9, backgroundColor: '#E2E5E8', borderRadius: 6, marginBottom: 12 }, remain: { fontSize: 15, color: '#A1A8B2', marginBottom: 20 }, targetDays: { flexDirection: 'row', gap: 8, marginBottom: 24 }, targetDay: { flex: 1, alignItems: 'center', gap: 8 }, targetBar: { width: '100%', height: 8, borderWidth: 2, borderColor: '#E2E5E8', borderRadius: 4 }, targetLabel: { fontSize: 12, color: '#A1A8B2' }, statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 }, stat: { width: '48%', minHeight: 112, borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 }, statIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }, statLabel: { fontSize: 15, color: '#10294B', marginBottom: 5 }, statValue: { fontSize: 25, fontWeight: '800', color: '#10294B' },
+  activityDaySection: { marginTop: 30, paddingTop: 24, borderTopWidth: 1, borderTopColor: '#EEF0F2' }, activityDayHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }, activityEmpty: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 20 }, activityEmptyIcon: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#F5F6F8', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }, activityEmptyTitle: { fontSize: 19, fontWeight: '800', color: '#10294B', marginBottom: 8 }, activityEmptyText: { fontSize: 14, lineHeight: 21, color: '#64748B', textAlign: 'center', marginBottom: 20 }, addActivityButton: { backgroundColor: '#49C99B', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 22 }, addActivityText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });
