@@ -1,7 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Section = 'meals' | 'activities';
@@ -21,6 +21,7 @@ export default function PlanScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [selectedDate, setSelectedDate] = useState(19);
   const [selectedWeek, setSelectedWeek] = useState(1);
+  const [mealSheetVisible, setMealSheetVisible] = useState(false);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -45,15 +46,41 @@ export default function PlanScreen() {
 
         {viewMode === 'day' ? <View style={styles.dayPicker}>{days.map((day) => <TouchableOpacity key={day.date} style={[styles.dayItem, selectedDate === day.date && styles.dayItemActive]} onPress={() => setSelectedDate(day.date)}><Text style={[styles.dayLabel, day.weekend && styles.weekend, selectedDate === day.date && styles.activeText]}>{day.label}</Text><Text style={[styles.dayDate, day.weekend && styles.weekend, selectedDate === day.date && styles.activeText]}>{day.date}</Text></TouchableOpacity>)}</View> : <View style={styles.weekPicker}>{weeks.map((week, index) => <TouchableOpacity key={week.label} style={[styles.weekItem, selectedWeek === index && styles.weekItemActive]} onPress={() => setSelectedWeek(index)}><Text style={[styles.weekLabel, selectedWeek === index && styles.activeText]}>{week.label}</Text><Text style={[styles.weekRange, selectedWeek === index && styles.activeText]}>{week.range}</Text></TouchableOpacity>)}</View>}
 
-        {section === 'meals' ? <MealPlan viewMode={viewMode} /> : <ActivityPlan viewMode={viewMode} />}
+        {section === 'meals' ? <MealPlan viewMode={viewMode} onAddMeal={() => setMealSheetVisible(true)} /> : <ActivityPlan viewMode={viewMode} onAddActivity={() => router.push('/activity')} />}
       </ScrollView>
+
+      <MealOptionsSheet visible={mealSheetVisible} onClose={() => setMealSheetVisible(false)} />
     </SafeAreaView>
   );
 }
 
-function MealPlan({ viewMode }: { viewMode: ViewMode }) {
+function MealOptionsSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <View style={styles.sheetBackdrop}>
+      <TouchableOpacity style={styles.sheetDismissArea} onPress={onClose} activeOpacity={1} />
+      <View style={styles.mealSheet}>
+        <TouchableOpacity style={styles.mealSheetOption} onPress={onClose}>
+          <MaterialCommunityIcons name="chef-hat" size={28} color="#49C99B" />
+          <Text style={[styles.mealSheetText, { color: '#49C99B' }]}>Thêm công thức</Text>
+        </TouchableOpacity>
+        <View style={styles.mealSheetDivider} />
+        <TouchableOpacity style={styles.mealSheetOption} onPress={onClose}>
+          <MaterialCommunityIcons name="food-apple-outline" size={29} color="#F59E0B" />
+          <Text style={[styles.mealSheetText, { color: '#F59E0B' }]}>Thêm nguyên liệu</Text>
+        </TouchableOpacity>
+      </View>
+      <TouchableOpacity style={styles.sheetCancel} onPress={onClose}>
+        <Text style={styles.sheetCancelText}>Huỷ</Text>
+      </TouchableOpacity>
+    </View>
+  </Modal>;
+}
+
+function MealPlan({ viewMode, onAddMeal }: { viewMode: ViewMode; onAddMeal: () => void }) {
+  const router = useRouter();
+
   return <View>
-    <View style={styles.titleRow}><Text style={styles.sectionTitle}>Thông tin dinh dưỡng</Text><View style={styles.actionIcons}><View style={styles.iconButton}><Ionicons name="bar-chart-outline" size={21} color="#64748B" /></View><View style={styles.iconButton}><Ionicons name="document-text" size={20} color="#64748B" /></View></View></View>
+    <View style={styles.titleRow}><Text style={styles.sectionTitle}>Thông tin dinh dưỡng</Text><View style={styles.actionIcons}><TouchableOpacity style={styles.iconButton} onPress={() => router.push('/nutrition')} accessibilityLabel="Xem biểu đồ dinh dưỡng"><Ionicons name="bar-chart-outline" size={21} color="#64748B" /></TouchableOpacity><TouchableOpacity style={styles.iconButton} onPress={() => router.push('/ingredients')} accessibilityLabel="Thêm nguyên liệu"><Ionicons name="document-text" size={20} color="#64748B" /></TouchableOpacity></View></View>
     <View style={styles.calorieRow}><Text style={styles.calorie}>0</Text><Text style={styles.calorieUnit}>/ 1492 kcal</Text></View>
     {viewMode === 'week' && <Text style={styles.average}>Trung bình dựa trên 0/7 ngày có dữ liệu</Text>}
     <View style={styles.macrosRow}>{[['Đường bột', '213g'], ['Chất đạm', '74g'], ['Chất béo', '38g']].map(([label, target]) => <View key={label} style={styles.macro}><Text style={styles.macroLabel}>{label}</Text><View style={styles.progressTrack} /><Text style={styles.macroValue}>0g / {target}</Text></View>)}</View>
@@ -64,7 +91,7 @@ function MealPlan({ viewMode }: { viewMode: ViewMode }) {
         <View key={meal} style={styles.mealGroup}>
           <View style={styles.mealGroupHeader}>
             <Text style={styles.mealGroupTitle}>{meal}</Text>
-            <TouchableOpacity style={styles.mealAddButton}>
+            <TouchableOpacity style={styles.mealAddButton} onPress={onAddMeal}>
               <Ionicons name="add" size={22} color="#64748B" />
             </TouchableOpacity>
           </View>
@@ -88,9 +115,11 @@ function Metric({ title, value, suffix, status, filled = false }: { title: strin
   return <View style={styles.metric}><View style={styles.metricTitleRow}><Text style={styles.metricTitle}>{title}</Text><Ionicons name="information-circle" size={21} color="#475569" /></View><View style={styles.metricValueRow}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricSuffix}>{suffix}</Text><Text style={styles.metricStatus}>{status}</Text></View><View style={styles.scoreTrack}>{Array.from({ length: 10 }).map((_, index) => <View key={index} style={[styles.scoreSegment, filled && index === 0 && styles.scoreFilled]} />)}</View></View>;
 }
 
-function ActivityPlan({ viewMode }: { viewMode: ViewMode }) {
+function ActivityPlan({ viewMode, onAddActivity }: { viewMode: ViewMode; onAddActivity: () => void }) {
+  const router = useRouter();
+
   return <View>
-    <View style={styles.titleRow}><Text style={styles.sectionTitle}>{viewMode === 'week' ? 'Kế hoạch tuần này' : 'Kế hoạch hoạt động'}</Text><View style={styles.actionIcons}><View style={styles.iconButton}><Ionicons name="bar-chart-outline" size={21} color="#64748B" /></View><View style={styles.iconButton}><Ionicons name="options-outline" size={21} color="#64748B" /></View></View></View>
+    <View style={styles.titleRow}><Text style={styles.sectionTitle}>{viewMode === 'week' ? 'Kế hoạch tuần này' : 'Kế hoạch hoạt động'}</Text><View style={styles.actionIcons}><TouchableOpacity style={styles.iconButton} onPress={() => router.push('/activity-insights')} accessibilityLabel="Xem biểu đồ hoạt động"><Ionicons name="bar-chart-outline" size={21} color="#64748B" /></TouchableOpacity><TouchableOpacity style={styles.iconButton} onPress={() => router.push('/activity-goals')} accessibilityLabel="Chỉnh mục tiêu vận động"><Ionicons name="options-outline" size={21} color="#64748B" /></TouchableOpacity></View></View>
     <View style={styles.activityLabelRow}><Text style={styles.activityLabel}>phút vận động · {viewMode === 'week' ? 'tuần này' : 'hôm nay'}</Text><Text style={styles.boost}>Cần tăng tốc</Text></View>
     <View style={styles.calorieRow}><Text style={styles.activityValue}>0</Text><Text style={styles.calorieUnit}>/ 150 phút</Text></View><View style={styles.activityTrack} /><Text style={styles.remain}>Còn 150 phút · 5 ngày còn lại trong tuần</Text>
     {viewMode === 'week' && <View style={styles.targetDays}>{['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((day) => <View key={day} style={styles.targetDay}><View style={styles.targetBar} /><Text style={styles.targetLabel}>{day}</Text></View>)}</View>}
@@ -100,7 +129,7 @@ function ActivityPlan({ viewMode }: { viewMode: ViewMode }) {
         <Text style={styles.sectionTitle}>Hoạt động trong ngày</Text>
         <View style={styles.actionIcons}>
           <TouchableOpacity style={styles.iconButton}><Ionicons name="swap-horizontal-outline" size={21} color="#64748B" /></TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}><Ionicons name="add" size={22} color="#64748B" /></TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton} onPress={onAddActivity}><Ionicons name="add" size={22} color="#64748B" /></TouchableOpacity>
         </View>
       </View>
       <View style={styles.activityEmpty}>
@@ -129,4 +158,5 @@ const styles = StyleSheet.create({
   mealGroups: { marginTop: 24 }, mealGroup: { marginBottom: 22 }, mealGroupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }, mealGroupTitle: { fontSize: 18, fontWeight: '700', color: '#10294B' }, mealAddButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }, mealEmpty: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4 }, mealEmptyIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: '#F5F6F8', alignItems: 'center', justifyContent: 'center', position: 'relative', marginRight: 14 }, mealHeart: { position: 'absolute', right: -2, bottom: 0, width: 23, height: 23, borderRadius: 12, backgroundColor: '#49C99B', alignItems: 'center', justifyContent: 'center' }, mealEmptyCopy: { flex: 1 }, mealEmptyTitle: { fontSize: 16, fontWeight: '700', color: '#10294B', marginBottom: 4 }, mealEmptyText: { fontSize: 13, color: '#64748B' },
   activityLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }, activityLabel: { fontSize: 15, fontWeight: '700', color: '#10294B' }, boost: { backgroundColor: '#FFF0ED', color: '#EF6C5B', fontSize: 15, fontWeight: '700', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18 }, activityValue: { fontSize: 52, fontWeight: '800', color: '#10294B' }, activityTrack: { height: 9, backgroundColor: '#E2E5E8', borderRadius: 6, marginBottom: 12 }, remain: { fontSize: 15, color: '#A1A8B2', marginBottom: 20 }, targetDays: { flexDirection: 'row', gap: 8, marginBottom: 24 }, targetDay: { flex: 1, alignItems: 'center', gap: 8 }, targetBar: { width: '100%', height: 8, borderWidth: 2, borderColor: '#E2E5E8', borderRadius: 4 }, targetLabel: { fontSize: 12, color: '#A1A8B2' }, statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 }, stat: { width: '48%', minHeight: 112, borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 }, statIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }, statLabel: { fontSize: 15, color: '#10294B', marginBottom: 5 }, statValue: { fontSize: 25, fontWeight: '800', color: '#10294B' },
   activityDaySection: { marginTop: 30, paddingTop: 24, borderTopWidth: 1, borderTopColor: '#EEF0F2' }, activityDayHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }, activityEmpty: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 20 }, activityEmptyIcon: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#F5F6F8', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }, activityEmptyTitle: { fontSize: 19, fontWeight: '800', color: '#10294B', marginBottom: 8 }, activityEmptyText: { fontSize: 14, lineHeight: 21, color: '#64748B', textAlign: 'center', marginBottom: 20 }, addActivityButton: { backgroundColor: '#49C99B', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 22 }, addActivityText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.42)', justifyContent: 'flex-end', padding: 16 }, sheetDismissArea: { flex: 1 }, mealSheet: { backgroundColor: '#FFFFFF', borderRadius: 22, overflow: 'hidden' }, mealSheetOption: { minHeight: 88, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 18 }, mealSheetDivider: { height: 1, backgroundColor: '#EEF0F2' }, mealSheetText: { fontSize: 22, fontWeight: '700' }, sheetCancel: { height: 86, marginTop: 16, borderRadius: 22, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }, sheetCancelText: { fontSize: 22, color: '#EF5555', fontWeight: '600' },
 });

@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Modal,
@@ -12,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function DiaryScreen() {
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(19);
   const [displayMode, setDisplayMode] = useState('Tất cả');
   const [displayModeVisible, setDisplayModeVisible] = useState(false);
@@ -40,7 +42,7 @@ export default function DiaryScreen() {
             <TouchableOpacity style={styles.diaryIconButton}>
               <Ionicons name="paper-plane-outline" size={22} color="#64748B" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.diaryIconButton}>
+            <TouchableOpacity style={styles.diaryIconButton} onPress={() => router.push('/habit-analysis')} accessibilityLabel="Xem phân tích thói quen">
               <Ionicons name="bar-chart-outline" size={24} color="#64748B" />
             </TouchableOpacity>
           </View>
