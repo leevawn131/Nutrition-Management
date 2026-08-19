@@ -3,14 +3,14 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -351,7 +351,7 @@ export default function HomeScreen() {
         <View style={styles.planSection}>
           <View style={styles.planHeader}>
             <Text style={styles.planTitle}>Kế hoạch hôm nay</Text>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/(tabs)/diary')}>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/plan')}>
               <Text style={styles.planLink}>Chi tiết</Text>
             </TouchableOpacity>
           </View>
@@ -366,7 +366,7 @@ export default function HomeScreen() {
               Lên kế hoạch bữa ăn và hoạt động để bắt đầu ngày mới.
             </Text>
 
-            <TouchableOpacity style={styles.planButton} activeOpacity={0.85} onPress={() => router.push('/(tabs)/diary')}>
+            <TouchableOpacity style={styles.planButton} activeOpacity={0.85} onPress={() => router.push('/plan')}>
               <Text style={styles.planButtonText}>Lên kế hoạch</Text>
               <Ionicons name="chevron-forward" size={18} color="#10B981" />
             </TouchableOpacity>

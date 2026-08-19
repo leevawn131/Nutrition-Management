@@ -1,5 +1,4 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Modal,
@@ -13,46 +12,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function DiaryScreen() {
-  const router = useRouter();
-  const [activeSection, setActiveSection] = useState<'meals' | 'activities'>('meals');
-  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
   const [selectedDate, setSelectedDate] = useState(19);
-  const [selectedWeek, setSelectedWeek] = useState(0);
   const [displayMode, setDisplayMode] = useState('Tất cả');
   const [displayModeVisible, setDisplayModeVisible] = useState(false);
-
-  const today = new Date();
-  const weekHeaderDates = [
-    'tuần trước (10/08/2026 - 16/08/2026)',
-    'tuần này (17/08/2026 - 23/08/2026)',
-    'tuần sau (24/08/2026 - 30/08/2026)',
-  ];
-  const dateString = viewMode === 'week'
-    ? weekHeaderDates[selectedWeek + 1]
-    : `${['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'][today.getDay()]}, ${selectedDate} tháng ${today.getMonth() + 1}, ${today.getFullYear()}`;
-
-  const calendarDates = [
-    { day: 'CN', date: 16, isWeekend: true },
-    { day: 'T2', date: 17, isWeekend: false },
-    { day: 'T3', date: 18, isWeekend: false },
-    { day: 'T4', date: 19, isWeekend: false, isToday: true },
-    { day: 'T5', date: 20, isWeekend: false },
-    { day: 'T6', date: 21, isWeekend: false },
-    { day: 'T7', date: 22, isWeekend: true },
-  ];
-
-  const weekRanges = [
-    { label: 'Tuần trước', range: '10/08 - 16/08', offset: -1 },
-    { label: 'Tuần này', range: '17/08 - 23/08', offset: 0 },
-    { label: 'Tuần sau', range: '24/08 - 30/08', offset: 1 },
-  ];
-
-  const mealGroups = [
-    { id: 'breakfast', label: 'Bữa sáng', items: [] },
-    { id: 'lunch', label: 'Bữa trưa', items: [] },
-    { id: 'dinner', label: 'Bữa tối', items: [] },
-    { id: 'snacks', label: 'Đồ ăn thêm trong ngày', items: [] },
-  ];
 
   const diaryDays = [
     { day: 'T2', date: 17 },
@@ -65,6 +27,8 @@ export default function DiaryScreen() {
   ];
 
   const displayModes = ['Đã ghi nhận', 'Chưa hoàn thành', 'Tất cả', 'Chỉ hoạt động', 'Chỉ bữa ăn'];
+
+  const selectedDay = diaryDays.find((item) => item.date === selectedDate) ?? diaryDays[2];
 
   const renderDiaryScreen = () => (
     <SafeAreaView style={styles.diarySafeArea} edges={['top', 'left', 'right']}>
@@ -83,18 +47,18 @@ export default function DiaryScreen() {
         </View>
 
         <View style={styles.diaryWeekPicker}>
-          <View style={styles.diaryWeekCell}>
+          <TouchableOpacity style={styles.diaryWeekCell}>
             <Text style={styles.diaryWeekLabel}>Tuần trước</Text>
             <Text style={styles.diaryWeekDate}>10/08 - 16/08</Text>
-          </View>
-          <View style={[styles.diaryWeekCell, styles.diaryWeekCellActive]}>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.diaryWeekCell, styles.diaryWeekCellActive]}>
             <Text style={[styles.diaryWeekLabel, styles.diaryActiveText]}>Tuần này</Text>
             <Text style={[styles.diaryWeekDate, styles.diaryActiveText]}>17/08 - 23/08</Text>
-          </View>
-          <View style={[styles.diaryWeekCell, styles.diaryWeekCellDisabled]}>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.diaryWeekCell, styles.diaryWeekCellDisabled]}>
             <Text style={styles.diaryWeekLabel}>Tuần sau</Text>
             <Text style={styles.diaryWeekDate}>24/08 - 30/08</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.diaryDayPicker}>
@@ -110,7 +74,7 @@ export default function DiaryScreen() {
         </View>
 
         <View style={styles.diarySummary}>
-          <Text style={styles.diarySummaryTitle}>thứ tư, 19 tháng 8, 2026 · Hôm nay</Text>
+          <Text style={styles.diarySummaryTitle}>thứ tư, {selectedDay.date} tháng 8, 2026{selectedDay.date === 19 ? ' · Hôm nay' : ''}</Text>
           <View style={styles.diarySummaryRow}>
             <MaterialCommunityIcons name="silverware-fork-knife" size={22} color="#F59E0B" />
             <Text style={styles.diarySummaryLabel}>Bữa ăn đã ghi</Text>
