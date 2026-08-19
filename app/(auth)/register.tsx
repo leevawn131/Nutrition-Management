@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -18,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 
 import { AppLogo } from '@/components/ui/app-logo';
 import { authService } from '@/services/auth.service';
+import { setAuthToken, setCachedUser } from '@/services/storage.service';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -91,21 +91,21 @@ export default function RegisterScreen() {
       const response = await authService.register(email.trim(), password);
 
       if (response && response.success) {
+        // Auto-login to persist session for setup wizard
+        try {
+          const loginRes = await authService.login(email.trim(), password);
+          if (loginRes && loginRes.success) {
+            if (loginRes.data.accessToken) await setAuthToken(loginRes.data.accessToken);
+            if (loginRes.data.user) await setCachedUser(loginRes.data.user);
+          }
+        } catch {}
+
         if (Platform.OS !== 'web') {
           try {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } catch {}
         }
-        Alert.alert(
-          'Đăng ký thành công',
-          'Tài khoản của bạn đã được tạo thành công. Vui lòng đăng nhập để tiếp tục.',
-          [
-            {
-              text: 'Đăng nhập ngay',
-              onPress: () => router.replace('/(auth)/login'),
-            },
-          ]
-        );
+        router.replace('/(setup)/step-1');
       }
     } catch (error: any) {
       setErrorMessage(error.message || 'Đăng ký không thành công. Vui lòng thử lại sau.');
