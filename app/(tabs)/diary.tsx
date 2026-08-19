@@ -2,6 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  Modal,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -13,20 +14,37 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function DiaryScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('meals');
-  const [selectedDate, setSelectedDate] = useState(18);
+  const [activeSection, setActiveSection] = useState<'meals' | 'activities'>('meals');
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+  const [selectedDate, setSelectedDate] = useState(19);
+  const [selectedWeek, setSelectedWeek] = useState(0);
+  const [displayMode, setDisplayMode] = useState('Tất cả');
+  const [displayModeVisible, setDisplayModeVisible] = useState(false);
 
   const today = new Date();
-  const dateString = `${['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'][today.getDay()]}, ${today.getDate()} tháng ${today.getMonth() + 1}, ${today.getFullYear()}`;
+  const weekHeaderDates = [
+    'tuần trước (10/08/2026 - 16/08/2026)',
+    'tuần này (17/08/2026 - 23/08/2026)',
+    'tuần sau (24/08/2026 - 30/08/2026)',
+  ];
+  const dateString = viewMode === 'week'
+    ? weekHeaderDates[selectedWeek + 1]
+    : `${['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'][today.getDay()]}, ${selectedDate} tháng ${today.getMonth() + 1}, ${today.getFullYear()}`;
 
   const calendarDates = [
-    { day: 'T7', date: 15, isWeekend: false },
     { day: 'CN', date: 16, isWeekend: true },
     { day: 'T2', date: 17, isWeekend: false },
-    { day: 'T3', date: 18, isWeekend: false, isToday: true },
-    { day: 'T4', date: 19, isWeekend: false },
+    { day: 'T3', date: 18, isWeekend: false },
+    { day: 'T4', date: 19, isWeekend: false, isToday: true },
     { day: 'T5', date: 20, isWeekend: false },
     { day: 'T6', date: 21, isWeekend: false },
+    { day: 'T7', date: 22, isWeekend: true },
+  ];
+
+  const weekRanges = [
+    { label: 'Tuần trước', range: '10/08 - 16/08', offset: -1 },
+    { label: 'Tuần này', range: '17/08 - 23/08', offset: 0 },
+    { label: 'Tuần sau', range: '24/08 - 30/08', offset: 1 },
   ];
 
   const mealGroups = [
@@ -36,350 +54,368 @@ export default function DiaryScreen() {
     { id: 'snacks', label: 'Đồ ăn thêm trong ngày', items: [] },
   ];
 
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+  const diaryDays = [
+    { day: 'T2', date: 17 },
+    { day: 'T3', date: 18 },
+    { day: 'T4', date: 19 },
+    { day: 'T5', date: 20 },
+    { day: 'T6', date: 21 },
+    { day: 'T7', date: 22, weekend: true },
+    { day: 'CN', date: 23, weekend: true },
+  ];
+
+  const displayModes = ['Đã ghi nhận', 'Chưa hoàn thành', 'Tất cả', 'Chỉ hoạt động', 'Chỉ bữa ăn'];
+
+  const renderDiaryScreen = () => (
+    <SafeAreaView style={styles.diarySafeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" />
-
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* HEADER */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#0F172A" />
-          </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>Kế hoạch</Text>
-            <Text style={styles.headerDate}>{dateString}</Text>
+      <ScrollView style={styles.diaryContainer} contentContainerStyle={styles.diaryContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.diaryHeader}>
+          <Text style={styles.diaryTitle}>Nhật ký của bạn</Text>
+          <View style={styles.diaryHeaderActions}>
+            <TouchableOpacity style={styles.diaryIconButton}>
+              <Ionicons name="paper-plane-outline" size={22} color="#64748B" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.diaryIconButton}>
+              <Ionicons name="bar-chart-outline" size={24} color="#64748B" />
+            </TouchableOpacity>
           </View>
-          <View style={styles.spacer} />
         </View>
 
-        {/* TABS */}
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'meals' && styles.tabActive]}
-            onPress={() => setActiveTab('meals')}>
-            <Text style={[styles.tabText, activeTab === 'meals' && styles.tabTextActive]}>
-              Bữa ăn
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.diaryWeekPicker}>
+          <View style={styles.diaryWeekCell}>
+            <Text style={styles.diaryWeekLabel}>Tuần trước</Text>
+            <Text style={styles.diaryWeekDate}>10/08 - 16/08</Text>
+          </View>
+          <View style={[styles.diaryWeekCell, styles.diaryWeekCellActive]}>
+            <Text style={[styles.diaryWeekLabel, styles.diaryActiveText]}>Tuần này</Text>
+            <Text style={[styles.diaryWeekDate, styles.diaryActiveText]}>17/08 - 23/08</Text>
+          </View>
+          <View style={[styles.diaryWeekCell, styles.diaryWeekCellDisabled]}>
+            <Text style={styles.diaryWeekLabel}>Tuần sau</Text>
+            <Text style={styles.diaryWeekDate}>24/08 - 30/08</Text>
+          </View>
+        </View>
 
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'activities' && styles.tabActive]}
-            onPress={() => setActiveTab('activities')}>
-            <Text style={[styles.tabText, activeTab === 'activities' && styles.tabTextActive]}>
-              Hoạt động
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.diaryDayPicker}>
+          {diaryDays.map((item) => (
+            <TouchableOpacity
+              key={item.date}
+              style={[styles.diaryDayCell, selectedDate === item.date && styles.diaryDayCellActive]}
+              onPress={() => setSelectedDate(item.date)}>
+              <Text style={[styles.diaryDayLabel, item.weekend && styles.diaryWeekendText, selectedDate === item.date && styles.diaryActiveText]}>{item.day}</Text>
+              <Text style={[styles.diaryDayDate, item.weekend && styles.diaryWeekendText, selectedDate === item.date && styles.diaryActiveText]}>{item.date}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'day' && styles.tabActive]}
-            onPress={() => setActiveTab('day')}>
-            <Text style={[styles.tabText, activeTab === 'day' && styles.tabTextActive]}>
-              Ngày
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.diarySummary}>
+          <Text style={styles.diarySummaryTitle}>thứ tư, 19 tháng 8, 2026 · Hôm nay</Text>
+          <View style={styles.diarySummaryRow}>
+            <MaterialCommunityIcons name="silverware-fork-knife" size={22} color="#F59E0B" />
+            <Text style={styles.diarySummaryLabel}>Bữa ăn đã ghi</Text>
+            <View style={styles.mealDots}>
+              {[0, 1, 2, 3].map((dot) => <View key={dot} style={styles.mealDot} />)}
+            </View>
+            <Text style={styles.diarySummaryValue}>0/4</Text>
+          </View>
+          <View style={styles.diarySummaryRow}>
+            <MaterialCommunityIcons name="dumbbell" size={22} color="#49C99B" />
+            <Text style={styles.diarySummaryLabel}>Vận động</Text>
+            <View style={styles.diaryActivityLine} />
+            <Text style={styles.diarySummaryMuted}>--</Text>
+          </View>
+        </View>
 
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'week' && styles.tabActive]}
-            onPress={() => setActiveTab('week')}>
-            <Text style={[styles.tabText, activeTab === 'week' && styles.tabTextActive]}>
-              Tuần
-            </Text>
+        <View style={styles.diaryEventsHeader}>
+          <Text style={styles.diaryEventsTitle}>Sự kiện trong ngày</Text>
+          <TouchableOpacity onPress={() => setDisplayModeVisible(true)} style={styles.diaryFilterButton}>
+            <Text style={styles.diaryFilterText}>{displayMode}</Text>
+            <Ionicons name="chevron-down" size={18} color="#F59E0B" />
           </TouchableOpacity>
         </View>
 
-        {/* CALENDAR */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.calendarScroll}>
-          <View style={styles.calendarRow}>
-            {calendarDates.map((item) => (
+        <View style={styles.diaryEmptyState}>
+          <View style={styles.diaryEmptyIcon}>
+            <Ionicons name="document-text-outline" size={38} color="#64748B" />
+          </View>
+          <Text style={styles.diaryEmptyTitle}>Chưa có dữ liệu hôm nay</Text>
+          <Text style={styles.diaryEmptyText}>Nhấn nút &quot;+&quot; ở thanh dưới để ghi lại bữa ăn và hoạt động.</Text>
+        </View>
+      </ScrollView>
+
+      <Modal visible={displayModeVisible} transparent animationType="fade" onRequestClose={() => setDisplayModeVisible(false)}>
+        <View style={styles.displayModalBackdrop}>
+          <View style={styles.displaySheet}>
+            <Text style={styles.displaySheetTitle}>Chế độ hiển thị</Text>
+            {displayModes.map((mode) => (
               <TouchableOpacity
-                key={item.date}
-                style={[
-                  styles.calendarItem,
-                  item.isToday && styles.calendarItemToday,
-                  selectedDate === item.date && styles.calendarItemSelected,
-                ]}
-                onPress={() => setSelectedDate(item.date)}>
-                <Text style={[styles.calendarLabel, item.isWeekend && styles.calendarLabelWeekend]}>
-                  {item.day}
-                </Text>
-                <Text
-                  style={[
-                    styles.calendarDate,
-                    item.isToday && styles.calendarDateToday,
-                    item.isWeekend && styles.calendarDateWeekend,
-                  ]}>
-                  {item.date}
-                </Text>
+                key={mode}
+                style={[styles.displayOption, displayMode === mode && styles.displayOptionActive]}
+                onPress={() => { setDisplayMode(mode); setDisplayModeVisible(false); }}>
+                <Text style={[styles.displayOptionText, displayMode === mode && styles.displayOptionTextActive]}>{mode}</Text>
               </TouchableOpacity>
             ))}
           </View>
-        </ScrollView>
-
-        {/* ACTIVITIES TAB CONTENT */}
-        {activeTab === 'activities' && (
-          <>
-            {/* Activity Header */}
-            <View style={styles.activityHeaderSection}>
-              <View style={styles.activityTitleRow}>
-                <Text style={styles.sectionTitle}>Kế hoạch hoạt động</Text>
-                <View style={styles.activityIcons}>
-                  <TouchableOpacity style={styles.iconBtn}>
-                    <Ionicons name="paper-plane-outline" size={20} color="#94A3B8" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.iconBtn}>
-                    <Ionicons name="bar-chart-outline" size={20} color="#94A3B8" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.iconBtn}>
-                    <Ionicons name="settings-outline" size={20} color="#94A3B8" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.activityLabelRow}>
-                <Text style={styles.activityLabel}>phút vận động · tuần này</Text>
-                <TouchableOpacity style={styles.accelerateBtn}>
-                  <Text style={styles.accelerateBtnText}>Căn tăng tốc</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.activityValueRow}>
-                <Text style={styles.activityValue}>0</Text>
-                <Text style={styles.activityUnit}>/ 150 phút</Text>
-              </View>
-
-              <View style={styles.activityProgressBar}>
-                <View style={styles.activityProgressFill} />
-              </View>
-
-              <Text style={styles.activityRemainText}>Còn 150 phút · 6 ngày còn lại trong tuần</Text>
-            </View>
-
-            {/* Activity Stats Grid */}
-            <View style={styles.activityStatsGrid}>
-              <View style={[styles.activityStatCard, { backgroundColor: '#DFF7EE' }]}>
-                <View style={[styles.activityStatIconCircle, { backgroundColor: '#FFFFFF' }]}>
-                  <Ionicons name="list-outline" size={22} color="#10B981" />
-                </View>
-                <View style={styles.activityStatTextWrap}>
-                  <Text style={styles.activityStatLabel}>Hoạt động</Text>
-                  <Text style={styles.activityStatValue}>0</Text>
-                </View>
-              </View>
-
-              <View style={[styles.activityStatCard, { backgroundColor: '#FDE7F1' }]}>
-                <View style={[styles.activityStatIconCircle, { backgroundColor: '#FFFFFF' }]}>
-                  <Ionicons name="time-outline" size={22} color="#EC4899" />
-                </View>
-                <View style={styles.activityStatTextWrap}>
-                  <Text style={styles.activityStatLabel}>Phút dự kiến</Text>
-                  <Text style={styles.activityStatValue}>0</Text>
-                </View>
-              </View>
-
-              <View style={[styles.activityStatCard, { backgroundColor: '#FEF3C7' }]}>
-                <View style={[styles.activityStatIconCircle, { backgroundColor: '#FFFFFF' }]}>
-                  <Ionicons name="flame-outline" size={22} color="#D97706" />
-                </View>
-                <View style={styles.activityStatTextWrap}>
-                  <Text style={styles.activityStatLabel}>Kcal dự kiến</Text>
-                  <Text style={styles.activityStatValue}>0</Text>
-                </View>
-              </View>
-
-              <View style={[styles.activityStatCard, { backgroundColor: '#E0F2FE' }]}>
-                <View style={[styles.activityStatIconCircle, { backgroundColor: '#FFFFFF' }]}>
-                  <MaterialCommunityIcons name="dumbbell" size={22} color="#F59E0B" />
-                </View>
-                <View style={styles.activityStatTextWrap}>
-                  <Text style={styles.activityStatLabel}>Buổi kháng lực</Text>
-                  <Text style={styles.activityStatValue}>0/2</Text>
-                </View>
-              </View>
-
-              <View style={[styles.activityStatCardWide, { backgroundColor: '#EAF3FF' }]}>
-                <View style={[styles.activityStatIconCircle, { backgroundColor: '#FFFFFF' }]}>
-                  <Ionicons name="calendar-outline" size={22} color="#3B82F6" />
-                </View>
-                <View style={styles.activityStatTextWrap}>
-                  <Text style={styles.activityStatLabel}>Ngày có kế hoạch</Text>
-                  <Text style={styles.activityStatValue}>0/7</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Activity in Day */}
-            <View style={styles.activityInDaySection}>
-              <View style={styles.activityInDayHeader}>
-                <Text style={styles.sectionTitle}>Hoạt động trong ngày</Text>
-                <View style={styles.activityActionBtns}>
-                  <TouchableOpacity style={styles.iconBtn}>
-                    <Ionicons name="swap-horizontal-outline" size={20} color="#94A3B8" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.iconBtn}>
-                    <Ionicons name="add" size={20} color="#94A3B8" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.emptyActivityState}>
-                <View style={styles.emptyActivityIcon}>
-                  <MaterialCommunityIcons name="heart-outline" size={48} color="#CBD5E1" />
-                </View>
-                <Text style={styles.emptyActivityTitle}>Chưa có hoạt động nào</Text>
-                <Text style={styles.emptyActivityText}>
-                  Chưa có hoạt động nào được lên kế hoạch. Hãy thêm hoạt động hoặc tạo thói quen mới.
-                </Text>
-                <TouchableOpacity style={styles.addActivityBtn}>
-                  <Text style={styles.addActivityBtnText}>Thêm hoạt động</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </>
-        )}
-
-        {/* MEALS TAB CONTENT */}
-        {activeTab === 'meals' && (
-          <>
-            {/* NUTRITION INFO */}
-            <View style={styles.nutritionSection}>
-          <Text style={styles.sectionTitle}>Thông tin dinh dưỡng</Text>
-
-          <View style={styles.calorieCard}>
-            <Text style={styles.calorieValue}>0</Text>
-            <Text style={styles.calorieLabel}>/ 1492 kcal</Text>
-          </View>
-
-          <View style={styles.macrosRow}>
-            <View style={styles.macroItem}>
-              <Text style={styles.macroLabel}>Đường bột</Text>
-              <View style={styles.macroBar}>
-                <View style={styles.macroBarEmpty} />
-              </View>
-              <Text style={styles.macroValue}>0g / 213g</Text>
-            </View>
-
-            <View style={styles.macroItem}>
-              <Text style={styles.macroLabel}>Chất đạm</Text>
-              <View style={styles.macroBar}>
-                <View style={styles.macroBarEmpty} />
-              </View>
-              <Text style={styles.macroValue}>0g / 74g</Text>
-            </View>
-
-            <View style={styles.macroItem}>
-              <Text style={styles.macroLabel}>Chất béo</Text>
-              <View style={styles.macroBar}>
-                <View style={styles.macroBarEmpty} />
-              </View>
-              <Text style={styles.macroValue}>0g / 38g</Text>
-            </View>
-          </View>
+          <TouchableOpacity style={styles.displayCancel} onPress={() => setDisplayModeVisible(false)}>
+            <Text style={styles.displayCancelText}>Hủy</Text>
+          </TouchableOpacity>
         </View>
-
-        {/* NUTRITION SCORE */}
-        <View style={styles.scoreSection}>
-          <View style={styles.scoreHeader}>
-            <Text style={styles.sectionTitle}>Điểm dinh dưỡng</Text>
-            <TouchableOpacity style={styles.infoIcon}>
-              <Ionicons name="information-circle-outline" size={20} color="#475569" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.scoreRow}>
-            <Text style={styles.scoreValue}>1</Text>
-            <Text style={styles.scoreMax}>/10</Text>
-            <Text style={styles.scoreBadge}>Thấp</Text>
-          </View>
-
-          <View style={styles.scoreBar}>
-            <View style={styles.scoreBarFill} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-          </View>
-        </View>
-
-        {/* FOOD DIVERSITY */}
-        <View style={styles.diversitySection}>
-          <View style={styles.diversityHeader}>
-            <Text style={styles.sectionTitle}>Độ đa dạng thực phẩm</Text>
-            <TouchableOpacity style={styles.infoIcon}>
-              <Ionicons name="information-circle-outline" size={20} color="#475569" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.diversityRow}>
-            <Text style={styles.diversityValue}>0</Text>
-            <Text style={styles.diversityMax}>/10</Text>
-            <Text style={styles.diversityBadge}>Thấp</Text>
-          </View>
-
-          <View style={styles.scoreBar}>
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-            <View style={styles.scoreBarEmpty} />
-          </View>
-        </View>
-
-        {/* MEAL PLAN */}
-        <View style={styles.mealPlanSection}>
-          <View style={styles.mealPlanHeader}>
-            <Text style={styles.sectionTitle}>Thực đơn của bạn</Text>
-            <TouchableOpacity style={styles.exploreBtn}>
-              <MaterialCommunityIcons name="chef-hat" size={18} color="#FFFFFF" />
-              <Text style={styles.exploreBtnText}>Khám phá thực đơn mẫu</Text>
-            </TouchableOpacity>
-          </View>
-
-          {mealGroups.map((group) => (
-            <View key={group.id} style={styles.mealGroup}>
-              <View style={styles.mealGroupHeader}>
-                <Text style={styles.mealGroupTitle}>{group.label}</Text>
-                <TouchableOpacity style={styles.addBtn}>
-                  <Ionicons name="add" size={22} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              {group.items.length === 0 && (
-                <View style={styles.emptyMealState}>
-                  <View style={styles.emptyMealIcon}>
-                    <MaterialCommunityIcons name="silverware-fork-knife" size={48} color="#CBD5E1" />
-                    <View style={styles.emptyMealHeart}>
-                      <MaterialCommunityIcons name="heart" size={24} color="#FCD34D" />
-                    </View>
-                  </View>
-                  <Text style={styles.emptyMealTitle}>Chưa có món ăn hôm nay!</Text>
-                  <Text style={styles.emptyMealText}>
-                    Bắt đầu thêm món để đạt được mục tiêu dinh dưỡng
-                  </Text>
-                </View>
-              )}
-            </View>
-          ))}
-        </View>
-          </>
-        )}
-
-      </ScrollView>
+      </Modal>
     </SafeAreaView>
   );
+
+  return renderDiaryScreen();
+
 }
 
 const styles = StyleSheet.create({
+  diarySafeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  diaryContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  diaryContent: {
+    paddingHorizontal: 32,
+    paddingBottom: 36,
+  },
+  diaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    paddingBottom: 18,
+  },
+  diaryTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#10294B',
+  },
+  diaryHeaderActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  diaryIconButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#F5F6F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  diaryWeekPicker: {
+    flexDirection: 'row',
+    backgroundColor: '#F5F5F9',
+    borderRadius: 18,
+    padding: 4,
+    marginBottom: 16,
+  },
+  diaryWeekCell: {
+    flex: 1,
+    minHeight: 86,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    paddingHorizontal: 2,
+  },
+  diaryWeekCellActive: {
+    backgroundColor: '#49C99B',
+  },
+  diaryWeekCellDisabled: {
+    opacity: 0.45,
+  },
+  diaryWeekLabel: {
+    fontSize: 15,
+    color: '#64748B',
+    marginBottom: 7,
+  },
+  diaryWeekDate: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#10294B',
+  },
+  diaryActiveText: {
+    color: '#FFFFFF',
+  },
+  diaryDayPicker: {
+    flexDirection: 'row',
+    backgroundColor: '#F5F5F9',
+    borderRadius: 18,
+    padding: 4,
+    marginBottom: 28,
+  },
+  diaryDayCell: {
+    flex: 1,
+    minHeight: 92,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+  },
+  diaryDayCellActive: {
+    backgroundColor: '#49C99B',
+  },
+  diaryDayLabel: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 7,
+  },
+  diaryDayDate: {
+    fontSize: 25,
+    fontWeight: '800',
+    color: '#10294B',
+  },
+  diaryWeekendText: {
+    color: '#F3B8B8',
+  },
+  diarySummary: {
+    borderTopWidth: 1,
+    borderTopColor: '#F0F1F3',
+    paddingTop: 36,
+    paddingBottom: 48,
+  },
+  diarySummaryTitle: {
+    fontSize: 23,
+    fontWeight: '800',
+    color: '#10294B',
+    marginBottom: 34,
+  },
+  diarySummaryRow: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  diarySummaryLabel: {
+    fontSize: 18,
+    color: '#64748B',
+  },
+  mealDots: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    marginLeft: 12,
+  },
+  mealDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: '#F1F2F5',
+  },
+  diarySummaryValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#10294B',
+  },
+  diaryActivityLine: {
+    flex: 1,
+    height: 10,
+    borderRadius: 6,
+    backgroundColor: '#F1F2F5',
+    marginLeft: 20,
+  },
+  diarySummaryMuted: {
+    fontSize: 18,
+    color: '#CBD0D6',
+  },
+  diaryEventsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 58,
+  },
+  diaryEventsTitle: {
+    fontSize: 27,
+    fontWeight: '800',
+    color: '#10294B',
+  },
+  diaryFilterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  diaryFilterText: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#F59E0B',
+  },
+  diaryEmptyState: {
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  diaryEmptyIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#F5F6F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 30,
+  },
+  diaryEmptyTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#10294B',
+    marginBottom: 22,
+  },
+  diaryEmptyText: {
+    fontSize: 19,
+    lineHeight: 29,
+    textAlign: 'center',
+    color: '#64748B',
+  },
+  displayModalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.38)',
+    padding: 16,
+  },
+  displaySheet: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  displaySheetTitle: {
+    fontSize: 25,
+    fontWeight: '800',
+    color: '#10294B',
+    textAlign: 'center',
+    paddingVertical: 28,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  displayOption: {
+    minHeight: 74,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  displayOptionActive: {
+    backgroundColor: '#E5F7F0',
+  },
+  displayOptionText: {
+    fontSize: 23,
+    color: '#10294B',
+  },
+  displayOptionTextActive: {
+    color: '#49C99B',
+  },
+  displayCancel: {
+    height: 108,
+    marginTop: 16,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  displayCancelText: {
+    fontSize: 23,
+    color: '#10294B',
+  },
   safeArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -424,16 +460,29 @@ const styles = StyleSheet.create({
   spacer: {
     width: 40,
   },
-  tabsContainer: {
+  controlsRow: {
     flexDirection: 'row',
-    gap: 8,
+    justifyContent: 'space-between',
     marginBottom: 16,
   },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F1F3',
+    borderRadius: 24,
+    padding: 4,
+  },
+  segmentedControlSmall: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F1F3',
+    borderRadius: 24,
+    padding: 4,
+  },
   tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    minWidth: 72,
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
   },
   tabActive: {
     backgroundColor: '#D1FAE5',
@@ -454,6 +503,37 @@ const styles = StyleSheet.create({
   calendarRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  weekPicker: {
+    flexDirection: 'row',
+    backgroundColor: '#F5F5F9',
+    borderRadius: 18,
+    padding: 4,
+    marginBottom: 20,
+  },
+  weekItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 92,
+    paddingHorizontal: 4,
+    borderRadius: 16,
+  },
+  weekItemSelected: {
+    backgroundColor: '#49C99B',
+  },
+  weekLabel: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 6,
+  },
+  weekRange: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  weekTextSelected: {
+    color: '#FFFFFF',
   },
   calendarItem: {
     width: 56,
@@ -496,6 +576,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0F172A',
     marginBottom: 12,
+  },
+  weekAverage: {
+    fontSize: 13,
+    color: '#A1A1AA',
+    marginTop: -4,
+    marginBottom: 14,
   },
   calorieCard: {
     flexDirection: 'row',
@@ -781,6 +867,37 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748B',
   },
+  activityTargetDays: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 22,
+    marginBottom: 10,
+  },
+  activityTargetDay: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 8,
+  },
+  activityTargetBar: {
+    width: '100%',
+    height: 8,
+    borderWidth: 2,
+    borderColor: '#E2E5E8',
+    borderRadius: 5,
+  },
+  activityTargetBarDone: {
+    borderColor: '#D6DCE1',
+    backgroundColor: '#FFFFFF',
+  },
+  activityTargetLabel: {
+    fontSize: 12,
+    color: '#A1A1AA',
+  },
+  activityTargetHint: {
+    fontSize: 13,
+    color: '#A1A1AA',
+    marginBottom: 16,
+  },
   activityStatsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -795,7 +912,7 @@ const styles = StyleSheet.create({
     padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   activityStatCardWide: {
     width: '100%',
@@ -804,7 +921,7 @@ const styles = StyleSheet.create({
     padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   activityStatIconCircle: {
     width: 44,
@@ -816,20 +933,20 @@ const styles = StyleSheet.create({
   },
   activityStatTextWrap: {
     flex: 1,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   activityStatLabel: {
     fontSize: 15,
     fontWeight: '700',
     color: '#0F172A',
     marginBottom: 6,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   activityStatValue: {
     fontSize: 26,
     fontWeight: '800',
     color: '#0F172A',
-    textAlign: 'right',
+    textAlign: 'left',
   },
   activityInDaySection: {
     marginBottom: 20,
