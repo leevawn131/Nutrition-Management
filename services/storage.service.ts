@@ -107,3 +107,14 @@ export async function clearCachedUser(): Promise<void> {
     console.error('Error clearing user data from storage:', error);
   }
 }
+
+/**
+ * Clear all authentication and cached user data (used for logout)
+ */
+export async function clearAuthData(): Promise<void> {
+  try {
+    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, USER_DATA_KEY]);
+  } catch (error) {
+    console.error('Error clearing auth data from storage:', error);
+  }
+}

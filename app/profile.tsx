@@ -93,8 +93,17 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.circularBtn}
-            onPress={() => handlePlaceholderAction('Cài đặt')}
-            activeOpacity={0.7}>
+            onPress={() => {
+              if (Platform.OS !== 'web') {
+                try {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                } catch {}
+              }
+              router.push('/settings' as any);
+            }}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Cài đặt">
             <Ionicons name="settings-outline" size={19} color="#0F172A" />
           </TouchableOpacity>
         </View>
