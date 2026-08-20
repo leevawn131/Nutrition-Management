@@ -135,7 +135,7 @@ export default function SettingsScreen() {
           <SettingsItem
             title="Hồ sơ"
             showChevron={true}
-            onPress={() => router.push('/profile')}
+            onPress={() => router.push('/edit-profile' as any)}
           />
           <SettingsItem
             title="Thông tin cá nhân"
