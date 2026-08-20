@@ -1,0 +1,110 @@
+const mealPlanService = require('../services/meal_plan.service');
+const User = require('../models/user.model');
+
+/**
+ * Helper to get active user ID from request or fallback to first user in database
+ */
+const getEffectiveUserId = async (req) => {
+  if (req.user && req.user.id) {
+    return req.user.id;
+  }
+  // Fallback to first user in database if unauthenticated for smooth demo/testing
+  const firstUser = await User.findOne({ role: 'user' }).lean();
+  return firstUser ? firstUser._id.toString() : null;
+};
+
+/**
+ * GET /api/meal-plans
+ * Get meal plans for a specific date
+ */
+const getMealPlans = async (req, res) => {
+  try {
+    const { date } = req.query;
+    const userId = await getEffectiveUserId(req);
+    const plans = await mealPlanService.getMealPlans(userId, date);
+
+    return res.status(200).json({
+      success: true,
+      data: { plans },
+    });
+  } catch (error) {
+    console.error('Error in getMealPlans:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách kế hoạch bữa ăn',
+    });
+  }
+};
+
+/**
+ * POST /api/meal-plans
+ * Add an item (recipe or ingredient) to the meal plan
+ */
+const addMealPlanItem = async (req, res) => {
+  try {
+    const userId = await getEffectiveUserId(req);
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không tìm thấy người dùng hợp lệ để lưu kế hoạch',
+      });
+    }
+
+    const { plan_date, meal_type, recipe_id, food_item_id, source } = req.body;
+    const plan = await mealPlanService.addMealPlanItem(userId, {
+      plan_date,
+      meal_type,
+      recipe_id,
+      food_item_id,
+      source,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Thêm vào kế hoạch bữa ăn thành công',
+      data: { plan },
+    });
+  } catch (error) {
+    console.error('Error in addMealPlanItem:', error.message);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Lỗi khi thêm vào kế hoạch bữa ăn',
+    });
+  }
+};
+
+/**
+ * DELETE /api/meal-plans/:id
+ * Remove an item from the meal plan
+ */
+const deleteMealPlanItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = await getEffectiveUserId(req);
+    const deleted = await mealPlanService.deleteMealPlanItem(userId, id);
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy mục kế hoạch cần xoá',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Xoá món khỏi kế hoạch thành công',
+    });
+  } catch (error) {
+    console.error('Error in deleteMealPlanItem:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi khi xoá món khỏi kế hoạch',
+    });
+  }
+};
+
+module.exports = {
+  getMealPlans,
+  addMealPlanItem,
+  deleteMealPlanItem,
+};

@@ -23,6 +23,7 @@ export default function RootLayout() {
         <Stack.Screen name="activity" options={{ headerShown: false }} />
         <Stack.Screen name="nutrition" options={{ headerShown: false }} />
         <Stack.Screen name="ingredients" options={{ headerShown: false }} />
+        <Stack.Screen name="recipes" options={{ headerShown: false }} />
         <Stack.Screen name="activity-insights" options={{ headerShown: false }} />
         <Stack.Screen name="activity-goals" options={{ headerShown: false }} />
         <Stack.Screen name="habit-analysis" options={{ headerShown: false }} />
