@@ -145,7 +145,7 @@ export default function SettingsScreen() {
           <SettingsItem
             title="Sở thích ăn uống"
             showChevron={true}
-            onPress={() => handlePlaceholder('Sở thích ăn uống')}
+            onPress={() => router.push('/food-preferences' as any)}
           />
           <SettingsItem
             title="Cài đặt thông báo"
