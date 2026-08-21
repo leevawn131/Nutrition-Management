@@ -140,7 +140,7 @@ export default function SettingsScreen() {
           <SettingsItem
             title="Thông tin cá nhân"
             showChevron={true}
-            onPress={() => handlePlaceholder('Thông tin cá nhân')}
+            onPress={() => router.push('/personal-info' as any)}
           />
           <SettingsItem
             title="Sở thích ăn uống"
