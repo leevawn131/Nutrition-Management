@@ -16,14 +16,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { QuickActionsModal } from '@/components/home/quick-actions-modal';
 import { AppLogo } from '@/components/ui/app-logo';
+import { mealLogService } from '@/services/meal_log.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { HealthMetrics, userService } from '@/services/user.service';
 import { User } from '@/types/auth.types';
+import { DailySummary } from '@/types/meal_log.types';
 
 export default function HomeScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [health, setHealth] = useState<HealthMetrics | null>(null);
+  const [summary, setSummary] = useState<DailySummary | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showNotificationBanner, setShowNotificationBanner] = useState(true);
   const [showQuickActions, setShowQuickActions] = useState(false);
@@ -49,7 +52,7 @@ export default function HomeScreen() {
       case 'maintain':
         return 'Mục tiêu: Duy trì cân nặng';
       default:
-        return 'Mục tiêu: Chưa xác định';
+        return 'Mục tiêu: Cải thiện sức khỏe';
     }
   };
 
@@ -60,12 +63,13 @@ export default function HomeScreen() {
       setUser(cached);
     }
 
-    // 2. Fetch live data from backend APIs (Module A)
+    // 2. Fetch live data from backend APIs
     const token = await getAuthToken();
     if (token) {
-      const [profileData, healthData] = await Promise.all([
+      const [profileData, healthData, summaryData] = await Promise.all([
         userService.getProfile(token),
         userService.getHealthMetrics(token),
+        mealLogService.getDailySummary(),
       ]);
 
       if (profileData) {
@@ -73,6 +77,9 @@ export default function HomeScreen() {
       }
       if (healthData) {
         setHealth(healthData);
+      }
+      if (summaryData) {
+        setSummary(summaryData);
       }
     }
   }, []);
@@ -185,92 +192,136 @@ export default function HomeScreen() {
 
           <TouchableOpacity
             style={styles.diaryBadgeBtn}
-            onPress={() => Alert.alert('Nhật ký', 'Xem nhật ký dinh dưỡng tổng quan.')}
+            onPress={() => router.push('/(tabs)/diary')}
             activeOpacity={0.7}>
             <Ionicons name="book-outline" size={19} color="#334155" />
           </TouchableOpacity>
         </View>
 
         {/* 4. CALORIE & NUTRITION SUMMARY CARD */}
-        <View style={styles.calorieCard}>
-          {/* Left Circular Ring */}
-          <View style={styles.calorieRingContainer}>
-            <View style={styles.calorieRingOuter}>
-              <View style={styles.calorieRingDot} />
-              <View style={styles.calorieRingInner}>
-                <Text style={styles.calorieNumber}>
-                  {user?.target_calories
-                    ? user.target_calories.toLocaleString()
-                    : health?.tdee
-                    ? Math.round(health.tdee).toLocaleString()
-                    : '--'}
-                </Text>
-                <Text style={styles.calorieLabel}>cần nạp</Text>
-              </View>
-            </View>
-          </View>
+        {(() => {
+          const targetCalories =
+            user?.target_calories ||
+            summary?.targets.calories ||
+            (health?.tdee ? Math.round(health.tdee) : 2000);
+          const targetProtein =
+            user?.target_protein_g ||
+            summary?.targets.protein_g ||
+            Math.round((targetCalories * 0.25) / 4);
+          const targetCarb =
+            user?.target_carb_g ||
+            summary?.targets.carb_g ||
+            Math.round((targetCalories * 0.5) / 4);
+          const targetFat =
+            user?.target_fat_g ||
+            summary?.targets.fat_g ||
+            Math.round((targetCalories * 0.25) / 9);
 
-          {/* Right Stats Breakdown (Consumed / Burned) */}
-          <View style={styles.calorieBreakdown}>
-            {/* Consumed */}
-            <View style={styles.statRow}>
-              <View style={[styles.statIconBox, { backgroundColor: '#FEF3C7' }]}>
-                <FontAwesome6 name="utensils" size={16} color="#D97706" />
-              </View>
-              <View>
-                <Text style={styles.statValue}>0 kcal</Text>
-                <Text style={styles.statLabel}>Đã nạp</Text>
-              </View>
-            </View>
+          const consumedCalories = summary?.consumed.calories || 0;
+          const burnedCalories = summary?.burned.calories || 0;
+          const proteinConsumed = summary?.consumed.protein_g || 0;
+          const carbConsumed = summary?.consumed.carb_g || 0;
+          const fatConsumed = summary?.consumed.fat_g || 0;
 
-            {/* Burned */}
-            <View style={styles.statRow}>
-              <View style={[styles.statIconBox, { backgroundColor: '#E0F2FE' }]}>
-                <Ionicons name="flame" size={18} color="#0284C7" />
+          const proteinPercent = Math.min(100, Math.round((proteinConsumed / targetProtein) * 100));
+          const carbPercent = Math.min(100, Math.round((carbConsumed / targetCarb) * 100));
+          const fatPercent = Math.min(100, Math.round((fatConsumed / targetFat) * 100));
+
+          return (
+            <>
+              <View style={styles.calorieCard}>
+                {/* Left Circular Ring */}
+                <View style={styles.calorieRingContainer}>
+                  <View style={styles.calorieRingOuter}>
+                    <View style={styles.calorieRingDot} />
+                    <View style={styles.calorieRingInner}>
+                      <Text style={styles.calorieNumber}>
+                        {targetCalories.toLocaleString()}
+                      </Text>
+                      <Text style={styles.calorieLabel}>cần nạp</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Right Stats Breakdown (Consumed / Burned) */}
+                <View style={styles.calorieBreakdown}>
+                  {/* Consumed */}
+                  <View style={styles.statRow}>
+                    <View style={[styles.statIconBox, { backgroundColor: '#FEF3C7' }]}>
+                      <FontAwesome6 name="utensils" size={16} color="#D97706" />
+                    </View>
+                    <View>
+                      <Text style={styles.statValue}>{consumedCalories} kcal</Text>
+                      <Text style={styles.statLabel}>Đã nạp</Text>
+                    </View>
+                  </View>
+
+                  {/* Burned */}
+                  <View style={styles.statRow}>
+                    <View style={[styles.statIconBox, { backgroundColor: '#E0F2FE' }]}>
+                      <Ionicons name="flame" size={18} color="#0284C7" />
+                    </View>
+                    <View>
+                      <Text style={styles.statValue}>{burnedCalories} kcal</Text>
+                      <Text style={styles.statLabel}>Đã đốt</Text>
+                    </View>
+                  </View>
+                </View>
               </View>
-              <View>
-                <Text style={styles.statValue}>0 kcal</Text>
-                <Text style={styles.statLabel}>Đã đốt</Text>
+
+              {/* 5. MACRO SUMMARY ROW */}
+              <View style={styles.macroSection}>
+                {/* Protein */}
+                <View style={styles.macroCol}>
+                  <Text style={styles.macroName}>Chất đạm</Text>
+                  <Text style={styles.macroValue}>
+                    {proteinConsumed}g / {targetProtein}g
+                  </Text>
+                  <View style={styles.macroProgressBar}>
+                    <View
+                      style={[
+                        styles.macroProgressFill,
+                        { width: `${proteinPercent}%`, backgroundColor: '#F59E0B' },
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                {/* Carbs */}
+                <View style={styles.macroCol}>
+                  <Text style={styles.macroName}>Đường bột</Text>
+                  <Text style={styles.macroValue}>
+                    {carbConsumed}g / {targetCarb}g
+                  </Text>
+                  <View style={styles.macroProgressBar}>
+                    <View
+                      style={[
+                        styles.macroProgressFill,
+                        { width: `${carbPercent}%`, backgroundColor: '#3B82F6' },
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                {/* Fat */}
+                <View style={styles.macroCol}>
+                  <Text style={styles.macroName}>Chất béo</Text>
+                  <Text style={styles.macroValue}>
+                    {fatConsumed}g / {targetFat}g
+                  </Text>
+                  <View style={styles.macroProgressBar}>
+                    <View
+                      style={[
+                        styles.macroProgressFill,
+                        { width: `${fatPercent}%`, backgroundColor: '#10B981' },
+                      ]}
+                    />
+                  </View>
+                </View>
               </View>
-            </View>
-          </View>
-        </View>
-
-        {/* 5. MACRO SUMMARY ROW */}
-        <View style={styles.macroSection}>
-          {/* Protein */}
-          <View style={styles.macroCol}>
-            <Text style={styles.macroName}>Chất đạm</Text>
-            <Text style={styles.macroValue}>
-              0g / {user?.target_protein_g ? `${user.target_protein_g}g` : '--'}
-            </Text>
-            <View style={styles.macroProgressBar}>
-              <View style={[styles.macroProgressFill, { width: '0%', backgroundColor: '#F59E0B' }]} />
-            </View>
-          </View>
-
-          {/* Carbs */}
-          <View style={styles.macroCol}>
-            <Text style={styles.macroName}>Đường bột</Text>
-            <Text style={styles.macroValue}>
-              0g / {user?.target_carb_g ? `${user.target_carb_g}g` : '--'}
-            </Text>
-            <View style={styles.macroProgressBar}>
-              <View style={[styles.macroProgressFill, { width: '0%', backgroundColor: '#3B82F6' }]} />
-            </View>
-          </View>
-
-          {/* Fat */}
-          <View style={styles.macroCol}>
-            <Text style={styles.macroName}>Chất béo</Text>
-            <Text style={styles.macroValue}>
-              0g / {user?.target_fat_g ? `${user.target_fat_g}g` : '--'}
-            </Text>
-            <View style={styles.macroProgressBar}>
-              <View style={[styles.macroProgressFill, { width: '0%', backgroundColor: '#10B981' }]} />
-            </View>
-          </View>
-        </View>
+            </>
+          );
+        })()}
 
         {/* 6. NUTRITION ASSISTANT CARD */}
         <View style={styles.assistantCard}>

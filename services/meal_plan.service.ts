@@ -19,14 +19,22 @@ export interface AddMealPlanPayload {
 
 export const mealPlanService = {
   /**
-   * Fetch planned meals for a given date (YYYY-MM-DD or Date string)
+   * Fetch planned meals for a given date or range
    */
-  async getMealPlans(dateStr: string): Promise<MealPlanItem[]> {
+  async getMealPlans(dateOrOptions: string | { date?: string; startDate?: string; endDate?: string }): Promise<MealPlanItem[]> {
     try {
       const token = await getAuthToken();
-      const queryParams = new URLSearchParams({ date: dateStr });
-      const url = `${API_BASE_URL}/meal-plans?${queryParams.toString()}`;
+      const params = new URLSearchParams();
 
+      if (typeof dateOrOptions === 'string') {
+        params.append('date', dateOrOptions);
+      } else {
+        if (dateOrOptions.date) params.append('date', dateOrOptions.date);
+        if (dateOrOptions.startDate) params.append('startDate', dateOrOptions.startDate);
+        if (dateOrOptions.endDate) params.append('endDate', dateOrOptions.endDate);
+      }
+
+      const url = `${API_BASE_URL}/meal-plans?${params.toString()}`;
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -68,6 +76,32 @@ export const mealPlanService = {
       return null;
     } catch (error) {
       console.warn('Error adding meal plan item:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Toggle is_logged state for a meal plan item
+   */
+  async toggleMealPlanLog(planId: string, isLogged: boolean): Promise<MealPlanItem | null> {
+    try {
+      const token = await getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/meal-plans/${planId}/log`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ is_logged: isLogged }),
+      });
+
+      const resData = await response.json();
+      if (response.ok && resData.success && resData.data) {
+        return resData.data.plan;
+      }
+      return null;
+    } catch (error) {
+      console.warn('Error toggling meal plan log:', error);
       return null;
     }
   },

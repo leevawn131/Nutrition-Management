@@ -181,6 +181,35 @@ const calculateRecommendedTargetCalories = (tdee, daily_energy_adjustment, goal)
 };
 
 /**
+ * Calculate recommended macro targets (Protein, Carb, Fat) based on calories and goal
+ * @param {number} targetCalories
+ * @param {string} goal - 'lose' | 'maintain' | 'gain'
+ * @returns {Object} { targetProteinG, targetCarbG, targetFatG }
+ */
+const calculateMacroTargets = (targetCalories, goal) => {
+  const calories = Math.round(targetCalories);
+  let proteinRatio = 0.25;
+  let carbRatio = 0.50;
+  let fatRatio = 0.25;
+
+  if (goal === 'lose') {
+    proteinRatio = 0.30;
+    carbRatio = 0.45;
+    fatRatio = 0.25;
+  } else if (goal === 'gain') {
+    proteinRatio = 0.25;
+    carbRatio = 0.55;
+    fatRatio = 0.20;
+  }
+
+  return {
+    targetProteinG: Math.round((calories * proteinRatio) / 4),
+    targetCarbG: Math.round((calories * carbRatio) / 4),
+    targetFatG: Math.round((calories * fatRatio) / 9),
+  };
+};
+
+/**
  * Main function to calculate complete goal recommendation
  * @param {Object} params - { goal, current_weight, target_weight, target_duration_weeks, tdee }
  * @returns {Object}
@@ -197,6 +226,7 @@ const calculateGoalRecommendation = ({
 
   // 2. Handle maintain case
   if (goal === 'maintain') {
+    const macros = calculateMacroTargets(tdee, 'maintain');
     return {
       goal: 'maintain',
       currentWeight: current_weight,
@@ -206,6 +236,7 @@ const calculateGoalRecommendation = ({
       desiredWeeklyWeightChange: 0,
       dailyCalorieAdjustment: 0,
       recommendedTargetCalories: tdee,
+      macros,
     };
   }
 
@@ -214,6 +245,7 @@ const calculateGoalRecommendation = ({
   const desiredWeeklyWeightChange = calculateDesiredWeeklyWeightChange(weightChange, target_duration_weeks);
   const dailyCalorieAdjustment = calculateDailyCalorieAdjustment(desiredWeeklyWeightChange);
   const recommendedTargetCalories = calculateRecommendedTargetCalories(tdee, dailyCalorieAdjustment, goal);
+  const macros = calculateMacroTargets(recommendedTargetCalories, goal);
 
   return {
     goal,
@@ -224,6 +256,7 @@ const calculateGoalRecommendation = ({
     desiredWeeklyWeightChange,
     dailyCalorieAdjustment,
     recommendedTargetCalories,
+    macros,
   };
 };
 
@@ -235,5 +268,6 @@ module.exports = {
   calculateDesiredWeeklyWeightChange,
   calculateDailyCalorieAdjustment,
   calculateRecommendedTargetCalories,
+  calculateMacroTargets,
   calculateGoalRecommendation,
 };

@@ -26,6 +26,9 @@ router.get('/', optionalAuth, mealPlanController.getMealPlans);
 // POST /api/meal-plans
 router.post('/', optionalAuth, mealPlanController.addMealPlanItem);
 
+// PUT /api/meal-plans/:id/log
+router.put('/:id/log', optionalAuth, mealPlanController.toggleLogMealPlan);
+
 // DELETE /api/meal-plans/:id
 router.delete('/:id', optionalAuth, mealPlanController.deleteMealPlanItem);
 

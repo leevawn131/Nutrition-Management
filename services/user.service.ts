@@ -73,4 +73,29 @@ export const userService = {
       return null;
     }
   },
+
+  /**
+   * Update user profile (e.g. weight, height, name, macro targets)
+   */
+  async updateProfile(token: string, updateData: Partial<User>): Promise<User | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/profile`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      const data: ProfileResponse = await response.json();
+      if (response.ok && data.success && data.data) {
+        return data.data.user;
+      }
+      return null;
+    } catch (error) {
+      console.warn('Error updating user profile:', error);
+      return null;
+    }
+  },
 };

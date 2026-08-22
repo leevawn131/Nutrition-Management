@@ -28,6 +28,7 @@ const goalRoutes = require('./routes/goal.routes');
 const recipeRoutes = require('./routes/recipe.routes');
 const foodRoutes = require('./routes/food.routes');
 const mealPlanRoutes = require('./routes/meal_plan.routes');
+const mealLogRoutes = require('./routes/meal_log.routes');
 const activityRoutes = require('./routes/activity.routes');
 
 app.use('/api/auth', authRoutes);
@@ -37,6 +38,7 @@ app.use('/api/goal', goalRoutes);
 app.use('/api/recipes', recipeRoutes);
 app.use('/api/foods', foodRoutes);
 app.use('/api/meal-plans', mealPlanRoutes);
+app.use('/api/meal-logs', mealLogRoutes);
 app.use('/api/activities', activityRoutes);
 
 // Lắng nghe cổng

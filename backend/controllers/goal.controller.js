@@ -160,9 +160,18 @@ const confirmGoal = async (req, res) => {
       });
     }
 
-    // 5. Update only existing allowed fields in users collection: goal and target_calories
+    // 5. Update goal, target_calories, and macro targets in users collection
     user.goal = goal;
     user.target_calories = Math.round(recommendation.recommendedTargetCalories);
+    user.target_protein_g = req.body.target_protein_g !== undefined && req.body.target_protein_g !== null
+      ? req.body.target_protein_g
+      : (recommendation.macros && recommendation.macros.targetProteinG);
+    user.target_carb_g = req.body.target_carb_g !== undefined && req.body.target_carb_g !== null
+      ? req.body.target_carb_g
+      : (recommendation.macros && recommendation.macros.targetCarbG);
+    user.target_fat_g = req.body.target_fat_g !== undefined && req.body.target_fat_g !== null
+      ? req.body.target_fat_g
+      : (recommendation.macros && recommendation.macros.targetFatG);
 
     await user.save();
 

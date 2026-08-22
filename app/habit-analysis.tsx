@@ -1,7 +1,8 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -11,16 +12,40 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-type RangeType = 7 | 30;
+import { mealLogService } from '@/services/meal_log.service';
+import { PeriodStatistics } from '@/types/meal_log.types';
 
-const weekDays = ['T5', 'T6', 'T7', 'CN', 'T2', 'T3', 'T4'];
+type RangeType = 7 | 30;
 
 export default function HabitAnalysisScreen() {
   const router = useRouter();
   const [range, setRange] = useState<RangeType>(7);
+  const [statistics, setStatistics] = useState<PeriodStatistics | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const activeDaysCount = 0;
-  const loggedDaysCount = range === 7 ? 0 : 1;
+  const loadStatistics = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await mealLogService.getStatistics(range);
+      setStatistics(data);
+    } catch (err) {
+      console.warn('Error loading statistics:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [range]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadStatistics();
+    }, [loadStatistics])
+  );
+
+  const activeDaysCount = statistics?.activeDaysCount || 0;
+  const loggedDaysCount = statistics?.loggedDaysCount || 0;
+  const planCompletionPercent = statistics?.planCompletionPercent || 0;
+  const daysList = statistics?.days || [];
+  const totalBurnedMinutes = daysList.reduce((acc, d) => acc + (d.durationMinutes || 0), 0);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -66,7 +91,7 @@ export default function HabitAnalysisScreen() {
         showsVerticalScrollIndicator={false}>
         {/* Section 1: Tổng quan */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tổng quan</Text>
+          <Text style={styles.sectionTitle}>Tổng quan {range} ngày qua</Text>
           <View style={styles.summaryGrid}>
             {/* Card 1: Ngày active */}
             <View style={[styles.summaryCard, { backgroundColor: '#F0FDF4' }]}>
@@ -97,7 +122,7 @@ export default function HabitAnalysisScreen() {
               </View>
               <View style={styles.summaryTextGroup}>
                 <Text style={styles.summaryLabel}>Hoàn thành KH</Text>
-                <Text style={styles.summaryValue}>0%</Text>
+                <Text style={styles.summaryValue}>{planCompletionPercent}%</Text>
               </View>
             </View>
 
@@ -107,69 +132,97 @@ export default function HabitAnalysisScreen() {
                 <Ionicons name="time-outline" size={22} color="#EF4444" />
               </View>
               <View style={styles.summaryTextGroup}>
-                <Text style={styles.summaryLabel}>Thời gian vận động</Text>
-                <Text style={styles.summaryValue}>--</Text>
+                <Text style={styles.summaryLabel}>Vận động</Text>
+                <Text style={styles.summaryValue}>
+                  {totalBurnedMinutes > 0 ? `${totalBurnedMinutes} phút` : '--'}
+                </Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Section 2: Lịch Hoạt động & Nhật ký */}
+        {/* Section 2: Lịch Hoạt động & Nhật ký Heatmap */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Lịch Hoạt động &amp; Nhật ký</Text>
 
           {/* Legend */}
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
-              <View style={styles.legendDot} />
+              <View style={[styles.legendDot, { backgroundColor: '#38BDF8' }]} />
               <Text style={styles.legendText}>Vận động</Text>
             </View>
             <View style={styles.legendItem}>
-              <View style={styles.legendDot} />
+              <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
               <Text style={styles.legendText}>Bữa ăn đã ghi</Text>
             </View>
           </View>
 
           {/* Heatmap Grid */}
-          {range === 7 ? (
+          {loading ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="small" color="#10B981" />
+              <Text style={styles.loadingText}>Đang tổng hợp dữ liệu...</Text>
+            </View>
+          ) : range === 7 ? (
             <View style={styles.sevenDayContainer}>
               {/* Row 1: Vận động */}
               <View style={styles.sevenDayRow}>
-                {weekDays.map((_, i) => (
-                  <View key={`act-${i}`} style={styles.sevenDayCell} />
+                {daysList.map((d, i) => (
+                  <View
+                    key={`act-${i}`}
+                    style={[
+                      styles.sevenDayCell,
+                      d.hasActivity && { backgroundColor: '#38BDF8' },
+                    ]}
+                  />
                 ))}
               </View>
               {/* Row 2: Bữa ăn */}
               <View style={styles.sevenDayRow}>
-                {weekDays.map((_, i) => (
-                  <View key={`meal-${i}`} style={styles.sevenDayCell} />
+                {daysList.map((d, i) => (
+                  <View
+                    key={`meal-${i}`}
+                    style={[
+                      styles.sevenDayCell,
+                      d.hasMeal && { backgroundColor: '#10B981' },
+                    ]}
+                  />
                 ))}
               </View>
               {/* Day Labels */}
               <View style={styles.sevenDayLabelsRow}>
-                {weekDays.map((day, i) => (
-                  <Text key={`label-${day}-${i}`} style={styles.sevenDayLabel}>
-                    {day}
-                  </Text>
-                ))}
+                {daysList.map((d, i) => {
+                  const dayNum = d.date.split('-')[2];
+                  return (
+                    <Text key={`label-${i}`} style={styles.sevenDayLabel}>
+                      {dayNum}/08
+                    </Text>
+                  );
+                })}
               </View>
             </View>
           ) : (
             <View style={styles.thirtyDayContainer}>
               {/* Row 1: Vận động (30 ô) */}
               <View style={styles.thirtyDayRow}>
-                {Array.from({ length: 30 }).map((_, i) => (
-                  <View key={`act-30-${i}`} style={styles.thirtyDayCell} />
+                {daysList.map((d, i) => (
+                  <View
+                    key={`act-30-${i}`}
+                    style={[
+                      styles.thirtyDayCell,
+                      d.hasActivity && { backgroundColor: '#38BDF8' },
+                    ]}
+                  />
                 ))}
               </View>
-              {/* Row 2: Bữa ăn (30 ô, ô số 14 màu xanh) */}
+              {/* Row 2: Bữa ăn (30 ô) */}
               <View style={styles.thirtyDayRow}>
-                {Array.from({ length: 30 }).map((_, i) => (
+                {daysList.map((d, i) => (
                   <View
                     key={`meal-30-${i}`}
                     style={[
                       styles.thirtyDayCell,
-                      i === 13 && styles.thirtyDayCellActive,
+                      d.hasMeal && styles.thirtyDayCellActive,
                     ]}
                   />
                 ))}
@@ -179,97 +232,51 @@ export default function HabitAnalysisScreen() {
 
           {/* Scale Legend (0% - 100%) */}
           <View style={styles.scaleContainer}>
-            <Text style={styles.scaleText}>0%</Text>
-            <View style={[styles.scaleBlock, { backgroundColor: '#F0F1F3' }]} />
-            <View style={[styles.scaleBlock, { backgroundColor: '#D8F5EA' }]} />
-            <View style={[styles.scaleBlock, { backgroundColor: '#8AD9BA' }]} />
-            <View style={[styles.scaleBlock, { backgroundColor: '#49C99B' }]} />
-            <Text style={styles.scaleText}>100%</Text>
+            <View style={styles.scaleLabels}>
+              <Text style={styles.scaleLabelText}>0%</Text>
+              <Text style={styles.scaleLabelText}>50%</Text>
+              <Text style={styles.scaleLabelText}>100%</Text>
+            </View>
+            <View style={styles.scaleBarTrack}>
+              <View style={[styles.scaleBarBlock, { backgroundColor: '#E2E8F0' }]} />
+              <View style={[styles.scaleBarBlock, { backgroundColor: '#A7F3D0' }]} />
+              <View style={[styles.scaleBarBlock, { backgroundColor: '#34D399' }]} />
+              <View style={[styles.scaleBarBlock, { backgroundColor: '#10B981' }]} />
+              <View style={[styles.scaleBarBlock, { backgroundColor: '#047857' }]} />
+            </View>
           </View>
         </View>
 
-        {/* Section 3: Nhịp Bữa ăn (Chrononutrition) */}
+        {/* Section 3: Daily Calorie Consumption Bar Trend */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Nhịp Bữa ăn (Chrononutrition)</Text>
-
-          <View style={styles.chronoCardsRow}>
-            {/* Card 1: Bữa đầu TB */}
-            <View style={styles.chronoCard}>
-              <Text style={styles.chronoCardLabel}>Bữa đầu TB</Text>
-              <Text style={styles.chronoCardValue}>
-                {range === 7 ? '--' : '14:46'}
-              </Text>
-            </View>
-
-            {/* Card 2: Cửa sổ ăn */}
-            <View style={styles.chronoCard}>
-              <Text style={styles.chronoCardLabel}>Cửa sổ ăn</Text>
-              <Text style={styles.chronoCardValue}>~0h</Text>
-            </View>
-
-            {/* Card 3: Nhất quán giờ ăn */}
-            <View style={styles.chronoCard}>
-              <Text style={styles.chronoCardLabel}>Nhất quán giờ ăn</Text>
-              <Text style={styles.chronoCardMutedValue}>
-                Chưa đủ dữ liệu
-              </Text>
-            </View>
-          </View>
-
-          {/* Timeline chart (shown in 7-day mode) */}
-          {range === 7 && (
-            <View style={styles.timelineContainer}>
-              {/* Time header labels */}
-              <View style={styles.timeHeaderRow}>
-                <Text style={styles.timeHeaderText}>05:00</Text>
-                <Text style={styles.timeHeaderText}>10:00</Text>
-                <Text style={styles.timeHeaderText}>15:00</Text>
-                <Text style={styles.timeHeaderText}>21:00</Text>
-              </View>
-
-              {/* Guideline line indicator at ~21:00 */}
-              <View style={styles.timelineGuideLine} />
-
-              {/* 7 Daily Tracks */}
-              {weekDays.map((day, i) => (
-                <View key={`chrono-${day}-${i}`} style={styles.timelineTrackRow}>
-                  <Text style={styles.timelineDayLabel}>{day}</Text>
-                  <View style={styles.timelineTrack}>
-                    <Text style={styles.timelineTrackDash}>—</Text>
+          <Text style={styles.sectionTitle}>Diễn biến Calo nạp theo ngày</Text>
+          <View style={styles.trendCard}>
+            <View style={styles.trendBarsRow}>
+              {daysList.slice(range === 7 ? -7 : -14).map((d, i) => {
+                const heightPercent = Math.min(100, Math.max(10, Math.round((d.caloriesConsumed / 2500) * 100)));
+                const dayNum = d.date.split('-')[2];
+                return (
+                  <View key={`bar-${i}`} style={styles.trendBarCol}>
+                    <Text style={styles.trendBarVal}>
+                      {d.caloriesConsumed > 0 ? Math.round(d.caloriesConsumed) : ''}
+                    </Text>
+                    <View style={styles.trendBarBg}>
+                      <View
+                        style={[
+                          styles.trendBarFill,
+                          {
+                            height: `${heightPercent}%`,
+                            backgroundColor: d.caloriesConsumed > 0 ? '#10B981' : '#E2E8F0',
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.trendBarDay}>{dayNum}</Text>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
-          )}
-        </View>
-
-        {/* Section 4: 💡 Nhận xét */}
-        <View style={styles.section}>
-          <View style={styles.insightHeaderRow}>
-            <Ionicons name="bulb-outline" size={22} color="#F59E0B" />
-            <Text style={styles.insightTitle}>Nhận xét</Text>
           </View>
-
-          {range === 7 ? (
-            <View style={styles.insightCard}>
-              <Text style={styles.insightText}>
-                Chuỗi gián đoạn dài nhất: 7 ngày. Hãy nhớ quy tắc &quot;never miss twice&quot; — bỏ 1 ngày là bình thường, đừng để cascading.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.insightList}>
-              <View style={styles.insightCard}>
-                <Text style={styles.insightText}>
-                  Bạn chỉ ghi được 1/30 ngày. Nhật ký hiệu quả nhất khi log ≥5 ngày/tuần (NIH, 2023).
-                </Text>
-              </View>
-              <View style={styles.insightCard}>
-                <Text style={styles.insightText}>
-                  Chuỗi gián đoạn dài nhất: 15 ngày. Hãy nhớ quy tắc &quot;never miss twice&quot; — bỏ 1 ngày là bình thường, đừng để cascading.
-                </Text>
-              </View>
-            </View>
-          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -277,79 +284,64 @@ export default function HabitAnalysisScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 44,
-  },
+  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  content: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 50 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#F5F6F8',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
   headerTitle: {
-    flex: 1,
     fontSize: 18,
     fontWeight: '800',
     color: '#10294B',
   },
   rangeToggleContainer: {
     flexDirection: 'row',
-    backgroundColor: '#F3F4F8',
-    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 20,
     padding: 3,
-    flexShrink: 0,
   },
   rangePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    minWidth: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   rangePillActive: {
     backgroundColor: '#FFFFFF',
-    shadowColor: '#000000',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 2,
     elevation: 2,
   },
   rangePillText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '600',
     color: '#64748B',
   },
   rangePillTextActive: {
-    color: '#49C99B',
+    color: '#10294B',
     fontWeight: '700',
   },
   section: {
-    marginTop: 22,
+    marginTop: 20,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: '#10294B',
     marginBottom: 14,
@@ -357,24 +349,23 @@ const styles = StyleSheet.create({
   summaryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 12,
   },
   summaryCard: {
     width: '48%',
-    borderRadius: 16,
-    padding: 12,
+    borderRadius: 18,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   summaryIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
   summaryTextGroup: {
     flex: 1,
@@ -382,18 +373,17 @@ const styles = StyleSheet.create({
   summaryLabel: {
     fontSize: 12,
     color: '#64748B',
-    marginBottom: 2,
+    marginBottom: 4,
     fontWeight: '500',
   },
   summaryValue: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: '#10294B',
   },
   legendRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 20,
+    gap: 18,
     marginBottom: 14,
   },
   legendItem: {
@@ -402,182 +392,142 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 3,
-    backgroundColor: '#49C99B',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   legendText: {
+    fontSize: 12.5,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  loadingBox: {
+    paddingVertical: 30,
+    alignItems: 'center',
+    gap: 8,
+  },
+  loadingText: {
     fontSize: 13,
     color: '#64748B',
   },
   sevenDayContainer: {
+    backgroundColor: '#FAFAFB',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
     gap: 8,
   },
   sevenDayRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 6,
   },
   sevenDayCell: {
     flex: 1,
-    aspectRatio: 1,
-    borderRadius: 10,
-    backgroundColor: '#F0F1F3',
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#E2E8F0',
   },
   sevenDayLabelsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 4,
-    paddingHorizontal: 4,
   },
   sevenDayLabel: {
     flex: 1,
-    textAlign: 'center',
-    fontSize: 13,
+    fontSize: 11,
+    fontWeight: '600',
     color: '#64748B',
-    fontWeight: '500',
+    textAlign: 'center',
   },
   thirtyDayContainer: {
-    gap: 6,
+    backgroundColor: '#FAFAFB',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    gap: 8,
   },
   thirtyDayRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 3,
+    flexWrap: 'wrap',
+    gap: 4,
   },
   thirtyDayCell: {
-    flex: 1,
-    height: 10,
-    borderRadius: 2.5,
-    backgroundColor: '#F0F1F3',
+    width: '9%',
+    height: 22,
+    borderRadius: 4,
+    backgroundColor: '#E2E8F0',
   },
   thirtyDayCellActive: {
-    backgroundColor: '#49C99B',
+    backgroundColor: '#10B981',
   },
   scaleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: 6,
     marginTop: 14,
   },
-  scaleText: {
-    fontSize: 12,
-    color: '#94A3B8',
-  },
-  scaleBlock: {
-    width: 16,
-    height: 16,
-    borderRadius: 3,
-  },
-  chronoCardsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  chronoCard: {
-    flex: 1,
-    minHeight: 82,
-    borderRadius: 14,
-    backgroundColor: '#F6F7FA',
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chronoCardLabel: {
-    fontSize: 12,
-    color: '#475569',
-    marginBottom: 4,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  chronoCardValue: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#10294B',
-  },
-  chronoCardMutedValue: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  timelineContainer: {
-    marginTop: 8,
-    position: 'relative',
-  },
-  timeHeaderRow: {
+  scaleLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingLeft: 34,
-    paddingRight: 10,
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  timeHeaderText: {
-    fontSize: 12,
+  scaleLabelText: {
+    fontSize: 11,
     color: '#94A3B8',
-    fontWeight: '500',
+    fontWeight: '600',
   },
-  timelineGuideLine: {
-    position: 'absolute',
-    top: 24,
-    bottom: 4,
-    right: 28,
-    width: 1,
-    backgroundColor: 'rgba(239, 68, 68, 0.25)',
-    zIndex: 1,
-  },
-  timelineTrackRow: {
+  scaleBarTrack: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    gap: 2,
   },
-  timelineDayLabel: {
-    width: 24,
-    fontSize: 13,
-    color: '#94A3B8',
-    fontWeight: '500',
-  },
-  timelineTrack: {
+  scaleBarBlock: {
     flex: 1,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#F6F7FA',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  timelineTrackDash: {
-    color: '#CBD0D6',
-    fontSize: 14,
-  },
-  insightHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
-  },
-  insightTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#10294B',
-  },
-  insightList: {
-    gap: 10,
-  },
-  insightCard: {
-    borderRadius: 16,
-    backgroundColor: '#FFF5F3',
+  trendCard: {
+    backgroundColor: '#FAFAFB',
+    borderRadius: 18,
     padding: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
-  insightText: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: '#10294B',
-    fontWeight: '500',
+  trendBarsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 140,
+    gap: 6,
+  },
+  trendBarCol: {
+    flex: 1,
+    alignItems: 'center',
+    height: '100%',
+    justifyContent: 'flex-end',
+  },
+  trendBarVal: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#059669',
+    marginBottom: 4,
+  },
+  trendBarBg: {
+    width: 14,
+    height: 90,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 7,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
+  trendBarFill: {
+    width: '100%',
+    borderRadius: 7,
+  },
+  trendBarDay: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 6,
   },
 });

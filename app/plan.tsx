@@ -18,7 +18,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { activityService } from '@/services/activity.service';
 import { mealPlanService } from '@/services/meal_plan.service';
+import { getAuthToken, getCachedUser } from '@/services/storage.service';
+import { userService } from '@/services/user.service';
 import { Activity, ActivityLog } from '@/types/activity.types';
+import { User } from '@/types/auth.types';
 import { FoodItem, MealPlanItem, MealType, Recipe } from '@/types/plan.types';
 
 type Section = 'meals' | 'activities';
@@ -102,6 +105,9 @@ export default function PlanScreen() {
   const [mealSheetVisible, setMealSheetVisible] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>('breakfast');
 
+  // User target state
+  const [user, setUser] = useState<User | null>(null);
+
   // Meal plans state
   const [plannedMeals, setPlannedMeals] = useState<MealPlanItem[]>([]);
   const [loadingMeals, setLoadingMeals] = useState(false);
@@ -115,6 +121,13 @@ export default function PlanScreen() {
 
   const loadData = useCallback(async () => {
     try {
+      const cached = await getCachedUser();
+      if (cached) setUser(cached);
+      const token = await getAuthToken();
+      if (token) {
+        userService.getProfile(token).then((p) => p && setUser(p));
+      }
+
       if (section === 'meals') {
         setLoadingMeals(true);
         const items = await mealPlanService.getMealPlans(formattedDateStr);
@@ -253,6 +266,20 @@ export default function PlanScreen() {
           onPress: executeDelete,
         },
       ]);
+    }
+  };
+
+  const handleToggleLogMeal = async (item: MealPlanItem) => {
+    const newLoggedState = !item.is_logged;
+    setPlannedMeals((prev) =>
+      prev.map((m) => (m._id === item._id ? { ...m, is_logged: newLoggedState } : m))
+    );
+    try {
+      await mealPlanService.toggleMealPlanLog(item._id, newLoggedState);
+    } catch (err) {
+      console.warn('Error toggling meal log:', err);
+    } finally {
+      loadData();
     }
   };
 
@@ -413,8 +440,10 @@ export default function PlanScreen() {
             totalCarb={totalCarb}
             totalProtein={totalProtein}
             totalFat={totalFat}
+            user={user}
             onAddMeal={handleOpenAddMeal}
             onDeleteMealItem={handleDeleteMealItem}
+            onToggleLogMealItem={handleToggleLogMeal}
           />
         ) : (
           <ActivityPlan
@@ -538,8 +567,10 @@ function MealPlan({
   totalCarb,
   totalProtein,
   totalFat,
+  user,
   onAddMeal,
   onDeleteMealItem,
+  onToggleLogMealItem,
 }: {
   viewMode: ViewMode;
   currentWeekDays: DayInfo[];
@@ -551,10 +582,24 @@ function MealPlan({
   totalCarb: number;
   totalProtein: number;
   totalFat: number;
+  user?: User | null;
   onAddMeal: (mealType: MealType) => void;
   onDeleteMealItem: (item: MealPlanItem) => void;
+  onToggleLogMealItem: (item: MealPlanItem) => void;
 }) {
   const router = useRouter();
+
+  // Dynamic user targets
+  const targetCalories = user?.target_calories || 2000;
+  const targetCarb = user?.target_carb_g || Math.round((targetCalories * 0.5) / 4);
+  const targetProtein = user?.target_protein_g || Math.round((targetCalories * 0.25) / 4);
+  const targetFat = user?.target_fat_g || Math.round((targetCalories * 0.25) / 9);
+
+  // Plan completion calculations
+  const totalPlannedCount = plannedMeals.length;
+  const completedPlannedCount = plannedMeals.filter((m) => m.is_logged).length;
+  const planCompletionPercent =
+    totalPlannedCount > 0 ? Math.round((completedPlannedCount / totalPlannedCount) * 100) : 0;
 
   return (
     <View>
@@ -582,7 +627,7 @@ function MealPlan({
           {/* Calorie Stats */}
           <View style={styles.calorieRow}>
             <Text style={styles.calorie}>{Math.round(totalCalories)}</Text>
-            <Text style={styles.calorieUnit}>/ 1492 kcal</Text>
+            <Text style={styles.calorieUnit}>/ {targetCalories} kcal</Text>
           </View>
 
           {/* Macros */}
@@ -593,11 +638,16 @@ function MealPlan({
                 <View
                   style={[
                     styles.progressBar,
-                    { width: `${Math.min(100, (totalCarb / 213) * 100)}%`, backgroundColor: '#38BDF8' },
+                    {
+                      width: `${Math.min(100, (totalCarb / targetCarb) * 100)}%`,
+                      backgroundColor: '#38BDF8',
+                    },
                   ]}
                 />
               </View>
-              <Text style={styles.macroValue}>{Math.round(totalCarb)}g / 213g</Text>
+              <Text style={styles.macroValue}>
+                {Math.round(totalCarb)}g / {targetCarb}g
+              </Text>
             </View>
 
             <View style={styles.macro}>
@@ -606,11 +656,16 @@ function MealPlan({
                 <View
                   style={[
                     styles.progressBar,
-                    { width: `${Math.min(100, (totalProtein / 74) * 100)}%`, backgroundColor: '#49C99B' },
+                    {
+                      width: `${Math.min(100, (totalProtein / targetProtein) * 100)}%`,
+                      backgroundColor: '#49C99B',
+                    },
                   ]}
                 />
               </View>
-              <Text style={styles.macroValue}>{Math.round(totalProtein)}g / 74g</Text>
+              <Text style={styles.macroValue}>
+                {Math.round(totalProtein)}g / {targetProtein}g
+              </Text>
             </View>
 
             <View style={styles.macro}>
@@ -619,16 +674,35 @@ function MealPlan({
                 <View
                   style={[
                     styles.progressBar,
-                    { width: `${Math.min(100, (totalFat / 38) * 100)}%`, backgroundColor: '#F59E0B' },
+                    {
+                      width: `${Math.min(100, (totalFat / targetFat) * 100)}%`,
+                      backgroundColor: '#F59E0B',
+                    },
                   ]}
                 />
               </View>
-              <Text style={styles.macroValue}>{Math.round(totalFat)}g / 38g</Text>
+              <Text style={styles.macroValue}>
+                {Math.round(totalFat)}g / {targetFat}g
+              </Text>
             </View>
           </View>
 
-          <Metric title="Điểm dinh dưỡng" value="1" suffix="/10" status="Thấp" filled />
-          <Metric title="Độ đa dạng thực phẩm" value="0" suffix="/10" status="Thấp" />
+          {/* Plan Execution Progress Banner */}
+          <View style={styles.planProgressCard}>
+            <View style={styles.planProgressHeader}>
+              <View style={styles.planProgressTitleRow}>
+                <Ionicons name="checkmark-done-circle" size={20} color="#10B981" />
+                <Text style={styles.planProgressTitle}>Tiến độ thực hiện kế hoạch</Text>
+              </View>
+              <Text style={styles.planProgressBadge}>{planCompletionPercent}%</Text>
+            </View>
+            <View style={styles.planProgressBarTrack}>
+              <View style={[styles.planProgressBarFill, { width: `${planCompletionPercent}%` }]} />
+            </View>
+            <Text style={styles.planProgressSub}>
+              Đã hoàn thành {completedPlannedCount}/{totalPlannedCount} món đã lên thực đơn hôm nay
+            </Text>
+          </View>
         </>
       ) : (
         <>
@@ -761,7 +835,22 @@ function MealPlan({
                       const itemImg = recipe?.image_url || food?.image_url;
 
                       return (
-                        <View key={item._id} style={styles.plannedMealCard}>
+                        <View
+                          key={item._id}
+                          style={[styles.plannedMealCard, item.is_logged && styles.plannedMealCardLogged]}>
+                          {/* Check / Mark as Eaten Button */}
+                          <TouchableOpacity
+                            style={styles.checkBtn}
+                            onPress={() => onToggleLogMealItem(item)}
+                            activeOpacity={0.7}
+                            accessibilityLabel={item.is_logged ? 'Bỏ đánh dấu đã ăn' : 'Đánh dấu đã ăn'}>
+                            <Ionicons
+                              name={item.is_logged ? 'checkmark-circle' : 'ellipse-outline'}
+                              size={24}
+                              color={item.is_logged ? '#10B981' : '#94A3B8'}
+                            />
+                          </TouchableOpacity>
+
                           <View style={styles.mealItemThumb}>
                             {itemImg ? (
                               <Image source={{ uri: itemImg }} style={styles.mealItemImage} />
@@ -777,9 +866,18 @@ function MealPlan({
                           </View>
 
                           <View style={styles.mealItemDetails}>
-                            <Text style={styles.mealItemName} numberOfLines={1}>
-                              {itemName}
-                            </Text>
+                            <View style={styles.mealItemTitleRow}>
+                              <Text
+                                style={[styles.mealItemName, item.is_logged && styles.mealItemNameLogged]}
+                                numberOfLines={1}>
+                                {itemName}
+                              </Text>
+                              {item.is_logged && (
+                                <View style={styles.loggedBadge}>
+                                  <Text style={styles.loggedBadgeText}>Đã ăn</Text>
+                                </View>
+                              )}
+                            </View>
                             <Text style={styles.mealItemNutrition}>
                               {item.food_item_id ? '100 g' : `${Math.round(itemCalories)} kcal · ${Math.round(itemProtein)}g đạm`}
                             </Text>
@@ -1239,10 +1337,72 @@ const styles = StyleSheet.create({
   weekDayTextActive: {
     color: '#FFFFFF',
   },
+  planProgressCard: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+  },
+  planProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  planProgressTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  planProgressTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  planProgressBadge: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  planProgressBarTrack: {
+    height: 8,
+    backgroundColor: '#DCFCE7',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  planProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    borderRadius: 4,
+  },
+  planProgressSub: {
+    fontSize: 12.5,
+    color: '#047857',
+  },
   mealGroups: { marginTop: 14 },
   mealGroup: { marginBottom: 22 },
   mealGroupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   mealGroupTitle: { fontSize: 18, fontWeight: '700', color: '#10294B' },
+  mealGroupActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  mealSuggestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  mealSuggestBtnText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#059669',
+  },
   mealAddButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
   mealEmpty: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4 },
   mealEmptyIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: '#F5F6F8', alignItems: 'center', justifyContent: 'center', position: 'relative', marginRight: 14 },
@@ -1259,23 +1419,45 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: '#F1F5F9',
-    gap: 14,
+    gap: 12,
+  },
+  plannedMealCardLogged: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#DCFCE7',
+  },
+  checkBtn: {
+    padding: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   mealItemThumb: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     overflow: 'hidden',
     backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mealItemImage: { width: '100%', height: '100%', borderRadius: 27 },
+  mealItemImage: { width: '100%', height: '100%', borderRadius: 25 },
   mealItemImageFallback: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ECFDF5' },
   mealItemDetails: { flex: 1 },
-  mealItemName: { fontSize: 16, fontWeight: '700', color: '#10294B', marginBottom: 4 },
-  mealItemNutrition: { fontSize: 14, color: '#64748B' },
-  deleteButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF1F1', alignItems: 'center', justifyContent: 'center' },
+  mealItemTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  mealItemName: { fontSize: 15.5, fontWeight: '700', color: '#10294B', flexShrink: 1 },
+  mealItemNameLogged: { color: '#047857' },
+  loggedBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  loggedBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  mealItemNutrition: { fontSize: 13, color: '#64748B' },
+  deleteButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#FFF1F1', alignItems: 'center', justifyContent: 'center' },
   loadingBox: { paddingVertical: 20, alignItems: 'center', gap: 8 },
   loadingText: { fontSize: 13, color: '#64748B' },
   activityLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },

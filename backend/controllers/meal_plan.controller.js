@@ -8,20 +8,19 @@ const getEffectiveUserId = async (req) => {
   if (req.user && req.user.id) {
     return req.user.id;
   }
-  // Fallback to first user in database if unauthenticated for smooth demo/testing
   const firstUser = await User.findOne({ role: 'user' }).lean();
   return firstUser ? firstUser._id.toString() : null;
 };
 
 /**
  * GET /api/meal-plans
- * Get meal plans for a specific date
+ * Get meal plans for a specific date or date range
  */
 const getMealPlans = async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, startDate, endDate } = req.query;
     const userId = await getEffectiveUserId(req);
-    const plans = await mealPlanService.getMealPlans(userId, date);
+    const plans = await mealPlanService.getMealPlans(userId, { date, startDate, endDate });
 
     return res.status(200).json({
       success: true,
@@ -74,6 +73,32 @@ const addMealPlanItem = async (req, res) => {
 };
 
 /**
+ * PUT /api/meal-plans/:id/log
+ * Toggle is_logged state for a meal plan item
+ */
+const toggleLogMealPlan = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_logged } = req.body;
+    const userId = await getEffectiveUserId(req);
+
+    const updatedPlan = await mealPlanService.toggleLogMealPlan(userId, id, is_logged);
+
+    return res.status(200).json({
+      success: true,
+      message: is_logged ? 'Đã đánh dấu món ăn đã hoàn thành' : 'Đã bỏ đánh dấu món ăn',
+      data: { plan: updatedPlan },
+    });
+  } catch (error) {
+    console.error('Error in toggleLogMealPlan:', error.message);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Lỗi khi cập nhật trạng thái kế hoạch',
+    });
+  }
+};
+
+/**
  * DELETE /api/meal-plans/:id
  * Remove an item from the meal plan
  */
@@ -98,7 +123,7 @@ const deleteMealPlanItem = async (req, res) => {
     console.error('Error in deleteMealPlanItem:', error.message);
     return res.status(500).json({
       success: false,
-      message: 'Lỗi khi xoá món khỏi kế hoạch',
+      message: 'Lỗi máy chủ khi xoá mục kế hoạch',
     });
   }
 };
@@ -106,5 +131,6 @@ const deleteMealPlanItem = async (req, res) => {
 module.exports = {
   getMealPlans,
   addMealPlanItem,
+  toggleLogMealPlan,
   deleteMealPlanItem,
 };
