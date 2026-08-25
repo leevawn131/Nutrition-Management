@@ -2,12 +2,19 @@
 
 # dependencies
 node_modules/
+**/node_modules/
 .env
+**/.env
+**/.env.local
+**/.env.*.local
 
 # Expo
 .expo/
+**/.expo/
 dist/
 web-build/
+**/dist/
+**/web-build/
 expo-env.d.ts
 
 # Native
