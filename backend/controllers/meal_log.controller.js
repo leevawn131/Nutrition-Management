@@ -6,7 +6,10 @@ const User = require('../models/user.model');
  */
 const getEffectiveUserId = async (req) => {
   if (req.user && req.user.id) {
-    return req.user.id;
+    const userExists = await User.findById(req.user.id).lean();
+    if (userExists) {
+      return req.user.id;
+    }
   }
   const firstUser = await User.findOne({ role: 'user' }).lean();
   return firstUser ? firstUser._id.toString() : null;

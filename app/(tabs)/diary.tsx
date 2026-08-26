@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons, FontAwesome6 } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,15 +20,91 @@ import { mealLogService } from '@/services/meal_log.service';
 import { DailySummary, MealLog } from '@/types/meal_log.types';
 import { MealType } from '@/types/plan.types';
 
-const diaryDays = [
-  { day: 'T2', date: 17 },
-  { day: 'T3', date: 18 },
-  { day: 'T4', date: 19 },
-  { day: 'T5', date: 20 },
-  { day: 'T6', date: 21 },
-  { day: 'T7', date: 22, weekend: true },
-  { day: 'CN', date: 23, weekend: true },
-];
+interface DayInfo {
+  label: string;
+  dayName: string;
+  date: number;
+  month: number;
+  year: number;
+  fullDate: string;
+  displayDate: string;
+  weekend?: boolean;
+  isToday?: boolean;
+}
+
+interface WeekInfo {
+  index: number;
+  label: string;
+  range: string;
+  fullRange: string;
+  days: DayInfo[];
+}
+
+const DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const DAY_NAMES = ['hai', 'ba', 'tư', 'năm', 'sáu', 'bảy', 'chủ nhật'];
+
+function formatYYYYMMDD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getMonday(d: Date): Date {
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = date.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+
+function generateWeeksData(refDate: Date = new Date()): WeekInfo[] {
+  const currentMonday = getMonday(refDate);
+  const todayStr = formatYYYYMMDD(refDate);
+  const weekLabels = ['Tuần trước', 'Tuần này', 'Tuần sau'];
+  const weekOffsets = [-7, 0, 7];
+
+  return weekOffsets.map((offset, index) => {
+    const monday = new Date(currentMonday);
+    monday.setDate(monday.getDate() + offset);
+
+    const days: DayInfo[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+
+      const dayNumber = d.getDate();
+      const monthNumber = d.getMonth() + 1;
+      const yearNumber = d.getFullYear();
+      const fullDate = formatYYYYMMDD(d);
+      const displayDate = `${String(dayNumber).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}`;
+
+      days.push({
+        label: DAY_LABELS[i],
+        dayName: DAY_NAMES[i],
+        date: dayNumber,
+        month: monthNumber,
+        year: yearNumber,
+        fullDate,
+        displayDate,
+        weekend: i === 5 || i === 6,
+        isToday: fullDate === todayStr,
+      });
+    }
+
+    const startDay = days[0];
+    const endDay = days[6];
+    const range = `${startDay.displayDate} - ${endDay.displayDate}`;
+    const fullRange = `${startDay.displayDate}/${startDay.year} - ${endDay.displayDate}/${endDay.year}`;
+
+    return {
+      index,
+      label: weekLabels[index],
+      range,
+      fullRange,
+      days,
+    };
+  });
+}
 
 const MEAL_SECTIONS: { key: MealType; title: string; icon: string; color: string }[] = [
   { key: 'breakfast', title: 'Bữa sáng', icon: 'weather-sunset-up', color: '#F59E0B' },
@@ -39,8 +115,12 @@ const MEAL_SECTIONS: { key: MealType; title: string; icon: string; color: string
 
 export default function DiaryScreen() {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState(20);
-  const [selectedWeek, setSelectedWeek] = useState<'prev' | 'current' | 'next'>('current');
+
+  const todayStr = useMemo(() => formatYYYYMMDD(new Date()), []);
+  const weeksData = useMemo(() => generateWeeksData(new Date()), []);
+
+  const [selectedWeekIndex, setSelectedWeekIndex] = useState(1);
+  const [selectedFullDate, setSelectedFullDate] = useState(todayStr);
   const [displayMode, setDisplayMode] = useState('Tất cả');
   const [displayModeVisible, setDisplayModeVisible] = useState(false);
 
@@ -58,8 +138,12 @@ export default function DiaryScreen() {
   const [fatInput, setFatInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const formattedDateStr = `2026-08-${String(selectedDate).padStart(2, '0')}`;
-  const selectedDay = diaryDays.find((item) => item.date === selectedDate) ?? diaryDays[3];
+  const formattedDateStr = selectedFullDate;
+  const currentWeek = weeksData[selectedWeekIndex] || weeksData[1];
+  const selectedDayInfo =
+    currentWeek.days.find((d) => d.fullDate === selectedFullDate) ||
+    weeksData.flatMap((w) => w.days).find((d) => d.fullDate === selectedFullDate) ||
+    currentWeek.days[0];
 
   const loadDiaryData = useCallback(async () => {
     setLoading(true);
@@ -73,11 +157,36 @@ export default function DiaryScreen() {
     }
   }, [formattedDateStr]);
 
+  useEffect(() => {
+    loadDiaryData();
+  }, [loadDiaryData]);
+
   useFocusEffect(
     useCallback(() => {
       loadDiaryData();
     }, [loadDiaryData])
   );
+
+  const handleSelectWeek = (weekIndex: number) => {
+    setSelectedWeekIndex(weekIndex);
+    const targetWeek = weeksData[weekIndex];
+    if (targetWeek) {
+      const isDateInWeek = targetWeek.days.some((d) => d.fullDate === selectedFullDate);
+      if (!isDateInWeek) {
+        const todayInWeek = targetWeek.days.find((d) => d.fullDate === todayStr);
+        const newDay = todayInWeek || targetWeek.days[0];
+        setSelectedFullDate(newDay.fullDate);
+      }
+    }
+  };
+
+  const handleSelectDate = (fullDate: string) => {
+    setSelectedFullDate(fullDate);
+    const weekWithDay = weeksData.find((w) => w.days.some((d) => d.fullDate === fullDate));
+    if (weekWithDay && weekWithDay.index !== selectedWeekIndex) {
+      setSelectedWeekIndex(weekWithDay.index);
+    }
+  };
 
   const handleOpenAddModal = (mealType: MealType) => {
     setAddMealType(mealType);
@@ -146,19 +255,6 @@ export default function DiaryScreen() {
     }
   };
 
-  const getDayName = (day: string) => {
-    switch (day) {
-      case 'T2': return 'thứ hai';
-      case 'T3': return 'thứ ba';
-      case 'T4': return 'thứ tư';
-      case 'T5': return 'thứ năm';
-      case 'T6': return 'thứ sáu';
-      case 'T7': return 'thứ bảy';
-      case 'CN': return 'chủ nhật';
-      default: return 'thứ năm';
-    }
-  };
-
   const consumedCalories = summary?.consumed.calories || 0;
   const targetCalories = summary?.targets.calories || 2000;
   const calPercent = summary?.percentages.calories || 0;
@@ -193,60 +289,42 @@ export default function DiaryScreen() {
 
         {/* Week Selector */}
         <View style={styles.weekPicker}>
-          <TouchableOpacity
-            style={[styles.weekCell, selectedWeek === 'prev' && styles.weekCellActive]}
-            activeOpacity={0.7}
-            onPress={() => setSelectedWeek('prev')}>
-            <Text style={[styles.weekLabel, selectedWeek === 'prev' && styles.activeText]}>
-              Tuần trước
-            </Text>
-            <Text style={[styles.weekDate, selectedWeek === 'prev' && styles.activeText]}>
-              10/08 - 16/08
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.weekCell, selectedWeek === 'current' && styles.weekCellActive]}
-            activeOpacity={0.7}
-            onPress={() => setSelectedWeek('current')}>
-            <Text style={[styles.weekLabel, selectedWeek === 'current' && styles.activeText]}>
-              Tuần này
-            </Text>
-            <Text style={[styles.weekDate, selectedWeek === 'current' && styles.activeText]}>
-              17/08 - 23/08
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.weekCell, selectedWeek === 'next' && styles.weekCellActive, selectedWeek !== 'next' && styles.weekCellDisabled]}
-            activeOpacity={0.7}
-            onPress={() => setSelectedWeek('next')}>
-            <Text style={[styles.weekLabel, selectedWeek === 'next' && styles.activeText]}>
-              Tuần sau
-            </Text>
-            <Text style={[styles.weekDate, selectedWeek === 'next' && styles.activeText]}>
-              24/08 - 30/08
-            </Text>
-          </TouchableOpacity>
+          {weeksData.map((week) => {
+            const isWeekActive = selectedWeekIndex === week.index;
+            return (
+              <TouchableOpacity
+                key={week.label}
+                style={[styles.weekCell, isWeekActive && styles.weekCellActive]}
+                activeOpacity={0.7}
+                onPress={() => handleSelectWeek(week.index)}>
+                <Text style={[styles.weekLabel, isWeekActive && styles.activeText]}>
+                  {week.label}
+                </Text>
+                <Text style={[styles.weekDate, isWeekActive && styles.activeText]}>
+                  {week.range}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Day Picker */}
         <View style={styles.dayPicker}>
-          {diaryDays.map((item) => {
-            const isSelected = selectedDate === item.date;
+          {currentWeek.days.map((item) => {
+            const isSelected = selectedFullDate === item.fullDate;
             return (
               <TouchableOpacity
-                key={item.date}
+                key={item.fullDate}
                 style={[styles.dayCell, isSelected && styles.dayCellActive]}
                 activeOpacity={0.7}
-                onPress={() => setSelectedDate(item.date)}>
+                onPress={() => handleSelectDate(item.fullDate)}>
                 <Text
                   style={[
                     styles.dayLabel,
                     item.weekend && styles.weekendText,
                     isSelected && styles.activeText,
                   ]}>
-                  {item.day}
+                  {item.label}
                 </Text>
                 <Text
                   style={[
@@ -264,8 +342,10 @@ export default function DiaryScreen() {
         {/* Selected Day Summary Card */}
         <View style={styles.summarySection}>
           <Text style={styles.summaryTitle}>
-            {getDayName(selectedDay.day)}, {selectedDay.date} tháng 8, 2026
-            {selectedDay.date === 20 ? ' · Hôm nay' : ''}
+            {selectedDayInfo.dayName === 'chủ nhật'
+              ? `Chủ nhật, ${selectedDayInfo.date} tháng ${selectedDayInfo.month}, ${selectedDayInfo.year}`
+              : `Thứ ${selectedDayInfo.dayName}, ${selectedDayInfo.date} tháng ${selectedDayInfo.month}, ${selectedDayInfo.year}`}
+            {selectedDayInfo.isToday ? ' · Hôm nay' : ''}
           </Text>
 
           {/* Calorie & Macro Target Progress */}
