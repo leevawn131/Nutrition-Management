@@ -6,6 +6,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Platform,
   RefreshControl,
   StatusBar,
   StyleSheet,
@@ -217,20 +218,30 @@ export default function IngredientsScreen() {
         });
       }
 
-      Alert.alert(
-        'Thành công',
-        `Đã thêm ${selectedIds.length} nguyên liệu vào kế hoạch.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]
-      );
+      if (Platform.OS === 'web') {
+        window.alert(`Đã thêm ${selectedIds.length} nguyên liệu vào kế hoạch.`);
+        router.back();
+      } else {
+        Alert.alert(
+          'Thành công',
+          `Đã thêm ${selectedIds.length} nguyên liệu vào kế hoạch.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      }
     } catch (error) {
-      Alert.alert('Thông báo', 'Đã thêm nguyên liệu vào kế hoạch thành công!', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      if (Platform.OS === 'web') {
+        window.alert('Đã thêm nguyên liệu vào kế hoạch thành công!');
+        router.back();
+      } else {
+        Alert.alert('Thông báo', 'Đã thêm nguyên liệu vào kế hoạch thành công!', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }
     } finally {
       setIsSubmitting(false);
     }

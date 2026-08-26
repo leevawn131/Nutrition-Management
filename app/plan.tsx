@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -122,7 +122,9 @@ const MEAL_CATEGORIES: { key: MealType; title: string }[] = [
 
 export default function PlanScreen() {
   const router = useRouter();
-  const [section, setSection] = useState<Section>('activities');
+  const routeParams = useLocalSearchParams<{ tab?: string }>();
+  const initialSection: Section = routeParams.tab === 'activities' ? 'activities' : 'meals';
+  const [section, setSection] = useState<Section>(initialSection);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
 
   const todayStr = useMemo(() => formatYYYYMMDD(new Date()), []);
@@ -151,6 +153,12 @@ export default function PlanScreen() {
     weeksData.flatMap((w) => w.days).find((d) => d.fullDate === selectedFullDate) ||
     currentWeek.days[0];
 
+  useEffect(() => {
+    if (routeParams.tab === 'activities' || routeParams.tab === 'meals') {
+      setSection(routeParams.tab as Section);
+    }
+  }, [routeParams.tab]);
+
   const loadData = useCallback(async () => {
     try {
       const cached = await getCachedUser();
@@ -176,6 +184,11 @@ export default function PlanScreen() {
       setLoadingActivities(false);
     }
   }, [formattedDateStr, section]);
+
+  // Ensure data loads whenever dependencies change or screen is focused
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   useFocusEffect(
     useCallback(() => {
@@ -521,7 +534,17 @@ export default function PlanScreen() {
 
         <TouchableOpacity
           style={styles.quickPill}
-          onPress={() => (section === 'meals' ? router.push('/recipes') : handleOpenAddActivity())}
+          onPress={() =>
+            section === 'meals'
+              ? router.push({
+                  pathname: '/recipes',
+                  params: {
+                    planDate: formattedDateStr,
+                    mealType: 'breakfast',
+                  },
+                })
+              : handleOpenAddActivity()
+          }
           activeOpacity={0.8}>
           <Text style={styles.quickPillText}>{section === 'meals' ? 'Mẹo meal prep' : 'Thêm hoạt động'}</Text>
         </TouchableOpacity>
@@ -841,7 +864,11 @@ function MealPlan({
                 </View>
 
                 {itemsInGroup.length === 0 ? (
-                  <View style={styles.mealEmpty}>
+                  <TouchableOpacity
+                    style={styles.mealEmpty}
+                    onPress={() => onAddMeal(key)}
+                    activeOpacity={0.7}
+                    accessibilityLabel={`Thêm món vào ${title}`}>
                     <View style={styles.mealEmptyIcon}>
                       <MaterialCommunityIcons name="silverware-fork-knife" size={34} color="#CBD5E1" />
                       <View style={styles.mealHeart}>
@@ -850,9 +877,9 @@ function MealPlan({
                     </View>
                     <View style={styles.mealEmptyCopy}>
                       <Text style={styles.mealEmptyTitle}>Chưa có món ăn</Text>
-                      <Text style={styles.mealEmptyText}>Thêm món để đạt mục tiêu dinh dưỡng</Text>
+                      <Text style={styles.mealEmptyText}>Nhấn để thêm món vào {title.toLowerCase()}</Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ) : (
                   <View style={styles.mealItemsList}>
                     {itemsInGroup.map((item) => {

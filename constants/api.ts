@@ -19,9 +19,9 @@ const getWebFallbackApiUrl = () => {
 };
 
 export const API_BASE_URL =
-  ENV_API_URL ||
-  (Platform.OS === 'android'
-    ? 'http://10.0.2.2:5000/api'
-    : Platform.OS === 'web'
-      ? getWebFallbackApiUrl()
-      : 'http://localhost:5000/api');
+  Platform.OS === 'web'
+    ? getWebFallbackApiUrl()
+    : ENV_API_URL ||
+      (Platform.OS === 'android'
+        ? 'http://10.0.2.2:5000/api'
+        : 'http://localhost:5000/api');

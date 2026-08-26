@@ -20,7 +20,9 @@ const getMealPlans = async (req, res) => {
   try {
     const { date, startDate, endDate } = req.query;
     const userId = await getEffectiveUserId(req);
+    console.log(`[API GET /api/meal-plans] userId: ${userId}, query:`, { date, startDate, endDate });
     const plans = await mealPlanService.getMealPlans(userId, { date, startDate, endDate });
+    console.log(`[API GET /api/meal-plans] Returned ${plans.length} plans for userId ${userId}`);
 
     return res.status(200).json({
       success: true,
@@ -42,6 +44,7 @@ const getMealPlans = async (req, res) => {
 const addMealPlanItem = async (req, res) => {
   try {
     const userId = await getEffectiveUserId(req);
+    console.log(`[API POST /api/meal-plans] userId: ${userId}, body:`, req.body);
     if (!userId) {
       return res.status(400).json({
         success: false,
@@ -57,6 +60,7 @@ const addMealPlanItem = async (req, res) => {
       food_item_id,
       source,
     });
+    console.log(`[API POST /api/meal-plans] Created plan ID: ${plan ? plan._id : null}`);
 
     return res.status(201).json({
       success: true,

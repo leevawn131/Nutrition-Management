@@ -6,6 +6,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  Platform,
   RefreshControl,
   ScrollView,
   StatusBar,
@@ -171,27 +172,38 @@ export default function RecipesScreen() {
   const handleSelectRecipe = async (recipe: Recipe) => {
     try {
       setAddingId(recipe._id);
-      const res = await mealPlanService.addMealPlanItem({
+      const isFallback = recipe._id.startsWith('recipe-');
+      await mealPlanService.addMealPlanItem({
         plan_date: planDate,
         meal_type: mealType,
-        recipe_id: recipe._id.startsWith('recipe-') ? null : recipe._id,
+        recipe_id: isFallback ? null : recipe._id,
         source: 'recipe',
       });
 
-      Alert.alert(
-        'Đã thêm công thức',
-        `Đã thêm "${recipe.title}" vào kế hoạch ${getMealTypeName(mealType)}.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]
-      );
+      if (Platform.OS === 'web') {
+        window.alert(`Đã thêm "${recipe.title}" vào kế hoạch ${getMealTypeName(mealType)}.`);
+        router.back();
+      } else {
+        Alert.alert(
+          'Đã thêm công thức',
+          `Đã thêm "${recipe.title}" vào kế hoạch ${getMealTypeName(mealType)}.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      }
     } catch (error) {
-      Alert.alert('Thông báo', 'Đã thêm món vào kế hoạch thành công!', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      if (Platform.OS === 'web') {
+        window.alert('Đã thêm món vào kế hoạch thành công!');
+        router.back();
+      } else {
+        Alert.alert('Thông báo', 'Đã thêm món vào kế hoạch thành công!', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }
     } finally {
       setAddingId(null);
     }
