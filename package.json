@@ -8,6 +8,7 @@
     "mobile": "cd frontend/mobile && npm start",
     "backend": "cd backend && node server.js",
     "admin": "cd frontend/admin && npm run dev",
+    "build:admin": "cd frontend/admin && npm run build",
     "dev:all": "concurrently \"npm run backend\" \"npm run mobile\" \"npm run admin\""
   },
   "devDependencies": {
