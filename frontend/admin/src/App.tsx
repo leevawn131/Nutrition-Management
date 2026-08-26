@@ -6,6 +6,7 @@ import { AdminLayout } from './layouts/AdminLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Users } from './pages/Users';
+import { Foods } from './pages/Foods';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 
 export const App: React.FC = () => {
@@ -22,15 +23,7 @@ export const App: React.FC = () => {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/users" element={<Users />} />
-              <Route
-                path="/foods"
-                element={
-                  <PlaceholderPage
-                    title="Quản lý Món ăn & Dinh dưỡng"
-                    description="Quản lý cơ sở dữ liệu thực phẩm, thành phần calo, protein, carb, fat."
-                  />
-                }
-              />
+              <Route path="/foods" element={<Foods />} />
               <Route
                 path="/meal-plans"
                 element={
