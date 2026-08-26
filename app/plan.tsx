@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FoodDetailSheet } from '@/components/plan/food-detail-sheet';
 import { activityService } from '@/services/activity.service';
 import { mealPlanService } from '@/services/meal_plan.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
@@ -47,8 +48,8 @@ interface WeekInfo {
   days: DayInfo[];
 }
 
-const DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-const DAY_NAMES = ['hai', 'ba', 'tư', 'năm', 'sáu', 'bảy', 'chủ nhật'];
+const DAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+const DAY_NAMES = ['chủ nhật', 'hai', 'ba', 'tư', 'năm', 'sáu', 'bảy'];
 
 function formatYYYYMMDD(d: Date): string {
   const y = d.getFullYear();
@@ -57,27 +58,26 @@ function formatYYYYMMDD(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function getMonday(d: Date): Date {
+function getSunday(d: Date): Date {
   const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const day = date.getDay(); // 0 is Sunday, 1 is Monday...
-  const diff = (day === 0 ? -6 : 1) - day;
-  date.setDate(date.getDate() + diff);
+  date.setDate(date.getDate() - day);
   return date;
 }
 
 function generateWeeksData(refDate: Date = new Date()): WeekInfo[] {
-  const currentMonday = getMonday(refDate);
+  const currentSunday = getSunday(refDate);
   const todayStr = formatYYYYMMDD(refDate);
   const weekLabels = ['Tuần trước', 'Tuần này', 'Tuần sau'];
   const weekOffsets = [-7, 0, 7];
 
   return weekOffsets.map((offset, index) => {
-    const monday = new Date(currentMonday);
-    monday.setDate(monday.getDate() + offset);
+    const sunday = new Date(currentSunday);
+    sunday.setDate(sunday.getDate() + offset);
 
     const days: DayInfo[] = [];
     for (let i = 0; i < 7; i++) {
-      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+      const d = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + i);
 
       const dayNumber = d.getDate();
       const monthNumber = d.getMonth() + 1;
@@ -93,7 +93,7 @@ function generateWeeksData(refDate: Date = new Date()): WeekInfo[] {
         year: yearNumber,
         fullDate,
         displayDate,
-        weekend: i === 5 || i === 6,
+        weekend: i === 0 || i === 6,
         isToday: fullDate === todayStr,
       });
     }
@@ -134,6 +134,10 @@ export default function PlanScreen() {
   const [selectedFullDate, setSelectedFullDate] = useState(todayStr);
   const [mealSheetVisible, setMealSheetVisible] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>('breakfast');
+
+  // Food Item Detail Sheet state
+  const [selectedMealItem, setSelectedMealItem] = useState<MealPlanItem | null>(null);
+  const [detailSheetVisible, setDetailSheetVisible] = useState(false);
 
   // User target state
   const [user, setUser] = useState<User | null>(null);
@@ -334,6 +338,11 @@ export default function PlanScreen() {
     }
   };
 
+  const handleOpenMealDetail = (item: MealPlanItem) => {
+    setSelectedMealItem(item);
+    setDetailSheetVisible(true);
+  };
+
   const handleOpenAddActivity = () => {
     router.push({
       pathname: '/activity',
@@ -498,6 +507,7 @@ export default function PlanScreen() {
             onAddMeal={handleOpenAddMeal}
             onDeleteMealItem={handleDeleteMealItem}
             onToggleLogMealItem={handleToggleLogMeal}
+            onOpenMealDetail={handleOpenMealDetail}
           />
         ) : (
           <ActivityPlan
@@ -564,6 +574,16 @@ export default function PlanScreen() {
         onSelectRecipe={handleSelectAddRecipe}
         onSelectIngredient={handleSelectAddIngredient}
       />
+
+      {/* Food Item Detail Bottom Sheet */}
+      <FoodDetailSheet
+        visible={detailSheetVisible}
+        item={selectedMealItem}
+        user={user}
+        onClose={() => setDetailSheetVisible(false)}
+        onDelete={handleDeleteMealItem}
+        onToggleLogged={handleToggleLogMeal}
+      />
     </SafeAreaView>
   );
 }
@@ -624,6 +644,7 @@ function MealPlan({
   onAddMeal,
   onDeleteMealItem,
   onToggleLogMealItem,
+  onOpenMealDetail,
 }: {
   viewMode: ViewMode;
   currentWeekDays: DayInfo[];
@@ -640,6 +661,7 @@ function MealPlan({
   onAddMeal: (mealType: MealType) => void;
   onDeleteMealItem: (item: MealPlanItem) => void;
   onToggleLogMealItem: (item: MealPlanItem) => void;
+  onOpenMealDetail: (item: MealPlanItem) => void;
 }) {
   const router = useRouter();
 
@@ -909,37 +931,44 @@ function MealPlan({
                             />
                           </TouchableOpacity>
 
-                          <View style={styles.mealItemThumb}>
-                            {itemImg ? (
-                              <Image source={{ uri: itemImg }} style={styles.mealItemImage} />
-                            ) : (
-                              <View style={styles.mealItemImageFallback}>
-                                <MaterialCommunityIcons
-                                  name={isRecipe ? 'chef-hat' : 'food-apple-outline'}
-                                  size={24}
-                                  color="#49C99B"
-                                />
-                              </View>
-                            )}
-                          </View>
-
-                          <View style={styles.mealItemDetails}>
-                            <View style={styles.mealItemTitleRow}>
-                              <Text
-                                style={[styles.mealItemName, item.is_logged && styles.mealItemNameLogged]}
-                                numberOfLines={1}>
-                                {itemName}
-                              </Text>
-                              {item.is_logged && (
-                                <View style={styles.loggedBadge}>
-                                  <Text style={styles.loggedBadgeText}>Đã ăn</Text>
+                          {/* Main clickable area for viewing food details */}
+                          <TouchableOpacity
+                            style={styles.mealItemTouchArea}
+                            onPress={() => onOpenMealDetail(item)}
+                            activeOpacity={0.7}
+                            accessibilityLabel={`Xem chi tiết ${itemName}`}>
+                            <View style={styles.mealItemThumb}>
+                              {itemImg ? (
+                                <Image source={{ uri: itemImg }} style={styles.mealItemImage} />
+                              ) : (
+                                <View style={styles.mealItemImageFallback}>
+                                  <MaterialCommunityIcons
+                                    name={isRecipe ? 'chef-hat' : 'food-apple-outline'}
+                                    size={24}
+                                    color="#49C99B"
+                                  />
                                 </View>
                               )}
                             </View>
-                            <Text style={styles.mealItemNutrition}>
-                              {item.food_item_id ? '100 g' : `${Math.round(itemCalories)} kcal · ${Math.round(itemProtein)}g đạm`}
-                            </Text>
-                          </View>
+
+                            <View style={styles.mealItemDetails}>
+                              <View style={styles.mealItemTitleRow}>
+                                <Text
+                                  style={[styles.mealItemName, item.is_logged && styles.mealItemNameLogged]}
+                                  numberOfLines={1}>
+                                  {itemName}
+                                </Text>
+                                {item.is_logged && (
+                                  <View style={styles.loggedBadge}>
+                                    <Text style={styles.loggedBadgeText}>Đã ăn</Text>
+                                  </View>
+                                )}
+                              </View>
+                              <Text style={styles.mealItemNutrition}>
+                                {item.food_item_id ? '100 g' : `${Math.round(itemCalories)} kcal · ${Math.round(itemProtein)}g đạm`}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
 
                           <TouchableOpacity
                             style={styles.deleteButton}
@@ -1489,6 +1518,12 @@ const styles = StyleSheet.create({
     padding: 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  mealItemTouchArea: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   mealItemThumb: {
     width: 50,

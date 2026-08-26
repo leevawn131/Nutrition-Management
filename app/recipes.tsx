@@ -25,6 +25,29 @@ import { MealType, Recipe } from '@/types/plan.types';
 // Fallback seed recipes if offline/empty
 const FALLBACK_RECIPES: Recipe[] = [
   {
+    _id: 'recipe-0',
+    title: 'Lẩu cá tôm',
+    description: 'Lẩu hải sản chua cay thơm nồng với cá tươi và tôm sú, nước dùng đậm vị lá chanh và sả ớt.',
+    image_url: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624',
+    prep_time_minutes: 20,
+    cook_time_minutes: 25,
+    servings: 2,
+    calories_per_serving: 477.6,
+    protein_g: 38.0,
+    carb_g: 22.0,
+    fat_g: 14.5,
+    source_type: 'system',
+    ingredients: [
+      { ingredient_name: 'Cá hồi / cá lăng', quantity: 250, unit: 'g' },
+      { ingredient_name: 'Tôm sú tươi', quantity: 200, unit: 'g' },
+      { ingredient_name: 'Cà chua, dứa', quantity: 150, unit: 'g' },
+      { ingredient_name: 'Lá chanh, sả, ớt', quantity: 30, unit: 'g' },
+      { ingredient_name: 'Nấm rơm, bắp ngọt', quantity: 100, unit: 'g' },
+      { ingredient_name: 'Rau muống, hoa chuối', quantity: 150, unit: 'g' },
+      { ingredient_name: 'Nước hầm xương', quantity: 800, unit: 'ml' },
+    ],
+  },
+  {
     _id: 'recipe-1',
     title: 'Mắm Kho Chay',
     description: 'Món mắm kho chay thanh đạm từ chao, nấm và cà tím, đậm đà đưa cơm.',

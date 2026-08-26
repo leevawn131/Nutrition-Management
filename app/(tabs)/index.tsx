@@ -14,8 +14,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GroceryBagModal } from '@/components/home/grocery-bag-modal';
 import { QuickActionsModal } from '@/components/home/quick-actions-modal';
 import { AppLogo } from '@/components/ui/app-logo';
+import { groceryService } from '@/services/grocery.service';
 import { mealLogService } from '@/services/meal_log.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { HealthMetrics, userService } from '@/services/user.service';
@@ -30,6 +32,8 @@ export default function HomeScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showNotificationBanner, setShowNotificationBanner] = useState(true);
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showGroceryBag, setShowGroceryBag] = useState(false);
+  const [groceryCount, setGroceryCount] = useState(0);
 
   // Time-based greeting helper
   const getGreeting = (): string => {
@@ -82,6 +86,19 @@ export default function HomeScreen() {
         setSummary(summaryData);
       }
     }
+
+    // 3. Load grocery items count
+    try {
+      const items = await groceryService.getGroceryItems();
+      setGroceryCount(items.length);
+    } catch {}
+  }, []);
+
+  const handleUpdateGroceryCount = useCallback(async () => {
+    try {
+      const items = await groceryService.getGroceryItems();
+      setGroceryCount(items.length);
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -134,9 +151,17 @@ export default function HomeScreen() {
             {/* Bag/Shop Button */}
             <TouchableOpacity
               style={styles.headerIconBtn}
-              onPress={() => Alert.alert('Giỏ hàng', 'Giỏ hàng của bạn đang trống.')}
-              activeOpacity={0.7}>
+              onPress={() => setShowGroceryBag(true)}
+              activeOpacity={0.7}
+              accessibilityLabel="Mở giỏ hàng đi chợ">
               <Ionicons name="bag-handle-outline" size={21} color="#334155" />
+              {groceryCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>
+                    {groceryCount > 99 ? '99+' : groceryCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
 
             {/* Profile Avatar Button */}
@@ -430,6 +455,13 @@ export default function HomeScreen() {
         visible={showQuickActions}
         onClose={() => setShowQuickActions(false)}
       />
+
+      {/* GROCERY BAG MODAL */}
+      <GroceryBagModal
+        visible={showGroceryBag}
+        onClose={() => setShowGroceryBag(false)}
+        onItemsUpdated={handleUpdateGroceryCount}
+      />
     </SafeAreaView>
   );
 }
@@ -466,6 +498,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  cartBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   avatarBtn: {
     marginLeft: 2,
