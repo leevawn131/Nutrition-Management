@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -29,8 +29,14 @@ type ViewMode = 'day' | 'week';
 
 interface DayInfo {
   label: string;
+  dayName: string;
   date: number;
+  month: number;
+  year: number;
+  fullDate: string;
+  displayDate: string;
   weekend?: boolean;
+  isToday?: boolean;
 }
 
 interface WeekInfo {
@@ -41,53 +47,71 @@ interface WeekInfo {
   days: DayInfo[];
 }
 
-const WEEKS_DATA: WeekInfo[] = [
-  {
-    index: 0,
-    label: 'Tuần trước',
-    range: '10/08 - 16/08',
-    fullRange: '10/08/2026 - 16/08/2026',
-    days: [
-      { label: 'T2', date: 10 },
-      { label: 'T3', date: 11 },
-      { label: 'T4', date: 12 },
-      { label: 'T5', date: 13 },
-      { label: 'T6', date: 14 },
-      { label: 'T7', date: 15, weekend: true },
-      { label: 'CN', date: 16, weekend: true },
-    ],
-  },
-  {
-    index: 1,
-    label: 'Tuần này',
-    range: '17/08 - 23/08',
-    fullRange: '17/08/2026 - 23/08/2026',
-    days: [
-      { label: 'T2', date: 17 },
-      { label: 'T3', date: 18 },
-      { label: 'T4', date: 19 },
-      { label: 'T5', date: 20 },
-      { label: 'T6', date: 21 },
-      { label: 'T7', date: 22, weekend: true },
-      { label: 'CN', date: 23, weekend: true },
-    ],
-  },
-  {
-    index: 2,
-    label: 'Tuần sau',
-    range: '24/08 - 30/08',
-    fullRange: '24/08/2026 - 30/08/2026',
-    days: [
-      { label: 'T2', date: 24 },
-      { label: 'T3', date: 25 },
-      { label: 'T4', date: 26 },
-      { label: 'T5', date: 27 },
-      { label: 'T6', date: 28 },
-      { label: 'T7', date: 29, weekend: true },
-      { label: 'CN', date: 30, weekend: true },
-    ],
-  },
-];
+const DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const DAY_NAMES = ['hai', 'ba', 'tư', 'năm', 'sáu', 'bảy', 'chủ nhật'];
+
+function formatYYYYMMDD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getMonday(d: Date): Date {
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = date.getDay(); // 0 is Sunday, 1 is Monday...
+  const diff = (day === 0 ? -6 : 1) - day;
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+
+function generateWeeksData(refDate: Date = new Date()): WeekInfo[] {
+  const currentMonday = getMonday(refDate);
+  const todayStr = formatYYYYMMDD(refDate);
+  const weekLabels = ['Tuần trước', 'Tuần này', 'Tuần sau'];
+  const weekOffsets = [-7, 0, 7];
+
+  return weekOffsets.map((offset, index) => {
+    const monday = new Date(currentMonday);
+    monday.setDate(monday.getDate() + offset);
+
+    const days: DayInfo[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+
+      const dayNumber = d.getDate();
+      const monthNumber = d.getMonth() + 1;
+      const yearNumber = d.getFullYear();
+      const fullDate = formatYYYYMMDD(d);
+      const displayDate = `${String(dayNumber).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}`;
+
+      days.push({
+        label: DAY_LABELS[i],
+        dayName: DAY_NAMES[i],
+        date: dayNumber,
+        month: monthNumber,
+        year: yearNumber,
+        fullDate,
+        displayDate,
+        weekend: i === 5 || i === 6,
+        isToday: fullDate === todayStr,
+      });
+    }
+
+    const startDay = days[0];
+    const endDay = days[6];
+    const range = `${startDay.displayDate} - ${endDay.displayDate}`;
+    const fullRange = `${startDay.displayDate}/${startDay.year} - ${endDay.displayDate}/${endDay.year}`;
+
+    return {
+      index,
+      label: weekLabels[index],
+      range,
+      fullRange,
+      days,
+    };
+  });
+}
 
 const MEAL_CATEGORIES: { key: MealType; title: string }[] = [
   { key: 'breakfast', title: 'Bữa sáng' },
@@ -100,8 +124,12 @@ export default function PlanScreen() {
   const router = useRouter();
   const [section, setSection] = useState<Section>('activities');
   const [viewMode, setViewMode] = useState<ViewMode>('week');
-  const [selectedDate, setSelectedDate] = useState(20);
+
+  const todayStr = useMemo(() => formatYYYYMMDD(new Date()), []);
+  const weeksData = useMemo(() => generateWeeksData(new Date()), []);
+
   const [selectedWeek, setSelectedWeek] = useState(1);
+  const [selectedFullDate, setSelectedFullDate] = useState(todayStr);
   const [mealSheetVisible, setMealSheetVisible] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>('breakfast');
 
@@ -116,8 +144,12 @@ export default function PlanScreen() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
 
-  const formattedDateStr = `2026-08-${String(selectedDate).padStart(2, '0')}`;
-  const currentWeek = WEEKS_DATA[selectedWeek] || WEEKS_DATA[1];
+  const formattedDateStr = selectedFullDate;
+  const currentWeek = weeksData[selectedWeek] || weeksData[1];
+  const selectedDayInfo =
+    currentWeek.days.find((d) => d.fullDate === selectedFullDate) ||
+    weeksData.flatMap((w) => w.days).find((d) => d.fullDate === selectedFullDate) ||
+    currentWeek.days[0];
 
   const loadData = useCallback(async () => {
     try {
@@ -153,17 +185,23 @@ export default function PlanScreen() {
 
   const handleSelectWeek = (weekIndex: number) => {
     setSelectedWeek(weekIndex);
-    const targetWeek = WEEKS_DATA[weekIndex];
+    const targetWeek = weeksData[weekIndex];
     if (targetWeek) {
-      const isDateInWeek = targetWeek.days.some((d) => d.date === selectedDate);
+      const isDateInWeek = targetWeek.days.some((d) => d.fullDate === selectedFullDate);
       if (!isDateInWeek) {
-        setSelectedDate(targetWeek.days[0].date);
+        const todayInWeek = targetWeek.days.find((d) => d.fullDate === todayStr);
+        const newDay = todayInWeek || targetWeek.days[0];
+        setSelectedFullDate(newDay.fullDate);
       }
     }
   };
 
-  const handleSelectDate = (dateNum: number) => {
-    setSelectedDate(dateNum);
+  const handleSelectDate = (fullDate: string) => {
+    setSelectedFullDate(fullDate);
+    const weekWithDay = weeksData.find((w) => w.days.some((d) => d.fullDate === fullDate));
+    if (weekWithDay && weekWithDay.index !== selectedWeek) {
+      setSelectedWeek(weekWithDay.index);
+    }
   };
 
   const handleOpenAddMeal = (mealType: MealType) => {
@@ -331,7 +369,9 @@ export default function PlanScreen() {
             <Text style={styles.subtitle}>
               {viewMode === 'week'
                 ? `${currentWeek.label.toLowerCase()} (${currentWeek.fullRange})`
-                : `thứ ${getDayName(selectedDate)}, ${selectedDate} tháng 8, 2026`}
+                : selectedDayInfo.dayName === 'chủ nhật'
+                  ? `Chủ nhật, ${selectedDayInfo.date} tháng ${selectedDayInfo.month}, ${selectedDayInfo.year}`
+                  : `Thứ ${selectedDayInfo.dayName}, ${selectedDayInfo.date} tháng ${selectedDayInfo.month}, ${selectedDayInfo.year}`}
             </Text>
           </View>
           <View style={styles.headerSpacer} />
@@ -377,7 +417,7 @@ export default function PlanScreen() {
         {/* Week Picker when in week mode */}
         {viewMode === 'week' ? (
           <View style={styles.weekPicker}>
-            {WEEKS_DATA.map((week) => {
+            {weeksData.map((week) => {
               const isWeekActive = selectedWeek === week.index;
               return (
                 <TouchableOpacity
@@ -398,12 +438,12 @@ export default function PlanScreen() {
         ) : (
           <View style={styles.dayPicker}>
             {currentWeek.days.map((day) => {
-              const isDateActive = selectedDate === day.date;
+              const isDateActive = selectedFullDate === day.fullDate;
               return (
                 <TouchableOpacity
-                  key={day.date}
+                  key={day.fullDate}
                   style={[styles.dayItem, isDateActive && styles.dayItemActive]}
-                  onPress={() => handleSelectDate(day.date)}
+                  onPress={() => handleSelectDate(day.fullDate)}
                   activeOpacity={0.7}>
                   <Text
                     style={[
@@ -432,7 +472,8 @@ export default function PlanScreen() {
           <MealPlan
             viewMode={viewMode}
             currentWeekDays={currentWeek.days}
-            selectedDate={selectedDate}
+            selectedFullDate={selectedFullDate}
+            selectedDayInfo={selectedDayInfo}
             onSelectDate={handleSelectDate}
             plannedMeals={plannedMeals}
             loading={loadingMeals}
@@ -449,7 +490,8 @@ export default function PlanScreen() {
           <ActivityPlan
             viewMode={viewMode}
             currentWeekDays={currentWeek.days}
-            selectedDate={selectedDate}
+            selectedFullDate={selectedFullDate}
+            selectedDayInfo={selectedDayInfo}
             onSelectDate={handleSelectDate}
             activityLogs={activityLogs}
             loading={loadingActivities}
@@ -503,19 +545,6 @@ export default function PlanScreen() {
   );
 }
 
-function getDayName(dateNum: number): string {
-  switch (dateNum) {
-    case 10: case 17: case 24: return 'hai';
-    case 11: case 18: case 25: return 'ba';
-    case 12: case 19: case 26: return 'tư';
-    case 13: case 20: case 27: return 'năm';
-    case 14: case 21: case 28: return 'sáu';
-    case 15: case 22: case 29: return 'bảy';
-    case 16: case 23: case 30: return 'nhất';
-    default: return 'năm';
-  }
-}
-
 function MealOptionsSheet({
   visible,
   onClose,
@@ -559,7 +588,8 @@ function MealOptionsSheet({
 function MealPlan({
   viewMode,
   currentWeekDays,
-  selectedDate,
+  selectedFullDate,
+  selectedDayInfo,
   onSelectDate,
   plannedMeals,
   loading,
@@ -574,8 +604,9 @@ function MealPlan({
 }: {
   viewMode: ViewMode;
   currentWeekDays: DayInfo[];
-  selectedDate: number;
-  onSelectDate: (dateNum: number) => void;
+  selectedFullDate: string;
+  selectedDayInfo: DayInfo;
+  onSelectDate: (fullDate: string) => void;
   plannedMeals: MealPlanItem[];
   loading: boolean;
   totalCalories: number;
@@ -756,12 +787,12 @@ function MealPlan({
       {viewMode === 'week' && (
         <View style={styles.weekDaysStrip}>
           {currentWeekDays.map((day) => {
-            const isSelected = selectedDate === day.date;
+            const isSelected = selectedFullDate === day.fullDate;
             return (
               <TouchableOpacity
-                key={day.date}
+                key={day.fullDate}
                 style={[styles.weekDayPill, isSelected && styles.weekDayPillActive]}
-                onPress={() => onSelectDate(day.date)}
+                onPress={() => onSelectDate(day.fullDate)}
                 activeOpacity={0.7}>
                 <Text
                   style={[
@@ -790,7 +821,7 @@ function MealPlan({
         {loading && plannedMeals.length === 0 ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="small" color="#49C99B" />
-            <Text style={styles.loadingText}>Đang tải thực đơn ngày {selectedDate}/08...</Text>
+            <Text style={styles.loadingText}>Đang tải thực đơn ngày {selectedDayInfo.displayDate}...</Text>
           </View>
         ) : (
           MEAL_CATEGORIES.map(({ key, title }) => {
@@ -953,7 +984,8 @@ const getActivityIconAndColor = (name: string) => {
 function ActivityPlan({
   viewMode,
   currentWeekDays,
-  selectedDate,
+  selectedFullDate,
+  selectedDayInfo,
   onSelectDate,
   activityLogs,
   loading,
@@ -962,8 +994,9 @@ function ActivityPlan({
 }: {
   viewMode: ViewMode;
   currentWeekDays: DayInfo[];
-  selectedDate: number;
-  onSelectDate: (dateNum: number) => void;
+  selectedFullDate: string;
+  selectedDayInfo: DayInfo;
+  onSelectDate: (fullDate: string) => void;
   activityLogs: ActivityLog[];
   loading: boolean;
   onAddActivity: () => void;
@@ -1029,12 +1062,12 @@ function ActivityPlan({
       {viewMode === 'week' && (
         <View style={styles.targetDays}>
           {currentWeekDays.map((day) => {
-            const isSelected = selectedDate === day.date;
+            const isSelected = selectedFullDate === day.fullDate;
             return (
               <TouchableOpacity
-                key={day.date}
+                key={day.fullDate}
                 style={styles.targetDay}
-                onPress={() => onSelectDate(day.date)}>
+                onPress={() => onSelectDate(day.fullDate)}>
                 <View
                   style={[
                     styles.targetBar,
@@ -1100,12 +1133,12 @@ function ActivityPlan({
         {viewMode === 'week' && (
           <View style={styles.weekDaysStrip}>
             {currentWeekDays.map((day) => {
-              const isSelected = selectedDate === day.date;
+              const isSelected = selectedFullDate === day.fullDate;
               return (
                 <TouchableOpacity
-                  key={day.date}
+                  key={day.fullDate}
                   style={[styles.weekDayPill, isSelected && styles.weekDayPillActive]}
-                  onPress={() => onSelectDate(day.date)}
+                  onPress={() => onSelectDate(day.fullDate)}
                   activeOpacity={0.7}>
                   <Text
                     style={[
@@ -1133,7 +1166,7 @@ function ActivityPlan({
         {loading && activityLogs.length === 0 ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="small" color="#49C99B" />
-            <Text style={styles.loadingText}>Đang tải hoạt động ngày {selectedDate}/08...</Text>
+            <Text style={styles.loadingText}>Đang tải hoạt động ngày {selectedDayInfo.displayDate}...</Text>
           </View>
         ) : activityLogs.length === 0 ? (
           <View style={styles.activityEmpty}>
@@ -1142,7 +1175,7 @@ function ActivityPlan({
             </View>
             <Text style={styles.activityEmptyTitle}>Chưa có hoạt động nào</Text>
             <Text style={styles.activityEmptyText}>
-              Chưa có hoạt động nào được lên kế hoạch cho ngày {selectedDate}/08. Hãy thêm hoạt động để rèn luyện sức khoẻ.
+              Chưa có hoạt động nào được lên kế hoạch cho ngày {selectedDayInfo.displayDate}. Hãy thêm hoạt động để rèn luyện sức khoẻ.
             </Text>
             <TouchableOpacity
               style={styles.addActivityButton}
