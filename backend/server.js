@@ -25,10 +25,12 @@ const authRoutes = require('./routes/auth.routes');
 const profileRoutes = require('./routes/profile.routes');
 const healthRoutes = require('./routes/health.routes');
 const goalRoutes = require('./routes/goal.routes');
+const adminUserRoutes = require('./routes/admin/user.admin.routes');
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/goal', goalRoutes);
+app.use('/api/admin/users', adminUserRoutes);
 
 // Lắng nghe cổng
 app.listen(PORT, () => {
