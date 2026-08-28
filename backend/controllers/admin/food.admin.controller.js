@@ -4,7 +4,13 @@ class FoodAdminController {
   async listFoods(req, res) {
     try {
       const { page, limit, search, category, is_verified } = req.query;
-      const result = await adminFoodService.listFoods({ page, limit, search, category, is_verified });
+      const result = await adminFoodService.listFoods({
+        page,
+        limit,
+        search,
+        category,
+        is_verified,
+      });
 
       return res.status(200).json({
         success: true,
