@@ -19,6 +19,7 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { adminReportService } from "../services/report.service";
 import {
   FoodReportsData,
@@ -55,6 +56,8 @@ const ACTIVITY_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 export const Reports: React.FC = () => {
+  const navigate = useNavigate();
+
   // Navigation & Filter State
   const [activeTab, setActiveTab] = useState<
     "overview" | "users" | "foods" | "recipes"
@@ -140,167 +143,173 @@ export const Reports: React.FC = () => {
   return (
     <div className="users-page">
       {/* 1. Header & Controls */}
-      <div className="page-header-row" style={{ alignItems: "flex-start" }}>
-        <div>
-          <h1 className="page-heading">Báo cáo & Thống kê Hệ thống</h1>
-          <p className="page-subheading">
-            Theo dõi toàn diện các chỉ số tăng trưởng người dùng, dữ liệu dinh
-            dưỡng, công thức và kiểm duyệt.
-          </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        {/* Top Row: Page Title on Left, Controls & Refresh Button Aligned to Far Right */}
+        <div className="page-header-row" style={{ alignItems: "center" }}>
+          <div>
+            <h1 className="page-heading">Báo cáo & Thống kê Hệ thống</h1>
+            <p className="page-subheading">
+              Theo dõi toàn diện các chỉ số tăng trưởng người dùng, dữ liệu dinh
+              dưỡng, công thức và kiểm duyệt.
+            </p>
+          </div>
 
-          {/* Tab Navigation */}
+          {/* Action Controls & Timeframe aligned to far right */}
           <div
             style={{
               display: "flex",
-              gap: "8px",
-              marginTop: "16px",
-              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "12px",
+              flexShrink: 0,
             }}
           >
-            <button
-              onClick={() => setActiveTab("overview")}
+            {/* Timeframe Selector (Shown for Users Tab & Overview) */}
+            <div
               style={{
                 display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "8px 18px",
-                borderRadius: "var(--radius-md)",
-                fontSize: "14px",
-                fontWeight: 700,
-                cursor: "pointer",
-                border: "1px solid",
-                backgroundColor:
-                  activeTab === "overview" ? "#10B981" : "#FFFFFF",
-                color: activeTab === "overview" ? "#FFFFFF" : "#475569",
-                borderColor: activeTab === "overview" ? "#10B981" : "#E2E8F0",
-                transition: "all 0.2s ease",
+                backgroundColor: "#F1F5F9",
+                padding: "3px",
+                borderRadius: "8px",
               }}
             >
-              <BarChart3 size={16} />
-              <span>Tổng quan (Overview)</span>
-            </button>
+              {TIMEFRAME_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setTimeframe(opt.value)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    border: "none",
+                    fontSize: "12.5px",
+                    fontWeight: timeframe === opt.value ? 700 : 500,
+                    backgroundColor:
+                      timeframe === opt.value ? "#FFFFFF" : "transparent",
+                    color: timeframe === opt.value ? "#0F172A" : "#64748B",
+                    boxShadow:
+                      timeframe === opt.value
+                        ? "0 1px 3px rgba(0,0,0,0.1)"
+                        : "none",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
 
             <button
-              onClick={() => setActiveTab("users")}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "8px 18px",
-                borderRadius: "var(--radius-md)",
-                fontSize: "14px",
-                fontWeight: 700,
-                cursor: "pointer",
-                border: "1px solid",
-                backgroundColor: activeTab === "users" ? "#10B981" : "#FFFFFF",
-                color: activeTab === "users" ? "#FFFFFF" : "#475569",
-                borderColor: activeTab === "users" ? "#10B981" : "#E2E8F0",
-                transition: "all 0.2s ease",
-              }}
+              className="btn-secondary"
+              onClick={fetchAllReports}
+              disabled={isLoading}
+              title="Làm mới báo cáo"
             >
-              <Users size={16} />
-              <span>Người dùng (Users)</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("foods")}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "8px 18px",
-                borderRadius: "var(--radius-md)",
-                fontSize: "14px",
-                fontWeight: 700,
-                cursor: "pointer",
-                border: "1px solid",
-                backgroundColor: activeTab === "foods" ? "#10B981" : "#FFFFFF",
-                color: activeTab === "foods" ? "#FFFFFF" : "#475569",
-                borderColor: activeTab === "foods" ? "#10B981" : "#E2E8F0",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <UtensilsCrossed size={16} />
-              <span>Thực phẩm & Dinh dưỡng</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("recipes")}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "8px 18px",
-                borderRadius: "var(--radius-md)",
-                fontSize: "14px",
-                fontWeight: 700,
-                cursor: "pointer",
-                border: "1px solid",
-                backgroundColor:
-                  activeTab === "recipes" ? "#10B981" : "#FFFFFF",
-                color: activeTab === "recipes" ? "#FFFFFF" : "#475569",
-                borderColor: activeTab === "recipes" ? "#10B981" : "#E2E8F0",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <BookOpen size={16} />
-              <span>Công thức & Thực đơn</span>
+              <RefreshCw size={16} className={isLoading ? "spinner" : ""} />
+              <span>Làm mới</span>
             </button>
           </div>
         </div>
 
-        {/* Action Controls & Timeframe */}
+        {/* 4 Tabs on 1 Full-width Horizontal Row */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "10px",
-            flexWrap: "wrap",
+            gap: "8px",
+            overflowX: "auto",
+            paddingBottom: "2px",
           }}
         >
-          {/* Timeframe Selector (Shown for Users Tab & Overview) */}
-          <div
+          <button
+            onClick={() => setActiveTab("overview")}
             style={{
               display: "inline-flex",
-              backgroundColor: "#F1F5F9",
-              padding: "3px",
-              borderRadius: "8px",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 18px",
+              borderRadius: "var(--radius-md)",
+              fontSize: "14px",
+              fontWeight: 700,
+              cursor: "pointer",
+              border: "1px solid",
+              whiteSpace: "nowrap",
+              backgroundColor: activeTab === "overview" ? "#10B981" : "#FFFFFF",
+              color: activeTab === "overview" ? "#FFFFFF" : "#475569",
+              borderColor: activeTab === "overview" ? "#10B981" : "#E2E8F0",
+              transition: "all 0.2s ease",
             }}
           >
-            {TIMEFRAME_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setTimeframe(opt.value)}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: "6px",
-                  border: "none",
-                  fontSize: "12.5px",
-                  fontWeight: timeframe === opt.value ? 700 : 500,
-                  backgroundColor:
-                    timeframe === opt.value ? "#FFFFFF" : "transparent",
-                  color: timeframe === opt.value ? "#0F172A" : "#64748B",
-                  boxShadow:
-                    timeframe === opt.value
-                      ? "0 1px 3px rgba(0,0,0,0.1)"
-                      : "none",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+            <BarChart3 size={16} />
+            <span>Tổng quan (Overview)</span>
+          </button>
 
           <button
-            className="btn-secondary"
-            onClick={fetchAllReports}
-            disabled={isLoading}
-            title="Làm mới báo cáo"
+            onClick={() => setActiveTab("users")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 18px",
+              borderRadius: "var(--radius-md)",
+              fontSize: "14px",
+              fontWeight: 700,
+              cursor: "pointer",
+              border: "1px solid",
+              whiteSpace: "nowrap",
+              backgroundColor: activeTab === "users" ? "#10B981" : "#FFFFFF",
+              color: activeTab === "users" ? "#FFFFFF" : "#475569",
+              borderColor: activeTab === "users" ? "#10B981" : "#E2E8F0",
+              transition: "all 0.2s ease",
+            }}
           >
-            <RefreshCw size={16} className={isLoading ? "spinner" : ""} />
-            <span>Làm mới</span>
+            <Users size={16} />
+            <span>Người dùng (Users)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("foods")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 18px",
+              borderRadius: "var(--radius-md)",
+              fontSize: "14px",
+              fontWeight: 700,
+              cursor: "pointer",
+              border: "1px solid",
+              whiteSpace: "nowrap",
+              backgroundColor: activeTab === "foods" ? "#10B981" : "#FFFFFF",
+              color: activeTab === "foods" ? "#FFFFFF" : "#475569",
+              borderColor: activeTab === "foods" ? "#10B981" : "#E2E8F0",
+              transition: "all 0.2s ease",
+            }}
+          >
+            <UtensilsCrossed size={16} />
+            <span>Thực phẩm & Dinh dưỡng</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("recipes")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 18px",
+              borderRadius: "var(--radius-md)",
+              fontSize: "14px",
+              fontWeight: 700,
+              cursor: "pointer",
+              border: "1px solid",
+              whiteSpace: "nowrap",
+              backgroundColor: activeTab === "recipes" ? "#10B981" : "#FFFFFF",
+              color: activeTab === "recipes" ? "#FFFFFF" : "#475569",
+              borderColor: activeTab === "recipes" ? "#10B981" : "#E2E8F0",
+              transition: "all 0.2s ease",
+            }}
+          >
+            <BookOpen size={16} />
+            <span>Công thức & Thực đơn</span>
           </button>
         </div>
       </div>
@@ -395,6 +404,26 @@ export const Reports: React.FC = () => {
                       </span>
                     </div>
                   </div>
+
+                  <button
+                    onClick={() => navigate("/foods?tab=unidentified")}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "6px 14px",
+                      borderRadius: "6px",
+                      backgroundColor: "#D97706",
+                      color: "#FFFFFF",
+                      border: "none",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <span>Kiểm duyệt món lạ ngay</span>
+                  </button>
                 </div>
               )}
 
