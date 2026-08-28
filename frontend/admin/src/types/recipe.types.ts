@@ -52,17 +52,14 @@ export interface Recipe {
   fat_g?: number | null;
   avg_rating?: number;
   comment_count?: number;
-  source_type: "system" | "community";
-  created_by_user_id?:
-    | {
-        _id: string;
-        full_name?: string;
-        email: string;
-        role: string;
-      }
-    | string
-    | null;
-  status: "pending" | "approved" | "rejected";
+  source_type: 'system' | 'community';
+  created_by_user_id?: {
+    _id: string;
+    full_name?: string;
+    email: string;
+    role: string;
+  } | string | null;
+  status: 'pending' | 'approved' | 'rejected';
   created_at: string;
   ingredients?: RecipeIngredient[];
   steps?: RecipeStep[];

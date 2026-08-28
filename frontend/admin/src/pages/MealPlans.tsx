@@ -1,45 +1,45 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  AlertCircle,
+  BookOpen,
+  Calendar,
+  CheckCircle2,
+  ChefHat,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Edit2,
+  Eye,
+  Filter,
+  Flame,
+  Layers,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Trash2,
+  Utensils,
+  X,
+  XCircle,
+} from "lucide-react";
 import { adminMealPlanTemplateService } from "../services/meal_plan.service";
 import { adminRecipeService } from "../services/recipe.service";
 import {
+  CreateMealPlanTemplatePayload,
   MealPlanTemplate,
   MealType,
-  CreateMealPlanTemplatePayload,
   UpdateMealPlanTemplatePayload,
 } from "../types/meal_plan.types";
 import {
+  CreateRecipePayload,
   Recipe,
   RecipeIngredient,
   RecipeStep,
-  CreateRecipePayload,
   UpdateRecipePayload,
 } from "../types/recipe.types";
-import {
-  Search,
-  Filter,
-  Eye,
-  Plus,
-  Edit2,
-  Trash2,
-  BookOpen,
-  Utensils,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  AlertCircle,
-  X,
-  RefreshCw,
-  Calendar,
-  Flame,
-  CheckCircle2,
-  Clock,
-  ChefHat,
-  Star,
-  ShieldCheck,
-  XCircle,
-  Layers,
-  Sparkles,
-} from "lucide-react";
 
 const MEAL_TYPE_LABELS: Record<
   MealType,

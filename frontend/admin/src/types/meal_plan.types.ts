@@ -1,6 +1,6 @@
-import { Recipe } from "./recipe.types";
+import { Recipe } from './recipe.types';
 
-export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 export interface MealPlanTemplateItem {
   meal_type: MealType;
@@ -11,15 +11,12 @@ export interface MealPlanTemplate {
   _id: string;
   name: string;
   description?: string | null;
-  created_by_admin_id?:
-    | {
-        _id: string;
-        full_name?: string;
-        email: string;
-        role: string;
-      }
-    | string
-    | null;
+  created_by_admin_id?: {
+    _id: string;
+    full_name?: string;
+    email: string;
+    role: string;
+  } | string | null;
   items?: MealPlanTemplateItem[];
   item_count?: number;
 }
@@ -61,8 +58,7 @@ export interface CreateMealPlanTemplatePayload {
   }[];
 }
 
-export type UpdateMealPlanTemplatePayload =
-  Partial<CreateMealPlanTemplatePayload>;
+export type UpdateMealPlanTemplatePayload = Partial<CreateMealPlanTemplatePayload>;
 
 export interface MutateMealPlanTemplateResponse {
   success: boolean;
