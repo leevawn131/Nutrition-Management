@@ -1,12 +1,12 @@
-import { apiClient } from "./api";
 import {
+  CreateFoodPayload,
+  FoodDetailResponse,
   FoodListParams,
   FoodListResponse,
-  FoodDetailResponse,
-  CreateFoodPayload,
-  UpdateFoodPayload,
   MutateFoodResponse,
+  UpdateFoodPayload,
 } from "../types/food.types";
+import { apiClient } from "./api";
 
 export const adminFoodService = {
   /**

@@ -1,12 +1,12 @@
-import { apiClient } from "./api";
 import {
+  CreateMealPlanTemplatePayload,
+  MealPlanTemplateDetailResponse,
   MealPlanTemplateListParams,
   MealPlanTemplateListResponse,
-  MealPlanTemplateDetailResponse,
-  CreateMealPlanTemplatePayload,
-  UpdateMealPlanTemplatePayload,
   MutateMealPlanTemplateResponse,
+  UpdateMealPlanTemplatePayload,
 } from "../types/meal_plan.types";
+import { apiClient } from "./api";
 
 export const adminMealPlanTemplateService = {
   /**
