@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const RecipeIngredientSchema = new mongoose.Schema(
   {
@@ -18,7 +18,7 @@ const RecipeIngredientSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const RecipeStepSchema = new mongoose.Schema(
@@ -34,7 +34,7 @@ const RecipeStepSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const RecipeNutritionFactsSchema = new mongoose.Schema(
@@ -66,14 +66,14 @@ const RecipeNutritionFactsSchema = new mongoose.Schema(
     phosphorus_mg: { type: Number, default: null, min: 0 },
     updated_at: { type: Date, default: null },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const RecipeSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: [true, 'Tên công thức là bắt buộc'],
+      required: [true, "Tên công thức là bắt buộc"],
       trim: true,
     },
     description: {
@@ -98,8 +98,8 @@ const RecipeSchema = new mongoose.Schema(
     },
     servings: {
       type: Number,
-      required: [true, 'Khẩu phần là bắt buộc'],
-      min: [0.1, 'Khẩu phần phải lớn hơn 0'],
+      required: [true, "Khẩu phần là bắt buộc"],
+      min: [0.1, "Khẩu phần phải lớn hơn 0"],
     },
     calories_per_serving: {
       type: Number,
@@ -135,25 +135,25 @@ const RecipeSchema = new mongoose.Schema(
     source_type: {
       type: String,
       enum: {
-        values: ['system', 'community'],
-        message: 'source_type chỉ có thể là system hoặc community',
+        values: ["system", "community"],
+        message: "source_type chỉ có thể là system hoặc community",
       },
-      required: [true, 'Nguồn công thức (source_type) là bắt buộc'],
-      default: 'system',
+      required: [true, "Nguồn công thức (source_type) là bắt buộc"],
+      default: "system",
     },
     created_by_user_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       default: null,
     },
     status: {
       type: String,
       enum: {
-        values: ['pending', 'approved', 'rejected'],
-        message: 'status chỉ có thể là pending, approved hoặc rejected',
+        values: ["pending", "approved", "rejected"],
+        message: "status chỉ có thể là pending, approved hoặc rejected",
       },
-      required: [true, 'Trạng thái (status) là bắt buộc'],
-      default: 'approved',
+      required: [true, "Trạng thái (status) là bắt buộc"],
+      default: "approved",
     },
     created_at: {
       type: Date,
@@ -174,16 +174,16 @@ const RecipeSchema = new mongoose.Schema(
     },
   },
   {
-    collection: 'recipes',
+    collection: "recipes",
     timestamps: false,
     versionKey: false,
-  }
+  },
 );
 
-RecipeSchema.index({ title: 'text' });
+RecipeSchema.index({ title: "text" });
 RecipeSchema.index({ source_type: 1, status: 1 });
 RecipeSchema.index({ created_by_user_id: 1 });
 
-const Recipe = mongoose.models.Recipe || mongoose.model('Recipe', RecipeSchema);
+const Recipe = mongoose.models.Recipe || mongoose.model("Recipe", RecipeSchema);
 
 module.exports = Recipe;
