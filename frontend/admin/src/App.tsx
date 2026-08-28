@@ -9,7 +9,7 @@ import { Users } from './pages/Users';
 import { Foods } from './pages/Foods';
 import { MealPlans } from './pages/MealPlans';
 import { Reports } from './pages/Reports';
-import { PlaceholderPage } from './pages/PlaceholderPage';
+import { Settings } from './pages/Settings';
 
 export const App: React.FC = () => {
   return (
@@ -28,15 +28,7 @@ export const App: React.FC = () => {
               <Route path="/foods" element={<Foods />} />
               <Route path="/meal-plans" element={<MealPlans />} />
               <Route path="/reports" element={<Reports />} />
-              <Route
-                path="/settings"
-                element={
-                  <PlaceholderPage
-                    title="Cài đặt hệ thống"
-                    description="Cấu hình hệ thống, tham số AI và quản lý bảo mật."
-                  />
-                }
-              />
+              <Route path="/settings" element={<Settings />} />
             </Route>
           </Route>
 

@@ -1,4 +1,4 @@
-export type Timeframe = '7d' | '30d' | '90d' | '1y' | 'all';
+export type Timeframe = "7d" | "30d" | "90d" | "1y" | "all";
 
 export interface OverviewKPIs {
   total_users: number;

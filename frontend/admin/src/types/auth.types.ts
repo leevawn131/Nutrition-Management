@@ -34,3 +34,13 @@ export interface MeResponse {
     user: User;
   };
 }
+
+export interface ChangePasswordPayload {
+  current_password: string;
+  new_password: string;
+}
+
+export interface ChangePasswordResponse {
+  success: boolean;
+  message: string;
+}

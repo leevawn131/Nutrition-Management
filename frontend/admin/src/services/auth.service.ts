@@ -1,5 +1,10 @@
 import { apiClient } from './api';
-import { LoginResponse, MeResponse } from '../types/auth.types';
+import {
+  LoginResponse,
+  MeResponse,
+  ChangePasswordPayload,
+  ChangePasswordResponse,
+} from '../types/auth.types';
 
 export const authService = {
   /**
@@ -18,6 +23,19 @@ export const authService = {
    */
   async getMe(): Promise<MeResponse> {
     const response = await apiClient.get<MeResponse>('/auth/me');
+    return response.data;
+  },
+
+  /**
+   * Change password for current authenticated admin
+   */
+  async changePassword(
+    payload: ChangePasswordPayload,
+  ): Promise<ChangePasswordResponse> {
+    const response = await apiClient.put<ChangePasswordResponse>(
+      '/auth/change-password',
+      payload,
+    );
     return response.data;
   },
 
