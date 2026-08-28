@@ -8,6 +8,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Users } from './pages/Users';
 import { Foods } from './pages/Foods';
 import { MealPlans } from './pages/MealPlans';
+import { Reports } from './pages/Reports';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 
 export const App: React.FC = () => {
@@ -26,15 +27,7 @@ export const App: React.FC = () => {
               <Route path="/users" element={<Users />} />
               <Route path="/foods" element={<Foods />} />
               <Route path="/meal-plans" element={<MealPlans />} />
-              <Route
-                path="/reports"
-                element={
-                  <PlaceholderPage
-                    title="Báo cáo & Thống kê"
-                    description="Biểu đồ phân tích lượng người dùng, tần suất ăn uống và tương tác."
-                  />
-                }
-              />
+              <Route path="/reports" element={<Reports />} />
               <Route
                 path="/settings"
                 element={

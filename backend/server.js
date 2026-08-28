@@ -30,6 +30,7 @@ const adminUserRoutes = require("./routes/admin/user.admin.routes");
 const adminFoodRoutes = require("./routes/admin/food.admin.routes");
 const adminRecipeRoutes = require("./routes/admin/recipe.admin.routes");
 const adminMealPlanTemplateRoutes = require("./routes/admin/meal_plan_template.admin.routes");
+const adminReportRoutes = require("./routes/admin/report.admin.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
@@ -39,6 +40,7 @@ app.use("/api/admin/users", adminUserRoutes);
 app.use("/api/admin/foods", adminFoodRoutes);
 app.use("/api/admin/recipes", adminRecipeRoutes);
 app.use("/api/admin/meal-plan-templates", adminMealPlanTemplateRoutes);
+app.use("/api/admin/reports", adminReportRoutes);
 
 // Lắng nghe cổng
 app.listen(PORT, () => {

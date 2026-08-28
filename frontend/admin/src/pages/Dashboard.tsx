@@ -1,49 +1,92 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { adminReportService } from '../services/report.service';
+import { OverviewKPIs } from '../types/report.types';
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
   UtensilsCrossed,
-  CalendarCheck,
+  BookOpen,
   AlertTriangle,
   Server,
   Sparkles,
+  BarChart3,
+  ArrowRight,
+  Loader2,
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const [kpis, setKpis] = useState<OverviewKPIs | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const fetchDashboardKPIs = async () => {
+      try {
+        const res = await adminReportService.getOverview();
+        if (res.success && res.data) {
+          setKpis(res.data.kpis);
+        }
+      } catch (err) {
+        console.error('Lỗi khi tải KPI Dashboard:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardKPIs();
+  }, []);
 
   const statCards = [
     {
       title: 'Tổng người dùng',
-      value: '--',
-      subtitle: 'Người dùng trong hệ thống',
+      value: isLoading ? '...' : kpis ? kpis.total_users.toString() : '0',
+      subtitle: 'Tài khoản người dùng hệ thống',
       icon: Users,
       color: '#3B82F6',
       bgColor: '#EFF6FF',
+      path: '/users',
     },
     {
       title: 'Tổng món ăn',
-      value: '--',
-      subtitle: 'Thực phẩm & Dinh dưỡng',
+      value: isLoading ? '...' : kpis ? kpis.total_foods.toString() : '0',
+      subtitle: 'Cơ sở dữ liệu thực phẩm & calo',
       icon: UtensilsCrossed,
       color: '#10B981',
       bgColor: '#ECFDF5',
+      path: '/foods',
     },
     {
-      title: 'Tổng thực đơn',
-      value: '--',
-      subtitle: 'Kế hoạch dinh dưỡng mẫu',
-      icon: CalendarCheck,
+      title: 'Công thức & Thực đơn',
+      value: isLoading
+        ? '...'
+        : kpis
+        ? `${kpis.total_recipes}`
+        : '0',
+      subtitle: kpis
+        ? `${kpis.total_meal_plan_templates} thực đơn mẫu`
+        : 'Công thức & Thực đơn mẫu',
+      icon: BookOpen,
       color: '#8B5CF6',
       bgColor: '#F5F3FF',
+      path: '/meal-plans',
     },
     {
-      title: 'Báo cáo chờ xử lý',
-      value: '--',
-      subtitle: 'Phản hồi & khiếu nại',
+      title: 'Chờ kiểm duyệt',
+      value: isLoading
+        ? '...'
+        : kpis
+        ? `${kpis.pending_recipes + kpis.pending_unidentified_foods}`
+        : '0',
+      subtitle: kpis
+        ? `${kpis.pending_recipes} công thức • ${kpis.pending_unidentified_foods} món lạ`
+        : 'Yêu cầu chờ Admin xử lý',
       icon: AlertTriangle,
       color: '#F59E0B',
       bgColor: '#FEF3C7',
+      path: '/reports',
     },
   ];
 
@@ -71,17 +114,27 @@ export const Dashboard: React.FC = () => {
         {statCards.map((card, index) => {
           const Icon = card.icon;
           return (
-            <div key={index} className="stat-card">
+            <div
+              key={index}
+              className="stat-card"
+              onClick={() => navigate(card.path)}
+              style={{ cursor: 'pointer', transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}>
               <div className="stat-card-header">
                 <div
                   className="stat-icon-wrapper"
                   style={{ backgroundColor: card.bgColor, color: card.color }}>
                   <Icon size={22} />
                 </div>
-                <span className="stat-badge">Sắp ra mắt</span>
+                <span
+                  className="stat-badge"
+                  style={{ backgroundColor: '#ECFDF5', color: '#059669' }}>
+                  Realtime
+                </span>
               </div>
               <div className="stat-card-body">
-                <h3 className="stat-value">{card.value}</h3>
+                <h3 className="stat-value">
+                  {isLoading ? <Loader2 size={20} className="spinner" /> : card.value}
+                </h3>
                 <p className="stat-title">{card.title}</p>
                 <span className="stat-subtitle">{card.subtitle}</span>
               </div>
@@ -90,8 +143,54 @@ export const Dashboard: React.FC = () => {
         })}
       </div>
 
-      {/* 3. SYSTEM INFO & NEXT MODULES */}
-      <div className="dashboard-grid-2">
+      {/* 3. QUICK BANNER TO DETAILED REPORTS */}
+      <div
+        style={{
+          backgroundColor: '#FFFFFF',
+          border: '1px solid #E2E8F0',
+          borderRadius: 'var(--radius-lg)',
+          padding: '16px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginTop: '20px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '10px',
+              backgroundColor: '#ECFDF5',
+              color: '#10B981',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <BarChart3 size={22} />
+          </div>
+          <div>
+            <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>
+              Báo cáo & Thống kê Phân tích Đa chiều
+            </h4>
+            <p style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
+              Xem biểu đồ xu hướng tăng trưởng người dùng, phân loại mục tiêu sức khỏe và thống kê dinh dưỡng.
+            </p>
+          </div>
+        </div>
+
+        <button
+          className="btn-primary"
+          onClick={() => navigate('/reports')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <span>Xem báo cáo chi tiết</span>
+          <ArrowRight size={16} />
+        </button>
+      </div>
+
+      {/* 4. SYSTEM INFO & MODULES STATUS */}
+      <div className="dashboard-grid-2" style={{ marginTop: '20px' }}>
         {/* Module Status Card */}
         <div className="content-card">
           <div className="card-header">
@@ -110,28 +209,36 @@ export const Dashboard: React.FC = () => {
                 <span className="module-status-badge badge-success">Hoàn thành</span>
               </div>
 
-              <div className="module-item">
+              <div className="module-item module-completed">
                 <div className="module-info">
                   <span className="module-name">Quản lý Người dùng (User Management)</span>
                   <span className="module-desc">Xem danh sách, tìm kiếm, phân quyền tài khoản</span>
                 </div>
-                <span className="module-status-badge badge-pending">Giai đoạn tiếp theo</span>
+                <span className="module-status-badge badge-success">Hoàn thành</span>
               </div>
 
-              <div className="module-item">
+              <div className="module-item module-completed">
                 <div className="module-info">
                   <span className="module-name">Quản lý Món ăn & Dinh dưỡng (Food Database)</span>
-                  <span className="module-desc">CRUD danh mục thực phẩm, calo, macro</span>
+                  <span className="module-desc">CRUD danh mục thực phẩm, calo, macro, kiểm tra ràng buộc</span>
                 </div>
-                <span className="module-status-badge badge-pending">Giai đoạn tiếp theo</span>
+                <span className="module-status-badge badge-success">Hoàn thành</span>
               </div>
 
-              <div className="module-item">
+              <div className="module-item module-completed">
                 <div className="module-info">
-                  <span className="module-name">Kế hoạch mẫu & Thực đơn (Meal Plans)</span>
-                  <span className="module-desc">Thiết lập thực đơn mẫu theo mục tiêu tăng/giảm cân</span>
+                  <span className="module-name">Kế hoạch mẫu & Thực đơn (Meal Plans & Recipes)</span>
+                  <span className="module-desc">Quản trị công thức, kiểm duyệt cộng đồng, tạo gói thực đơn</span>
                 </div>
-                <span className="module-status-badge badge-pending">Giai đoạn tiếp theo</span>
+                <span className="module-status-badge badge-success">Hoàn thành</span>
+              </div>
+
+              <div className="module-item module-completed">
+                <div className="module-info">
+                  <span className="module-name">Báo cáo & Thống kê (Reports & Analytics)</span>
+                  <span className="module-desc">Biểu đồ tăng trưởng, cơ cấu người dùng và vận hành</span>
+                </div>
+                <span className="module-status-badge badge-success">Hoàn thành</span>
               </div>
             </div>
           </div>
@@ -169,8 +276,7 @@ export const Dashboard: React.FC = () => {
 
             <div className="dashboard-tip-box">
               <p>
-                💡 <strong>Gợi ý:</strong> Dữ liệu thống kê thực tế sẽ được kết nối tự động khi các API
-                thống kê thuộc phân hệ Admin hoàn thiện.
+                💡 <strong>Gợi ý:</strong> Số liệu thống kê được cập nhật theo thời gian thực từ cơ sở dữ liệu MongoDB thông qua các truy vấn Aggregation bảo toàn tính riêng tư.
               </p>
             </div>
           </div>
