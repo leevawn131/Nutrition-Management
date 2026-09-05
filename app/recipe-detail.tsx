@@ -18,10 +18,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AddCommentSheet } from '@/components/plan/add-comment-sheet';
 import { CookingStepsModal } from '@/components/plan/cooking-steps-modal';
 import { GroceryCartModal } from '@/components/plan/grocery-cart-modal';
+import { recipeService } from '@/services/recipe.service';
 
 export default function RecipeDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
+    id?: string;
     title?: string;
     imageUrl?: string;
     category?: string;
@@ -82,6 +84,14 @@ export default function RecipeDetailScreen() {
 
   const ratingText = '--';
 
+  React.useEffect(() => {
+    async function checkSavedState() {
+      const saved = await recipeService.isRecipeSaved(params.id || itemName);
+      setIsSaved(saved);
+    }
+    checkSavedState();
+  }, [params.id, itemName]);
+
   const handleShare = async () => {
     try {
       if (Platform.OS === 'web') {
@@ -99,14 +109,36 @@ export default function RecipeDetailScreen() {
     }
   };
 
-  const handleToggleSave = () => {
-    const nextState = !isSaved;
-    setIsSaved(nextState);
-    const msg = nextState ? `Đã lưu công thức "${itemName}" vào bộ sưu tập!` : `Đã bỏ lưu công thức.`;
-    if (Platform.OS === 'web') {
-      window.alert(msg);
-    } else {
-      Alert.alert('Bộ sưu tập', msg);
+  const handleToggleSave = async () => {
+    try {
+      const result = await recipeService.toggleSaveRecipe({
+        _id: params.id,
+        title: itemName,
+        image_url: itemImage,
+        prep_time_minutes: prepTime,
+        cook_time_minutes: cookTime,
+        servings,
+        calories_per_serving: itemCalories,
+        protein_g: itemProtein,
+        carb_g: itemCarb,
+        fat_g: itemFat,
+        ingredients,
+        steps,
+        description,
+      });
+
+      setIsSaved(result.isSaved);
+      const msg = result.isSaved
+        ? `Đã lưu công thức "${itemName}" vào bộ sưu tập "Món ăn yêu thích"!`
+        : `Đã bỏ lưu công thức "${itemName}".`;
+
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('Bộ sưu tập', msg);
+      }
+    } catch (error) {
+      console.warn('Error toggling save recipe:', error);
     }
   };
 

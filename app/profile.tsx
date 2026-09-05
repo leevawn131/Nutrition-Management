@@ -1,29 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import { FontAwesome6, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Image,
+  ActivityIndicator,
   Alert,
+  Dimensions,
+  Image,
   Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons, FontAwesome6 } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 
+import { recipeService } from '@/services/recipe.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { userService } from '@/services/user.service';
 import { User } from '@/types/auth.types';
+import { Recipe } from '@/types/plan.types';
 
 export default function ProfileScreen() {
   const router = useRouter();
 
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'posts' | 'recipes' | 'collections' | 'activities'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'recipes' | 'collections' | 'activities'>('collections');
+  const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
+  const [loadingCollections, setLoadingCollections] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     async function loadProfile() {
@@ -41,6 +49,30 @@ export default function ProfileScreen() {
     }
     loadProfile();
   }, []);
+
+  const loadSavedRecipes = useCallback(async () => {
+    setLoadingCollections(true);
+    try {
+      const list = await recipeService.getSavedRecipes();
+      setSavedRecipes(list);
+    } catch (error) {
+      console.warn('Error loading saved recipes in profile:', error);
+    } finally {
+      setLoadingCollections(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadSavedRecipes();
+    }, [loadSavedRecipes])
+  );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadSavedRecipes();
+  };
 
   const handleBack = () => {
     if (Platform.OS !== 'web') {
@@ -69,6 +101,42 @@ export default function ProfileScreen() {
       } catch {}
     }
     Alert.alert(actionName, `Tính năng "${actionName}" sẽ sớm kết nối trực tiếp với Module cộng đồng!`);
+  };
+
+  const handleOpenRecipeDetail = (item: Recipe) => {
+    router.push({
+      pathname: '/recipe-detail' as any,
+      params: {
+        id: item._id,
+        title: item.title,
+        imageUrl: item.image_url || undefined,
+        calories: item.calories_per_serving ? String(item.calories_per_serving) : undefined,
+        protein: item.protein_g ? String(item.protein_g) : undefined,
+        carb: item.carb_g ? String(item.carb_g) : undefined,
+        fat: item.fat_g ? String(item.fat_g) : undefined,
+      },
+    });
+  };
+
+  const handleRemoveSaved = async (recipe: Recipe) => {
+    const doRemove = async () => {
+      const updated = await recipeService.removeSavedRecipe(recipe._id || recipe.title);
+      setSavedRecipes(updated);
+      if (Platform.OS === 'web') {
+        window.alert(`Đã xóa món "${recipe.title}" khỏi bộ sưu tập!`);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Bạn có chắc muốn bỏ lưu món "${recipe.title}"?`)) {
+        await doRemove();
+      }
+    } else {
+      Alert.alert('Bỏ lưu công thức', `Bạn có chắc muốn xóa món "${recipe.title}" khỏi bộ sưu tập?`, [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Xóa', style: 'destructive', onPress: doRemove },
+      ]);
+    }
   };
 
   return (
@@ -103,8 +171,10 @@ export default function ProfileScreen() {
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-        
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#10B981']} tintColor="#10B981" />
+        }>
         {/* 2. USER PROFILE HEADER */}
         <View style={styles.userHeader}>
           {user?.avatar_url ? (
@@ -182,8 +252,18 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={[styles.tabItem, activeTab === 'collections' && styles.tabItemActive]}
-            onPress={() => setActiveTab('collections')}>
-            <Text style={[styles.tabText, activeTab === 'collections' && styles.tabTextActive]}>Bộ sưu tập</Text>
+            onPress={() => {
+              setActiveTab('collections');
+              loadSavedRecipes();
+            }}>
+            <View style={styles.tabWithBadge}>
+              <Text style={[styles.tabText, activeTab === 'collections' && styles.tabTextActive]}>Bộ sưu tập</Text>
+              {savedRecipes.length > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>{savedRecipes.length}</Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -193,21 +273,165 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 5. EMPTY STATE SECTION */}
-        <View style={styles.emptyStateContainer}>
-          <View style={styles.cookingPotWrapper}>
-            <MaterialCommunityIcons name="pot-steam-outline" size={72} color="#94A3B8" />
+        {/* 5. TAB CONTENT */}
+
+        {/* TAB A: BỘ SƯU TẬP (COLLECTIONS) */}
+        {activeTab === 'collections' && (
+          <View style={styles.tabContentContainer}>
+            {loadingCollections ? (
+              <View style={styles.centerLoading}>
+                <ActivityIndicator size="large" color="#10B981" />
+                <Text style={styles.loadingSubText}>Đang tải bộ sưu tập...</Text>
+              </View>
+            ) : savedRecipes.length > 0 ? (
+              <View>
+                <View style={styles.collectionHeaderRow}>
+                  <View style={styles.collectionTitleWrap}>
+                    <Text style={styles.collectionTitle}>Món ăn yêu thích</Text>
+                    <Text style={styles.collectionCountText}>({savedRecipes.length} món đã lưu)</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.exploreMoreBtn}
+                    onPress={() => router.push('/recipes')}
+                    activeOpacity={0.8}>
+                    <Ionicons name="add-circle-outline" size={16} color="#10B981" />
+                    <Text style={styles.exploreMoreBtnText}>Thêm món</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Saved Dishes List */}
+                <View style={styles.savedGrid}>
+                  {savedRecipes.map((item, idx) => {
+                    const cookTime =
+                      (item.prep_time_minutes || 0) + (item.cook_time_minutes || 0) || 20;
+                    const calories = item.calories_per_serving || 350;
+
+                    return (
+                      <TouchableOpacity
+                        key={item._id || idx}
+                        style={styles.savedCard}
+                        activeOpacity={0.88}
+                        onPress={() => handleOpenRecipeDetail(item)}>
+                        <View style={styles.savedImageWrapper}>
+                          <Image
+                            source={{
+                              uri:
+                                item.image_url ||
+                                'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
+                            }}
+                            style={styles.savedImage}
+                            resizeMode="cover"
+                          />
+                          <TouchableOpacity
+                            style={styles.savedBookmarkBtn}
+                            onPress={() => handleRemoveSaved(item)}
+                            activeOpacity={0.8}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <Ionicons name="bookmark" size={18} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.savedCardBody}>
+                          <Text style={styles.savedCardTitle} numberOfLines={2}>
+                            {item.title}
+                          </Text>
+
+                          <View style={styles.savedMetaRow}>
+                            <View style={styles.savedMetaItem}>
+                              <Ionicons name="time-outline" size={13} color="#64748B" />
+                              <Text style={styles.savedMetaText}>{cookTime}p</Text>
+                            </View>
+                            <Text style={styles.savedMetaDot}>•</Text>
+                            <View style={styles.savedMetaItem}>
+                              <MaterialCommunityIcons name="fire" size={14} color="#EF4444" />
+                              <Text style={styles.savedMetaText}>{Math.round(calories)} kcal</Text>
+                            </View>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <View style={styles.cookingPotWrapper}>
+                  <MaterialCommunityIcons name="bookmark-multiple-outline" size={64} color="#94A3B8" />
+                </View>
+                <Text style={styles.emptyStateHeading}>Chưa có món ăn nào trong bộ sưu tập</Text>
+                <Text style={styles.emptyStateText}>
+                  Hãy khám phá các công thức nấu ăn ngon và nhấn "Lưu lại" để xem lại bất cứ lúc nào!
+                </Text>
+                <TouchableOpacity
+                  style={styles.actionGreenBtn}
+                  onPress={() => router.push('/recipes')}
+                  activeOpacity={0.88}>
+                  <Ionicons name="restaurant-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.actionGreenBtnText}>Khám phá món ngon ngay</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
+        )}
 
-          <Text style={styles.emptyStateText}>Bạn chưa có hoạt động nào trên trang cá nhân</Text>
+        {/* TAB B: CÔNG THỨC (RECIPES) */}
+        {activeTab === 'recipes' && (
+          <View style={styles.tabContentContainer}>
+            <View style={styles.emptyStateContainer}>
+              <View style={styles.cookingPotWrapper}>
+                <MaterialCommunityIcons name="chef-hat" size={64} color="#94A3B8" />
+              </View>
+              <Text style={styles.emptyStateHeading}>Công thức của bạn</Text>
+              <Text style={styles.emptyStateText}>
+                Bạn chưa chia sẻ công thức nấu ăn nào. Hãy tạo công thức đầu tiên để chia sẻ với cộng đồng!
+              </Text>
+              <TouchableOpacity
+                style={styles.actionGreenBtn}
+                onPress={() => router.push('/recipes')}
+                activeOpacity={0.88}>
+                <Text style={styles.actionGreenBtnText}>Khám phá công thức mẫu</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
-          <TouchableOpacity
-            style={styles.createPostBtn}
-            onPress={() => handlePlaceholderAction('Tạo bài viết đầu tiên')}
-            activeOpacity={0.88}>
-            <Text style={styles.createPostBtnText}>Tạo bài viết đầu tiên</Text>
-          </TouchableOpacity>
-        </View>
+        {/* TAB C: BÀI VIẾT (POSTS) */}
+        {activeTab === 'posts' && (
+          <View style={styles.tabContentContainer}>
+            <View style={styles.emptyStateContainer}>
+              <View style={styles.cookingPotWrapper}>
+                <MaterialCommunityIcons name="pot-steam-outline" size={72} color="#94A3B8" />
+              </View>
+              <Text style={styles.emptyStateHeading}>Chưa có bài viết nào</Text>
+              <Text style={styles.emptyStateText}>Bạn chưa có hoạt động nào trên trang cá nhân</Text>
+              <TouchableOpacity
+                style={styles.actionGreenBtn}
+                onPress={() => handlePlaceholderAction('Tạo bài viết đầu tiên')}
+                activeOpacity={0.88}>
+                <Text style={styles.actionGreenBtnText}>Tạo bài viết đầu tiên</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* TAB D: HOẠT ĐỘNG (ACTIVITIES) */}
+        {activeTab === 'activities' && (
+          <View style={styles.tabContentContainer}>
+            <View style={styles.emptyStateContainer}>
+              <View style={styles.cookingPotWrapper}>
+                <MaterialCommunityIcons name="run-fast" size={64} color="#94A3B8" />
+              </View>
+              <Text style={styles.emptyStateHeading}>Nhật ký vận động</Text>
+              <Text style={styles.emptyStateText}>Theo dõi và ghi nhận các bài tập thể thao hàng ngày của bạn.</Text>
+              <TouchableOpacity
+                style={styles.actionGreenBtn}
+                onPress={() => router.push('/activity')}
+                activeOpacity={0.88}>
+                <Text style={styles.actionGreenBtnText}>Ghi nhận hoạt động</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       {/* 6. BOTTOM FLOATING BAR */}
@@ -379,11 +603,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
-    marginBottom: 32,
+    marginBottom: 20,
   },
   tabItem: {
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderBottomWidth: 2.5,
     borderBottomColor: 'transparent',
   },
@@ -399,10 +623,142 @@ const styles = StyleSheet.create({
     color: '#10B981',
     fontWeight: '700',
   },
+  tabWithBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tabBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+  },
+  tabBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  tabContentContainer: {
+    minHeight: 280,
+  },
+  collectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  collectionTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  collectionTitle: {
+    fontSize: 16.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  collectionCountText: {
+    fontSize: 13,
+    color: '#64748B',
+  },
+  exploreMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  exploreMoreBtnText: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  savedGrid: {
+    gap: 12,
+  },
+  savedCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    padding: 10,
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  savedImageWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#F1F5F9',
+    position: 'relative',
+  },
+  savedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  savedBookmarkBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  savedCardBody: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
+  },
+  savedCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+    lineHeight: 20,
+  },
+  savedMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  savedMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  savedMetaText: {
+    fontSize: 12.5,
+    color: '#64748B',
+  },
+  savedMetaDot: {
+    color: '#CBD5E1',
+    fontSize: 12,
+  },
+  centerLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  loadingSubText: {
+    marginTop: 10,
+    fontSize: 13,
+    color: '#64748B',
+  },
   emptyStateContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 24,
+    paddingVertical: 32,
     paddingHorizontal: 20,
   },
   cookingPotWrapper: {
@@ -412,28 +768,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  emptyStateHeading: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+    textAlign: 'center',
   },
   emptyStateText: {
-    fontSize: 14,
-    color: '#475569',
+    fontSize: 13.5,
+    color: '#64748B',
     textAlign: 'center',
-    marginBottom: 18,
+    lineHeight: 20,
+    marginBottom: 20,
   },
-  createPostBtn: {
-    backgroundColor: '#34D399',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
+  actionGreenBtn: {
+    flexDirection: 'row',
+    backgroundColor: '#10B981',
+    borderRadius: 22,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
-    elevation: 2,
+    elevation: 3,
   },
-  createPostBtnText: {
+  actionGreenBtnText: {
     fontSize: 14.5,
     fontWeight: '700',
     color: '#FFFFFF',

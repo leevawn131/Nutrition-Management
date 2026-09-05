@@ -158,7 +158,9 @@ export default function RecipesScreen() {
   const fetchRecipes = async (querySearch = search, tab = activeTab) => {
     try {
       const items = await recipeService.getRecipes({ search: querySearch, tab });
-      if (items && items.length > 0) {
+      if (tab === 'collections') {
+        setRecipes(items || []);
+      } else if (items && items.length > 0) {
         setRecipes(items);
       } else if (!querySearch) {
         setRecipes(FALLBACK_RECIPES);
@@ -171,7 +173,12 @@ export default function RecipesScreen() {
       }
     } catch (err) {
       console.warn('Could not load recipes from database, using fallback', err);
-      setRecipes(FALLBACK_RECIPES);
+      if (tab === 'collections') {
+        const saved = await recipeService.getSavedRecipes();
+        setRecipes(saved);
+      } else {
+        setRecipes(FALLBACK_RECIPES);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);

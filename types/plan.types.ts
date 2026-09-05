@@ -99,5 +99,32 @@ export interface UserCollection {
   user_id: string;
   name: string;
   items: UserCollectionItem[];
+  recipes?: Recipe[];
+  item_count?: number;
   created_at?: string;
 }
+
+export interface MealPlanTemplateItem {
+  _id?: string;
+  meal_type: MealType;
+  recipe_id?: Recipe | string | null;
+  food_item_id?: FoodItem | string | null;
+  day_number?: number;
+  quantity_text?: string | null;
+}
+
+export interface MealPlanTemplate {
+  _id: string;
+  name: string;
+  description?: string | null;
+  image_url?: string | null;
+  duration_days?: number;
+  created_by_admin_id?: string;
+  items: MealPlanTemplateItem[];
+  created_at?: string;
+  total_calories?: number;
+  total_protein_g?: number;
+  total_carb_g?: number;
+  total_fat_g?: number;
+}
+

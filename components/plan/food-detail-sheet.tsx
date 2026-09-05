@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AddCommentSheet } from './add-comment-sheet';
 import { CookingStepsModal } from './cooking-steps-modal';
 import { GroceryCartModal } from './grocery-cart-modal';
+import { recipeService } from '@/services/recipe.service';
 import { User } from '@/types/auth.types';
 import { FoodItem, MealPlanItem, MealType, Recipe } from '@/types/plan.types';
 
@@ -327,6 +328,14 @@ export function FullFoodDetailModal({
 
   const ratingText = recipe?.avg_rating ? recipe.avg_rating.toFixed(1) : '--';
 
+  React.useEffect(() => {
+    async function checkSavedState() {
+      const saved = await recipeService.isRecipeSaved(recipe?._id || food?._id || itemName);
+      setIsSaved(saved);
+    }
+    checkSavedState();
+  }, [recipe?._id, food?._id, itemName]);
+
   const handleShare = async () => {
     try {
       if (Platform.OS === 'web') {
@@ -344,14 +353,36 @@ export function FullFoodDetailModal({
     }
   };
 
-  const handleToggleSave = () => {
-    const nextState = !isSaved;
-    setIsSaved(nextState);
-    const msg = nextState ? `Đã lưu công thức "${itemName}" vào bộ sưu tập!` : `Đã bỏ lưu công thức.`;
-    if (Platform.OS === 'web') {
-      window.alert(msg);
-    } else {
-      Alert.alert('Bộ sưu tập', msg);
+  const handleToggleSave = async () => {
+    try {
+      const result = await recipeService.toggleSaveRecipe({
+        _id: recipe?._id || food?._id,
+        title: itemName,
+        image_url: itemImage,
+        prep_time_minutes: prepTime,
+        cook_time_minutes: cookTime,
+        servings,
+        calories_per_serving: itemCalories,
+        protein_g: itemProtein,
+        carb_g: itemCarb,
+        fat_g: itemFat,
+        ingredients,
+        steps,
+        description,
+      });
+
+      setIsSaved(result.isSaved);
+      const msg = result.isSaved
+        ? `Đã lưu món "${itemName}" vào bộ sưu tập "Món ăn yêu thích"!`
+        : `Đã bỏ lưu món "${itemName}".`;
+
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('Bộ sưu tập', msg);
+      }
+    } catch (error) {
+      console.warn('Error toggling save in FoodDetailSheet:', error);
     }
   };
 

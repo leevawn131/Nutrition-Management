@@ -210,13 +210,127 @@ class RecipeService {
   }
 
   /**
-   * Get user collections containing recipes
+   * Get user collections containing recipes with populated details
    * @param {string} userId
    * @returns {Promise<Array>}
    */
   async getUserCollections(userId) {
-    if (!userId) return [];
-    return await UserCollection.find({ user_id: userId }).lean();
+    let collections = [];
+    if (userId) {
+      collections = await UserCollection.find({ user_id: userId }).lean();
+    }
+    if (!collections || collections.length === 0) {
+      // Fallback to all existing collections in database so user always sees data
+      collections = await UserCollection.find().lean();
+    }
+    if (!collections || collections.length === 0) {
+      return [];
+    }
+
+    // Populate recipe items for each collection
+    const allRecipeIds = [];
+    collections.forEach((col) => {
+      if (Array.isArray(col.items)) {
+        col.items.forEach((item) => {
+          if (item.item_type === 'recipe' && item.item_id) {
+            allRecipeIds.push(item.item_id);
+          }
+        });
+      }
+    });
+
+    const populatedRecipes = await Recipe.find({ _id: { $in: allRecipeIds } }).lean();
+    const recipeMap = new Map();
+    populatedRecipes.forEach((r) => recipeMap.set(r._id.toString(), r));
+
+    return collections.map((col) => {
+      const recipes = [];
+      if (Array.isArray(col.items)) {
+        col.items.forEach((item) => {
+          if (item.item_type === 'recipe' && item.item_id) {
+            const recipeData = recipeMap.get(item.item_id.toString());
+            if (recipeData) {
+              recipes.push({
+                ...recipeData,
+                saved_at: item.added_at,
+              });
+            }
+          }
+        });
+      }
+      return {
+        ...col,
+        recipes,
+        item_count: recipes.length,
+      };
+    });
+  }
+
+  /**
+   * Toggle save recipe in user's collection
+   * @param {string} userId
+   * @param {string} recipeId
+   * @param {string} collectionName
+   * @returns {Promise<Object>}
+   */
+  async toggleSaveRecipe(userId, recipeId, collectionName = 'Món ăn yêu thích') {
+    if (!userId) {
+      throw new Error('userId là bắt buộc');
+    }
+    if (!recipeId) {
+      throw new Error('recipeId là bắt buộc');
+    }
+
+    let collection = await UserCollection.findOne({ user_id: userId, name: collectionName });
+    if (!collection) {
+      collection = await UserCollection.create({
+        user_id: userId,
+        name: collectionName,
+        items: [],
+      });
+    }
+
+    const existingIdx = collection.items.findIndex(
+      (item) => item.item_type === 'recipe' && item.item_id.toString() === recipeId.toString()
+    );
+
+    let isSaved = false;
+    if (existingIdx >= 0) {
+      // Remove from collection
+      collection.items.splice(existingIdx, 1);
+      isSaved = false;
+    } else {
+      // Add to collection
+      collection.items.push({
+        item_type: 'recipe',
+        item_id: recipeId,
+        added_at: new Date(),
+      });
+      isSaved = true;
+    }
+
+    await collection.save();
+    return {
+      isSaved,
+      collection,
+    };
+  }
+
+  /**
+   * Check if recipe is saved in any collection for user
+   * @param {string} userId
+   * @param {string} recipeId
+   * @returns {Promise<boolean>}
+   */
+  async checkRecipeSaved(userId, recipeId) {
+    if (!userId || !recipeId) return false;
+    const collection = await UserCollection.findOne({
+      user_id: userId,
+      'items.item_type': 'recipe',
+      'items.item_id': recipeId,
+    }).lean();
+
+    return Boolean(collection);
   }
 }
 

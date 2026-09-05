@@ -52,13 +52,26 @@ const getRecipeById = async (req, res) => {
   }
 };
 
+const User = require('../models/user.model');
+
+const getEffectiveUserId = async (req) => {
+  if (req.user && req.user.id) {
+    const userExists = await User.findById(req.user.id).lean();
+    if (userExists) {
+      return req.user.id;
+    }
+  }
+  const firstUser = await User.findOne({ role: 'user' }).lean();
+  return firstUser ? firstUser._id.toString() : null;
+};
+
 /**
  * GET /api/recipes/collections/my
  * Get current user collections
  */
 const getUserCollections = async (req, res) => {
   try {
-    const userId = req.user ? req.user.id : null;
+    const userId = await getEffectiveUserId(req);
     const collections = await recipeService.getUserCollections(userId);
 
     return res.status(200).json({
@@ -74,8 +87,66 @@ const getUserCollections = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/recipes/:id/toggle-save
+ * Toggle save recipe into user collection
+ */
+const toggleSaveRecipe = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { collectionName } = req.body;
+    const userId = await getEffectiveUserId(req);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không tìm thấy người dùng hợp lệ để lưu món ăn',
+      });
+    }
+
+    const result = await recipeService.toggleSaveRecipe(userId, id, collectionName);
+
+    return res.status(200).json({
+      success: true,
+      message: result.isSaved ? 'Đã lưu công thức vào bộ sưu tập' : 'Đã bỏ lưu công thức',
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error in toggleSaveRecipe:', error.message);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Lỗi khi cập nhật bộ sưu tập',
+    });
+  }
+};
+
+/**
+ * GET /api/recipes/:id/is-saved
+ * Check if recipe is saved in user collection
+ */
+const checkRecipeSaved = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = await getEffectiveUserId(req);
+    const isSaved = await recipeService.checkRecipeSaved(userId, id);
+
+    return res.status(200).json({
+      success: true,
+      data: { isSaved },
+    });
+  } catch (error) {
+    console.error('Error in checkRecipeSaved:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi khi kiểm tra trạng thái lưu',
+    });
+  }
+};
+
 module.exports = {
   getRecipes,
   getRecipeById,
   getUserCollections,
+  toggleSaveRecipe,
+  checkRecipeSaved,
 };

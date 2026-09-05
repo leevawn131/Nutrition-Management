@@ -26,6 +26,12 @@ router.get('/', optionalAuth, recipeController.getRecipes);
 // GET /api/recipes/collections/my
 router.get('/collections/my', optionalAuth, recipeController.getUserCollections);
 
+// POST /api/recipes/:id/toggle-save
+router.post('/:id/toggle-save', optionalAuth, recipeController.toggleSaveRecipe);
+
+// GET /api/recipes/:id/is-saved
+router.get('/:id/is-saved', optionalAuth, recipeController.checkRecipeSaved);
+
 // GET /api/recipes/:id
 router.get('/:id', optionalAuth, recipeController.getRecipeById);
 

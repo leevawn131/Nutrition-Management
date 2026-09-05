@@ -821,7 +821,7 @@ function MealPlan({
         <Text style={styles.sectionTitle}>Thực đơn của bạn</Text>
         <TouchableOpacity
           style={styles.exploreButton}
-          onPress={() => router.push('/recipes')}
+          onPress={() => router.push('/sample-plans' as any)}
           activeOpacity={0.8}>
           <MaterialCommunityIcons name="auto-fix" size={18} color="#FFFFFF" />
           <Text style={styles.exploreText}>Khám phá thực đơn mẫu</Text>
