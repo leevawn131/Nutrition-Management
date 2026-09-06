@@ -1,4 +1,4 @@
-const adminRecipeService = require("../../services/admin.recipe.service");
+const adminRecipeService = require("../../services/admin/admin.recipe.service");
 
 class RecipeAdminController {
   async listRecipes(req, res) {

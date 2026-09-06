@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
-const UnidentifiedFood = require("../models/unidentified_food.model");
-const FoodItem = require("../models/food_item.model");
+const UnidentifiedFood = require("../../models/unidentified_food.model");
+const FoodItem = require("../../models/food_item.model");
 
 class AdminUnidentifiedFoodService {
   /**

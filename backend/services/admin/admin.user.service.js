@@ -1,5 +1,5 @@
-const mongoose = require('mongoose');
-const User = require('../models/user.model');
+const mongoose = require("mongoose");
+const User = require("../../models/user.model");
 
 /**
  * Service to manage User administration
@@ -15,13 +15,15 @@ const adminUserService = {
     const limitNum = parseInt(limit, 10);
 
     if (isNaN(pageNum) || pageNum < 1) {
-      const error = new Error('Tham số page phải là số nguyên dương >= 1');
+      const error = new Error("Tham số page phải là số nguyên dương >= 1");
       error.statusCode = 400;
       throw error;
     }
 
     if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
-      const error = new Error('Tham số limit phải nằm trong khoảng từ 1 đến 100');
+      const error = new Error(
+        "Tham số limit phải nằm trong khoảng từ 1 đến 100",
+      );
       error.statusCode = 400;
       throw error;
     }
@@ -29,9 +31,11 @@ const adminUserService = {
     const query = {};
 
     // Filter by role if specified
-    if (role !== undefined && role !== null && role !== '') {
-      if (!['user', 'admin'].includes(role)) {
-        const error = new Error("Tham số role chỉ chấp nhận giá trị 'user' hoặc 'admin'");
+    if (role !== undefined && role !== null && role !== "") {
+      if (!["user", "admin"].includes(role)) {
+        const error = new Error(
+          "Tham số role chỉ chấp nhận giá trị 'user' hoặc 'admin'",
+        );
         error.statusCode = 400;
         throw error;
       }
@@ -39,11 +43,13 @@ const adminUserService = {
     }
 
     // Search by email or full_name (case-insensitive regex)
-    if (search && typeof search === 'string' && search.trim() !== '') {
-      const sanitizedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (search && typeof search === "string" && search.trim() !== "") {
+      const sanitizedSearch = search
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       query.$or = [
-        { email: { $regex: sanitizedSearch, $options: 'i' } },
-        { full_name: { $regex: sanitizedSearch, $options: 'i' } },
+        { email: { $regex: sanitizedSearch, $options: "i" } },
+        { full_name: { $regex: sanitizedSearch, $options: "i" } },
       ];
     }
 
@@ -52,7 +58,7 @@ const adminUserService = {
     const [total, users] = await Promise.all([
       User.countDocuments(query),
       User.find(query)
-        .select('-password_hash')
+        .select("-password_hash")
         .sort({ created_at: -1 })
         .skip(skip)
         .limit(limitNum)
@@ -79,15 +85,15 @@ const adminUserService = {
    */
   async getUserDetailById(id) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      const error = new Error('User ID không hợp lệ');
+      const error = new Error("User ID không hợp lệ");
       error.statusCode = 400;
       throw error;
     }
 
-    const user = await User.findById(id).select('-password_hash');
+    const user = await User.findById(id).select("-password_hash");
 
     if (!user) {
-      const error = new Error('Không tìm thấy người dùng với ID đã cung cấp');
+      const error = new Error("Không tìm thấy người dùng với ID đã cung cấp");
       error.statusCode = 404;
       throw error;
     }
@@ -104,12 +110,12 @@ const adminUserService = {
    */
   async updateUserRole(adminUserId, targetUserId, newRole) {
     if (!targetUserId || !mongoose.Types.ObjectId.isValid(targetUserId)) {
-      const error = new Error('User ID không hợp lệ');
+      const error = new Error("User ID không hợp lệ");
       error.statusCode = 400;
       throw error;
     }
 
-    if (!newRole || !['user', 'admin'].includes(newRole)) {
+    if (!newRole || !["user", "admin"].includes(newRole)) {
       const error = new Error("Vai trò mới (role) phải là 'user' hoặc 'admin'");
       error.statusCode = 400;
       throw error;
@@ -117,24 +123,29 @@ const adminUserService = {
 
     const targetUser = await User.findById(targetUserId);
     if (!targetUser) {
-      const error = new Error('Không tìm thấy người dùng cần cập nhật');
+      const error = new Error("Không tìm thấy người dùng cần cập nhật");
       error.statusCode = 404;
       throw error;
     }
 
     // Security Rule 1: Admin cannot demote themselves
-    if (adminUserId.toString() === targetUserId.toString() && newRole === 'user') {
-      const error = new Error('Quản trị viên không thể tự hạ quyền của chính mình.');
+    if (
+      adminUserId.toString() === targetUserId.toString() &&
+      newRole === "user"
+    ) {
+      const error = new Error(
+        "Quản trị viên không thể tự hạ quyền của chính mình.",
+      );
       error.statusCode = 400;
       throw error;
     }
 
     // Security Rule 2: Cannot demote the last remaining admin in the system
-    if (targetUser.role === 'admin' && newRole === 'user') {
-      const adminCount = await User.countDocuments({ role: 'admin' });
+    if (targetUser.role === "admin" && newRole === "user") {
+      const adminCount = await User.countDocuments({ role: "admin" });
       if (adminCount <= 1) {
         const error = new Error(
-          'Không thể hạ quyền vì đây là tài khoản Quản trị viên duy nhất còn lại trong hệ thống.'
+          "Không thể hạ quyền vì đây là tài khoản Quản trị viên duy nhất còn lại trong hệ thống.",
         );
         error.statusCode = 400;
         throw error;
@@ -146,7 +157,8 @@ const adminUserService = {
     await targetUser.save();
 
     // Return sanitized user
-    const updatedUser = await User.findById(targetUserId).select('-password_hash');
+    const updatedUser =
+      await User.findById(targetUserId).select("-password_hash");
     return updatedUser;
   },
 };

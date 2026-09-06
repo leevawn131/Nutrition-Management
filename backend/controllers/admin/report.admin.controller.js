@@ -1,4 +1,4 @@
-const adminReportService = require("../../services/admin.report.service");
+const adminReportService = require("../../services/admin/admin.report.service");
 
 class ReportAdminController {
   async getOverview(req, res) {

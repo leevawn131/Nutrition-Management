@@ -1,4 +1,4 @@
-const adminUserService = require('../../services/admin.user.service');
+const adminUserService = require('../../services/admin/admin.user.service');
 
 /**
  * Controller to handle Admin User Management requests

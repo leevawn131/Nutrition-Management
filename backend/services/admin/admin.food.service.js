@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const FoodItem = require("../models/food_item.model");
+const FoodItem = require("../../models/food_item.model");
 
 class AdminFoodService {
   /**

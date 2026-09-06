@@ -1,8 +1,8 @@
 const mongoose = require("mongoose");
-const User = require("../models/user.model");
-const FoodItem = require("../models/food_item.model");
-const Recipe = require("../models/recipe.model");
-const MealPlanTemplate = require("../models/meal_plan_template.model");
+const User = require("../../models/user.model");
+const FoodItem = require("../../models/food_item.model");
+const Recipe = require("../../models/recipe.model");
+const MealPlanTemplate = require("../../models/meal_plan_template.model");
 
 class AdminReportService {
   /**

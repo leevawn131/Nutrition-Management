@@ -1,4 +1,4 @@
-const adminFoodService = require("../../services/admin.food.service");
+const adminFoodService = require("../../services/admin/admin.food.service");
 
 class FoodAdminController {
   async listFoods(req, res) {

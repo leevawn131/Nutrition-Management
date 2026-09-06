@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
-const MealPlanTemplate = require("../models/meal_plan_template.model");
-const Recipe = require("../models/recipe.model");
+const MealPlanTemplate = require("../../models/meal_plan_template.model");
+const Recipe = require("../../models/recipe.model");
 
 class AdminMealPlanTemplateService {
   /**

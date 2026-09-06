@@ -1,4 +1,4 @@
-const adminMealPlanTemplateService = require("../../services/admin.meal_plan_template.service");
+const adminMealPlanTemplateService = require("../../services/admin/admin.meal_plan_template.service");
 
 class MealPlanTemplateAdminController {
   async listTemplates(req, res) {

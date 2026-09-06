@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const Recipe = require("../models/recipe.model");
+const Recipe = require("../../models/recipe.model");
 
 class AdminRecipeService {
   /**

@@ -1,4 +1,4 @@
-const adminUnidentifiedFoodService = require("../../services/admin.unidentified_food.service");
+const adminUnidentifiedFoodService = require("../../services/admin/admin.unidentified_food.service");
 
 class UnidentifiedFoodAdminController {
   async getUnidentifiedFoods(req, res) {
