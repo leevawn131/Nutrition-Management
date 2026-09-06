@@ -67,6 +67,7 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error('Lỗi đăng nhập:', error);
     if (error.statusCode) {
       return res.status(error.statusCode).json({
         success: false,
@@ -74,10 +75,9 @@ const login = async (req, res) => {
       });
     }
 
-    console.error('Unhandled login error:', error.message);
     return res.status(500).json({
       success: false,
-      message: 'Đã xảy ra lỗi máy chủ nội bộ. Vui lòng thử lại sau.',
+      message: error.message || 'Đã xảy ra lỗi máy chủ nội bộ. Vui lòng thử lại sau.',
     });
   }
 };

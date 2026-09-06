@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Alert,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -18,7 +19,9 @@ import { AppLogo } from '@/components/ui/app-logo';
 import { QuickActionsModal } from '@/components/home/quick-actions-modal';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { userService, HealthMetrics } from '@/services/user.service';
+import { mealService } from '@/services/meal.service';
 import { User } from '@/types/auth.types';
+
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -53,6 +56,8 @@ export default function HomeScreen() {
     }
   };
 
+  const [todayLogs, setTodayLogs] = useState<any[]>([]);
+
   const loadData = useCallback(async () => {
     // 1. Try to load cached user first for instantaneous UI render
     const cached = await getCachedUser();
@@ -60,12 +65,14 @@ export default function HomeScreen() {
       setUser(cached);
     }
 
-    // 2. Fetch live data from backend APIs (Module A)
+    // 2. Fetch live data from backend APIs
     const token = await getAuthToken();
     if (token) {
-      const [profileData, healthData] = await Promise.all([
+      const todayStr = new Date().toISOString().split('T')[0];
+      const [profileData, healthData, mealLogsData] = await Promise.all([
         userService.getProfile(token),
         userService.getHealthMetrics(token),
+        mealService.getMealLogs(token, todayStr).catch(() => ({ success: false, data: [] })),
       ]);
 
       if (profileData) {
@@ -74,8 +81,12 @@ export default function HomeScreen() {
       if (healthData) {
         setHealth(healthData);
       }
+      if (mealLogsData && mealLogsData.data) {
+        setTodayLogs(mealLogsData.data);
+      }
     }
   }, []);
+
 
   useEffect(() => {
     loadData();
@@ -218,7 +229,9 @@ export default function HomeScreen() {
                 <FontAwesome6 name="utensils" size={16} color="#D97706" />
               </View>
               <View>
-                <Text style={styles.statValue}>0 kcal</Text>
+                <Text style={styles.statValue}>
+                  {Math.round(todayLogs.reduce((sum, item) => sum + (item.calories || 0), 0)).toLocaleString()} kcal
+                </Text>
                 <Text style={styles.statLabel}>Đã nạp</Text>
               </View>
             </View>
@@ -237,40 +250,57 @@ export default function HomeScreen() {
         </View>
 
         {/* 5. MACRO SUMMARY ROW */}
-        <View style={styles.macroSection}>
-          {/* Protein */}
-          <View style={styles.macroCol}>
-            <Text style={styles.macroName}>Chất đạm</Text>
-            <Text style={styles.macroValue}>
-              0g / {user?.target_protein_g ? `${user.target_protein_g}g` : '--'}
-            </Text>
-            <View style={styles.macroProgressBar}>
-              <View style={[styles.macroProgressFill, { width: '0%', backgroundColor: '#F59E0B' }]} />
-            </View>
-          </View>
+        {(() => {
+          const totalProtein = Math.round(todayLogs.reduce((sum, item) => sum + (item.protein_g || 0), 0));
+          const totalCarb = Math.round(todayLogs.reduce((sum, item) => sum + (item.carb_g || 0), 0));
+          const totalFat = Math.round(todayLogs.reduce((sum, item) => sum + (item.fat_g || 0), 0));
 
-          {/* Carbs */}
-          <View style={styles.macroCol}>
-            <Text style={styles.macroName}>Đường bột</Text>
-            <Text style={styles.macroValue}>
-              0g / {user?.target_carb_g ? `${user.target_carb_g}g` : '--'}
-            </Text>
-            <View style={styles.macroProgressBar}>
-              <View style={[styles.macroProgressFill, { width: '0%', backgroundColor: '#3B82F6' }]} />
-            </View>
-          </View>
+          const targetProtein = user?.target_protein_g || 1;
+          const targetCarb = user?.target_carb_g || 1;
+          const targetFat = user?.target_fat_g || 1;
 
-          {/* Fat */}
-          <View style={styles.macroCol}>
-            <Text style={styles.macroName}>Chất béo</Text>
-            <Text style={styles.macroValue}>
-              0g / {user?.target_fat_g ? `${user.target_fat_g}g` : '--'}
-            </Text>
-            <View style={styles.macroProgressBar}>
-              <View style={[styles.macroProgressFill, { width: '0%', backgroundColor: '#10B981' }]} />
+          const proteinPct = Math.min(100, Math.round((totalProtein / targetProtein) * 100));
+          const carbPct = Math.min(100, Math.round((totalCarb / targetCarb) * 100));
+          const fatPct = Math.min(100, Math.round((totalFat / targetFat) * 100));
+
+          return (
+            <View style={styles.macroSection}>
+              {/* Protein */}
+              <View style={styles.macroCol}>
+                <Text style={styles.macroName}>Chất đạm</Text>
+                <Text style={styles.macroValue}>
+                  {totalProtein}g / {user?.target_protein_g ? `${user.target_protein_g}g` : '--'}
+                </Text>
+                <View style={styles.macroProgressBar}>
+                  <View style={[styles.macroProgressFill, { width: `${proteinPct}%`, backgroundColor: '#F59E0B' }]} />
+                </View>
+              </View>
+
+              {/* Carbs */}
+              <View style={styles.macroCol}>
+                <Text style={styles.macroName}>Đường bột</Text>
+                <Text style={styles.macroValue}>
+                  {totalCarb}g / {user?.target_carb_g ? `${user.target_carb_g}g` : '--'}
+                </Text>
+                <View style={styles.macroProgressBar}>
+                  <View style={[styles.macroProgressFill, { width: `${carbPct}%`, backgroundColor: '#3B82F6' }]} />
+                </View>
+              </View>
+
+              {/* Fat */}
+              <View style={styles.macroCol}>
+                <Text style={styles.macroName}>Chất béo</Text>
+                <Text style={styles.macroValue}>
+                  {totalFat}g / {user?.target_fat_g ? `${user.target_fat_g}g` : '--'}
+                </Text>
+                <View style={styles.macroProgressBar}>
+                  <View style={[styles.macroProgressFill, { width: `${fatPct}%`, backgroundColor: '#10B981' }]} />
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
+          );
+        })()}
+
 
         {/* 6. NUTRITION ASSISTANT CARD */}
         <View style={styles.assistantCard}>
@@ -345,6 +375,61 @@ export default function HomeScreen() {
               </Text>
             </Text>
           </View>
+        </View>
+
+        {/* 8. FEATURED RECIPE CARD (Thịt nạc rim) */}
+        <View style={{ marginTop: 24 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: '#0F172A' }}>Món ăn gợi ý hôm nay</Text>
+            <TouchableOpacity onPress={() => router.push('/recipe/thit-nac-rim' as any)}>
+              <Text style={{ fontSize: 13, color: '#10B981', fontWeight: '600' }}>Xem tất cả</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 16,
+              overflow: 'hidden',
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 6,
+              elevation: 2,
+            }}
+            onPress={() => router.push('/recipe/thit-nac-rim' as any)}
+            activeOpacity={0.9}>
+            <Image
+              source={{ uri: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80' }}
+              style={{ width: '100%', height: 160 }}
+              resizeMode="cover"
+            />
+            <View style={{ padding: 14 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>Thịt nạc rim</Text>
+                <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#059669' }}>170 Calo</Text>
+                </View>
+              </View>
+
+              <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 10 }}>
+                Đạm: 14.1g | Tinh bột: 6.3g | Chất béo: 9.9g
+              </Text>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Image
+                    source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200' }}
+                    style={{ width: 20, height: 20, borderRadius: 10 }}
+                  />
+                  <Text style={{ fontSize: 12, color: '#475569', fontWeight: '500' }}>by Kiều Trang</Text>
+                </View>
+                <Text style={{ fontSize: 12, color: '#F59E0B', fontWeight: '600' }}>5 ⭐ (2 đánh giá)</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 

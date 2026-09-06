@@ -91,17 +91,19 @@ export default function LoginScreen() {
           try {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } catch {}
+          Alert.alert(
+            'Đăng nhập thành công',
+            `Chào mừng ${response.data.user.email} đã trở lại!`,
+            [
+              {
+                text: 'Bắt đầu',
+                onPress: () => router.replace('/(tabs)'),
+              },
+            ]
+          );
+        } else {
+          router.replace('/(tabs)');
         }
-        Alert.alert(
-          'Đăng nhập thành công',
-          `Chào mừng ${response.data.user.email} đã trở lại!`,
-          [
-            {
-              text: 'Bắt đầu',
-              onPress: () => router.replace('/(tabs)'),
-            },
-          ]
-        );
       }
     } catch (error: any) {
       setErrorMessage(error.message || 'Đăng nhập không thành công. Vui lòng kiểm tra lại.');

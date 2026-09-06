@@ -17,7 +17,9 @@ import * as Haptics from 'expo-haptics';
 interface QuickActionsModalProps {
   visible: boolean;
   onClose: () => void;
+  onOpenMealScan?: () => void;
 }
+
 
 interface OtherFeatureItem {
   id: string;
@@ -87,7 +89,7 @@ const OTHER_FEATURES: OtherFeatureItem[] = [
   },
 ];
 
-export function QuickActionsModal({ visible, onClose }: QuickActionsModalProps) {
+export function QuickActionsModal({ visible, onClose, onOpenMealScan }: QuickActionsModalProps) {
   const insets = useSafeAreaInsets();
 
   const handleFeaturePress = (title: string) => {
@@ -106,11 +108,16 @@ export function QuickActionsModal({ visible, onClose }: QuickActionsModalProps) 
       } catch {}
     }
     onClose();
-    Alert.alert(
-      `Ghi nhận ${type}`,
-      `Tính năng ghi nhận ${type} thuộc Module chuyên trách và sẽ sớm kết nối trực tiếp!`
-    );
+    if (type === 'Bữa ăn' && onOpenMealScan) {
+      onOpenMealScan();
+    } else {
+      Alert.alert(
+        `Ghi nhận ${type}`,
+        `Tính năng ghi nhận ${type} thuộc Module chuyên trách và sẽ sớm kết nối trực tiếp!`
+      );
+    }
   };
+
 
   return (
     <Modal

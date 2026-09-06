@@ -15,15 +15,19 @@ import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, FontAwesome6 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
+import { recipeService } from '@/services/recipe.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { userService } from '@/services/user.service';
 import { User } from '@/types/auth.types';
+import { Recipe } from '@/types/recipe.types';
 
 export default function ProfileScreen() {
   const router = useRouter();
 
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'posts' | 'recipes' | 'collections' | 'activities'>('posts');
+  const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
+  const [loadingRecipes, setLoadingRecipes] = useState<boolean>(false);
 
   useEffect(() => {
     async function loadProfile() {
@@ -41,6 +45,25 @@ export default function ProfileScreen() {
     }
     loadProfile();
   }, []);
+
+  useEffect(() => {
+    async function loadRecipes() {
+      setLoadingRecipes(true);
+      try {
+        const res = await recipeService.getAllRecipes();
+        if (res && res.data) {
+          setUserRecipes(res.data);
+        }
+      } catch (e) {
+        console.error('Error loading profile recipes:', e);
+      } finally {
+        setLoadingRecipes(false);
+      }
+    }
+    if (activeTab === 'recipes') {
+      loadRecipes();
+    }
+  }, [activeTab]);
 
   const handleBack = () => {
     if (Platform.OS !== 'web') {
@@ -193,22 +216,105 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 5. EMPTY STATE SECTION */}
-        <View style={styles.emptyStateContainer}>
-          <View style={styles.cookingPotWrapper}>
-            <MaterialCommunityIcons name="pot-steam-outline" size={72} color="#94A3B8" />
+        {/* 5. EMPTY STATE SECTION & RECIPES TAB */}
+        {activeTab === 'recipes' ? (
+          <View style={styles.recipesTabContainer}>
+            <View style={styles.recipesHeaderRow}>
+              <Text style={styles.recipesHeaderTitle}>Các công thức của bạn ({userRecipes.length}):</Text>
+              <TouchableOpacity style={styles.filterPillBtn}>
+                <Text style={styles.filterPillText}>Chế độ công khai</Text>
+                <Ionicons name="options-outline" size={14} color="#334155" />
+              </TouchableOpacity>
+            </View>
+
+            {userRecipes.length > 0 ? (
+              <View style={styles.recipesGridContainer}>
+                {userRecipes.map((item, idx) => (
+                  <TouchableOpacity
+                    key={item._id || String(idx)}
+                    style={styles.recipeCardItem}
+                    activeOpacity={0.88}
+                    onPress={() => router.push(`/recipe/${item._id}` as any)}>
+                    <Image
+                      source={{
+                        uri:
+                          item.cover_image_url &&
+                          !item.cover_image_url.startsWith('file://') &&
+                          !item.cover_image_url.startsWith('blob:')
+                            ? item.cover_image_url
+                            : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800',
+                      }}
+                      style={styles.recipeCardCover}
+                    />
+                    <View style={styles.recipeCardContent}>
+                      <Text style={styles.recipeCardTitle} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+
+                      <View style={styles.recipeCardMetaRow}>
+                        <View style={styles.recipeMetaPill}>
+                          <Ionicons name="flame-outline" size={13} color="#F97316" />
+                          <Text style={styles.recipeMetaText}>
+                            {item.nutrition_facts?.calories || 150} kcal
+                          </Text>
+                        </View>
+
+                        <View style={styles.recipeMetaPill}>
+                          <Ionicons name="time-outline" size={13} color="#64748B" />
+                          <Text style={styles.recipeMetaText}>
+                            {(item.prep_time_min || 10) + (item.cook_time_min || 15)} phút
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <View style={styles.cookingPotWrapper}>
+                  <MaterialCommunityIcons name="pot-steam-outline" size={72} color="#94A3B8" />
+                </View>
+
+                <Text style={styles.emptyStateText}>Bạn chưa có công thức công khai nào</Text>
+
+                <TouchableOpacity
+                  style={styles.createPostBtn}
+                  onPress={() => router.push('/recipe/create')}
+                  activeOpacity={0.88}>
+                  <Text style={styles.createPostBtnText}>Tạo công thức đầu tiên</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
+        ) : (
+          <View style={styles.emptyStateContainer}>
+            <View style={styles.cookingPotWrapper}>
+              <MaterialCommunityIcons name="pot-steam-outline" size={72} color="#94A3B8" />
+            </View>
 
-          <Text style={styles.emptyStateText}>Bạn chưa có hoạt động nào trên trang cá nhân</Text>
+            <Text style={styles.emptyStateText}>Bạn chưa có hoạt động nào trên trang cá nhân</Text>
 
-          <TouchableOpacity
-            style={styles.createPostBtn}
-            onPress={() => handlePlaceholderAction('Tạo bài viết đầu tiên')}
-            activeOpacity={0.88}>
-            <Text style={styles.createPostBtnText}>Tạo bài viết đầu tiên</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={styles.createPostBtn}
+              onPress={() => handlePlaceholderAction('Tạo bài viết đầu tiên')}
+              activeOpacity={0.88}>
+              <Text style={styles.createPostBtnText}>Tạo bài viết đầu tiên</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
+
+      {/* FLOATING ACTION BUTTON FOR CREATING RECIPE WHEN IN RECIPES TAB */}
+      {activeTab === 'recipes' && (
+        <TouchableOpacity
+          style={styles.floatingCreateRecipeBtn}
+          onPress={() => router.push('/recipe/create')}
+          activeOpacity={0.9}>
+          <Text style={styles.floatingCreateRecipeText}>Tạo công thức</Text>
+          <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+        </TouchableOpacity>
+      )}
 
       {/* 6. BOTTOM FLOATING BAR */}
       <View style={styles.bottomBar}>
@@ -434,6 +540,106 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   createPostBtnText: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  recipesTabContainer: {
+    width: '100%',
+  },
+  recipesHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  recipesHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  filterPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  filterPillText: {
+    fontSize: 12.5,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  recipesGridContainer: {
+    gap: 16,
+    marginBottom: 20,
+  },
+  recipeCardItem: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  recipeCardCover: {
+    width: 100,
+    height: 100,
+  },
+  recipeCardContent: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  recipeCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  recipeCardMetaRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  recipeMetaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  recipeMetaText: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  floatingCreateRecipeBtn: {
+    position: 'absolute',
+    bottom: 70,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    gap: 8,
+    elevation: 5,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  floatingCreateRecipeText: {
     fontSize: 14.5,
     fontWeight: '700',
     color: '#FFFFFF',

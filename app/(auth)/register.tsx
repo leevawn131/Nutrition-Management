@@ -95,17 +95,19 @@ export default function RegisterScreen() {
           try {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } catch {}
+          Alert.alert(
+            'Đăng ký thành công',
+            'Tài khoản của bạn đã được tạo thành công. Vui lòng đăng nhập để tiếp tục.',
+            [
+              {
+                text: 'Đăng nhập ngay',
+                onPress: () => router.replace('/(auth)/login'),
+              },
+            ]
+          );
+        } else {
+          router.replace('/(auth)/login');
         }
-        Alert.alert(
-          'Đăng ký thành công',
-          'Tài khoản của bạn đã được tạo thành công. Vui lòng đăng nhập để tiếp tục.',
-          [
-            {
-              text: 'Đăng nhập ngay',
-              onPress: () => router.replace('/(auth)/login'),
-            },
-          ]
-        );
       }
     } catch (error: any) {
       setErrorMessage(error.message || 'Đăng ký không thành công. Vui lòng thử lại sau.');
