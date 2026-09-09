@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('../models/user.model');
 const FoodItem = require('../models/food_item.model');
+const Recipe = require('../models/recipe.model');
+const RecipeComment = require('../models/recipe_comment.model');
 
 const sampleFoods = [
   {
@@ -91,6 +93,91 @@ const sampleFoods = [
   },
 ];
 
+const sampleRecipes = [
+  {
+    title: 'Thịt nạc rim mắm',
+    description: 'Món ăn gia đình đậm đà, thơm ngon, cách làm cực đơn giản.',
+    image_url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800',
+    prep_time_minutes: 10,
+    cook_time_minutes: 15,
+    servings: 1,
+    calories_per_serving: 170,
+    protein_g: 14.1,
+    carb_g: 6.3,
+    fat_g: 9.9,
+    avg_rating: 5.0,
+    comment_count: 2,
+    source_type: 'system',
+    status: 'approved',
+    ingredients: [
+      { ingredient_name: 'Thịt lợn nạc', quantity: 70, unit: 'g' },
+      { ingredient_name: 'Hành lá', quantity: 10, unit: 'g' },
+      { ingredient_name: 'Nước mắm', quantity: 7, unit: 'g' },
+      { ingredient_name: 'Đường kính', quantity: 5, unit: 'g' },
+      { ingredient_name: 'Tỏi ta', quantity: 1, unit: 'tép' },
+      { ingredient_name: 'Dầu ăn', quantity: 5, unit: 'g' },
+    ],
+    steps: [
+      { step_number: 1, instruction: 'Thịt lợn rửa sạch, thái miếng vừa ăn chừng 0.5cm.' },
+      { step_number: 2, instruction: 'Ướp thịt với tỏi băm, nước mắm, đường và dầu ăn trong 10 phút.' },
+      { step_number: 3, instruction: 'Bắc chảo lên bếp, cho thịt vào đảo đều cho săn lại. Thêm 30g nước lọc, đun lửa nhỏ cho đến khi nước sốt sánh mịn.' },
+      { step_number: 4, instruction: 'Rắc hành lá thái nhỏ lên trên, tắt bếp và trình bày ra đĩa.' },
+    ],
+    nutrition_facts: {
+      energy_kcal: 170,
+      protein_g: 14.1,
+      carbohydrate_g: 6.3,
+      fat_g: 9.9,
+      glycemic_load: 5,
+      saturated_fat_g: 2.0,
+      trans_fat_g: 0.1,
+      unsaturated_fat_g: 5.5,
+      fiber_g: 0.2,
+      cholesterol_mg: 47,
+      sodium_mg: 141,
+    },
+  },
+  {
+    title: 'Ức gà áp chảo sốt chanh leo Eat Clean',
+    description: 'Món ăn giàu đạm, ít béo, sốt chanh leo chua ngọt thơm ngon không bị khô.',
+    image_url: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=800',
+    prep_time_minutes: 15,
+    cook_time_minutes: 15,
+    servings: 2,
+    calories_per_serving: 320,
+    protein_g: 42.0,
+    carb_g: 12.0,
+    fat_g: 6.5,
+    avg_rating: 4.8,
+    comment_count: 1,
+    source_type: 'system',
+    status: 'approved',
+    ingredients: [
+      { ingredient_name: 'Ức gà phi lê', quantity: 300, unit: 'g' },
+      { ingredient_name: 'Chanh leo (chanh dây)', quantity: 2, unit: 'quả' },
+      { ingredient_name: 'Mật ong nguyên chất', quantity: 1, unit: 'muỗng canh' },
+      { ingredient_name: 'Dầu ô liu', quantity: 5, unit: 'ml' },
+    ],
+    steps: [
+      { step_number: 1, instruction: 'Ức gà rửa sạch, khía vảy rồng, ướp với chút muối, tiêu và tỏi băm trong 10 phút.' },
+      { step_number: 2, instruction: 'Chanh leo lọc lấy nước cốt, khuấy đều với 1 muỗng mật ong và 2 muỗng nước lọc.' },
+      { step_number: 3, instruction: 'Làm nóng chảo với dầu ô liu, áp chảo ức gà mỗi mặt 4-5 phút đến khi vàng đều.' },
+      { step_number: 4, instruction: 'Đổ sốt chanh leo vào chảo đun nhỏ lửa 2 phút cho sốt sệt lại và ngấm vào gà.' },
+    ],
+    nutrition_facts: {
+      energy_kcal: 320,
+      protein_g: 42.0,
+      carbohydrate_g: 12.0,
+      fat_g: 6.5,
+      glycemic_load: 4,
+      saturated_fat_g: 1.2,
+      trans_fat_g: 0.0,
+      unsaturated_fat_g: 4.8,
+      fiber_g: 2.1,
+    },
+  },
+];
+
 async function seedDatabase() {
   try {
     const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/nutrition_app';
@@ -99,6 +186,8 @@ async function seedDatabase() {
 
     console.log('🗑️ Làm sạch dữ liệu cũ...');
     await FoodItem.deleteMany({});
+    await Recipe.deleteMany({});
+    await RecipeComment.deleteMany({});
 
     console.log('🌱 Đang nạp dữ liệu danh mục food_items...');
     await FoodItem.insertMany(sampleFoods);
@@ -135,15 +224,34 @@ async function seedDatabase() {
       },
     ];
 
+    let firstUserDoc = null;
     for (const u of sampleUsers) {
-      await User.updateOne(
+      const doc = await User.findOneAndUpdate(
         { email: u.email },
         { $setOnInsert: u },
-        { upsert: true }
+        { upsert: true, new: true }
       );
+      if (!firstUserDoc) firstUserDoc = doc;
     }
 
-    console.log('✅ Nạp dữ liệu seed thành công (Food items & Users)!');
+    console.log('🍲 Đang nạp dữ liệu công thức recipes...');
+    for (const r of sampleRecipes) {
+      r.created_by_user_id = firstUserDoc ? firstUserDoc._id : null;
+      const createdRecipe = await Recipe.create(r);
+
+      // Add sample comment
+      if (firstUserDoc) {
+        await RecipeComment.create({
+          recipe_id: createdRecipe._id,
+          user_id: firstUserDoc._id,
+          rating: 5,
+          content: 'Món ăn rất vừa vị, rim mặn ngọt đậm đà chuẩn vị cơm nhà!',
+          status: 'visible',
+        });
+      }
+    }
+
+    console.log('✅ Nạp dữ liệu seed thành công (Food items, Users & Recipes)!');
     process.exit(0);
   } catch (error) {
     console.error('❌ Lỗi khi seed database:', error);

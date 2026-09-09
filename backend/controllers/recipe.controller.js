@@ -37,18 +37,16 @@ const addRecipeReview = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user ? req.user.id : null;
-    const { rating, quick_tags, tags, comment, content, user_name, user_avatar } = req.body;
+    const { rating, comment, content, quick_tags, tags } = req.body;
     const finalComment = comment || content || '';
     const finalTags = quick_tags || tags || [];
 
     const recipe = await recipeService.addReview(
       id,
       userId,
-      user_name || (req.user ? req.user.full_name || req.user.email : 'Người dùng'),
-      user_avatar || (req.user ? req.user.avatar_url : ''),
       rating,
-      finalTags,
-      finalComment
+      finalComment,
+      finalTags
     );
 
     return res.json({

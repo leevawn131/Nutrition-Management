@@ -1,138 +1,88 @@
 const Recipe = require('../models/recipe.model');
-
-const SAMPLE_THIT_NAC_RIM = {
-  title: 'Thịt nạc rim',
-  subtitle: 'Khám phá công thức mới này!',
-  category: 'Món chính',
-  cover_image_url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80',
-  author: {
-    name: 'Kiều Trang',
-    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-  },
-  prep_time_min: 10,
-  cook_time_min: 15,
-  servings: 1,
-  rating: 5.0,
-  rating_count: 2,
-  saved_count: 19,
-  ingredients: [
-    { name: 'Thịt lợn nạc', amount: 70, unit: 'g', icon_url: '🥩' },
-    { name: 'Hành lá', amount: 10, unit: 'g', icon_url: '🌿' },
-    { name: 'Nước mắm', amount: 7, unit: 'g', icon_url: '🍾' },
-    { name: 'Đường kính', amount: 5, unit: 'g', icon_url: '🍚' },
-    { name: 'Tỏi ta', amount: 1, unit: 'tép', icon_url: '🧄' },
-    { name: 'Dầu ăn', amount: 5, unit: 'g', icon_url: '🫗' },
-    { name: 'Nước', amount: 30, unit: 'g', icon_url: '💧' },
-  ],
-  steps: [
-    { step_number: 1, title: 'Sơ chế thịt', description: 'Thịt lợn rửa sạch, thái miếng vừa ăn chừng 0.5cm.' },
-    { step_number: 2, title: 'Ướp gia vị', description: 'Ướp thịt với tỏi băm, nước mắm, đường và dầu ăn trong 10 phút.' },
-    { step_number: 3, title: 'Rim thịt', description: 'Bắc chảo lên bếp, cho thịt vào đảo đều cho săn lại. Thêm 30g nước lọc, đun lửa nhỏ cho đến khi nước sốt sánh mịn.' },
-    { step_number: 4, title: 'Hoàn thiện', description: 'Rắc hành lá thái nhỏ lên trên, tắt bếp và trình bày ra đĩa.' },
-  ],
-  nutrition_facts: {
-    calories: 170,
-    protein_g: 14.1,
-    carb_g: 6.3,
-    fat_g: 9.9,
-    glycemic_load: 5,
-    saturated_fat_g: 2.0,
-    trans_fat_g: 0.1,
-    unsaturated_fat_g: 5.5,
-    fiber_g: 0.2,
-    cholesterol_mg: 47,
-    sodium_mg: 141,
-    vitamin_a_ug: 13,
-    vitamin_e_mg: 1,
-    vitamin_k_ug: 0,
-    vitamin_c_mg: 7,
-    folic_acid_ug: 4,
-    vitamin_b12_ug: 1,
-    calcium_mg: 42,
-    iron_mg: 1,
-    zinc_mg: 2,
-    magnesium_mg: 25,
-    potassium_mg: 264,
-    phosphorus_mg: 160,
-  },
-  reviews: [
-    {
-      user_name: 'Minh Anh',
-      user_avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-      rating: 5,
-      quick_tags: ['Ngon xuất sắc', 'Dễ làm', 'Mềm ẩm'],
-      comment: 'Món ăn rất vừa vị, rim mặn ngọt đậm đà chuẩn vị cơm nhà!',
-      created_at: new Date('2026-08-20'),
-    },
-    {
-      user_name: 'Hoàng Nam',
-      user_avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
-      rating: 5,
-      quick_tags: ['Phù hợp cho trẻ em', 'Làm dưới 30 phút'],
-      comment: 'Thịt rim mềm không bị khô, bé nhà mình thích ăn lắm!',
-      created_at: new Date('2026-08-22'),
-    },
-  ],
-};
+const RecipeComment = require('../models/recipe_comment.model');
 
 class RecipeService {
   async getRecipeById(id) {
     const idStr = id ? String(id) : '';
-    if (idStr === 'thit-nac-rim' || idStr === 'sample' || !idStr) {
-      let recipe = await Recipe.findOne({ title: 'Thịt nạc rim' });
-      if (!recipe) {
-        recipe = await Recipe.create(SAMPLE_THIT_NAC_RIM);
-      }
-      return recipe;
-    }
 
-    let recipe;
-    if (idStr.match(/^[0-9a-fA-F]{24}$/)) {
-      recipe = await Recipe.findById(idStr);
+    let recipe = null;
+    if (idStr && idStr.match(/^[0-9a-fA-F]{24}$/)) {
+      recipe = await Recipe.findById(idStr).populate('created_by_user_id', 'full_name avatar_url email');
     }
 
     if (!recipe) {
-      recipe = await Recipe.findOne({ title: 'Thịt nạc rim' });
-      if (!recipe) {
-        recipe = await Recipe.create(SAMPLE_THIT_NAC_RIM);
-      }
+      recipe = await Recipe.findOne().populate('created_by_user_id', 'full_name avatar_url email');
     }
 
-    return recipe;
+    if (!recipe) {
+      return null;
+    }
+
+    // Fetch comments for this recipe
+    const commentsDoc = await RecipeComment.find({ recipe_id: recipe._id, status: 'visible' })
+      .populate('user_id', 'full_name avatar_url email')
+      .sort({ created_at: -1 });
+
+    const recipeObj = recipe.toObject();
+
+    // Attach mapped reviews for frontend compatibility
+    recipeObj.reviews = commentsDoc.map(c => ({
+      _id: c._id,
+      user_id: c.user_id ? c.user_id._id : null,
+      user_name: c.user_id ? (c.user_id.full_name || c.user_id.email) : 'Người dùng',
+      user_avatar: c.user_id ? c.user_id.avatar_url : '',
+      rating: c.rating || 5,
+      comment: c.content,
+      created_at: c.created_at,
+    }));
+
+    return recipeObj;
   }
 
   async getAllRecipes() {
-    let recipes = await Recipe.find().sort({ created_at: -1 });
-    if (recipes.length === 0) {
-      const sample = await Recipe.create(SAMPLE_THIT_NAC_RIM);
-      recipes = [sample];
-    }
+    let recipes = await Recipe.find()
+      .populate('created_by_user_id', 'full_name avatar_url email')
+      .sort({ created_at: -1 });
+
     return recipes;
   }
 
-  async addReview(recipeId, userId, userName, userAvatar, rating, quickTags, comment) {
-    const recipe = await this.getRecipeById(recipeId);
+  async addReview(recipeId, userId, rating, content, quickTags = []) {
+    let recipe = await Recipe.findById(recipeId);
     if (!recipe) {
       throw new Error('Không tìm thấy món ăn');
     }
 
-    const newReview = {
+    let finalContent = (content || '').trim();
+    if (!finalContent) {
+      if (Array.isArray(quickTags) && quickTags.length > 0) {
+        finalContent = quickTags.join(', ');
+      } else {
+        finalContent = `Đánh giá ${rating || 5} sao`;
+      }
+    }
+
+    const comment = new RecipeComment({
+      recipe_id: recipe._id,
       user_id: userId,
-      user_name: userName || 'Người dùng',
-      user_avatar: userAvatar || '',
       rating: Number(rating) || 5,
-      quick_tags: quickTags || [],
-      comment: comment || '',
-      created_at: new Date(),
-    };
+      content: finalContent,
+      status: 'visible',
+    });
+    await comment.save();
 
-    recipe.reviews.unshift(newReview);
-    recipe.rating_count = recipe.reviews.length;
-    const totalStars = recipe.reviews.reduce((sum, r) => sum + r.rating, 0);
-    recipe.rating = Number((totalStars / recipe.rating_count).toFixed(1));
+    // Recalculate avg_rating & comment_count
+    const allComments = await RecipeComment.find({ recipe_id: recipe._id, status: 'visible' });
+    const count = allComments.length;
+    const ratedComments = allComments.filter(c => c.rating);
+    const totalRating = ratedComments.reduce((acc, c) => acc + c.rating, 0);
+    const avgRating = ratedComments.length > 0 ? Number((totalRating / ratedComments.length).toFixed(1)) : 5.0;
 
+    recipe.avg_rating = avgRating;
+    recipe.comment_count = count;
     await recipe.save();
-    return recipe;
+
+    return this.getRecipeById(recipe._id);
   }
 
   async createRecipe(userId, userName, userAvatar, payload) {
@@ -141,35 +91,58 @@ class RecipeService {
     const {
       title,
       description,
-      prep_time_min = 10,
-      cook_time_min = 15,
+      prep_time_minutes,
+      prep_time_min,
+      cook_time_minutes,
+      cook_time_min,
       servings = 1,
-      is_private = false,
+      image_url,
       cover_image_url,
       ingredients = [],
       steps = [],
     } = payload;
 
-    // Calculate Nutrition Facts & Glycemic Load (GL) from FoodItem database
+    const prepTime = Number(prep_time_minutes || prep_time_min) || 10;
+    const cookTime = Number(cook_time_minutes || cook_time_min) || 15;
+    const servingDivisor = Math.max(1, Number(servings) || 1);
+
+    const imageUrl =
+      (image_url || cover_image_url) &&
+      !(image_url || cover_image_url).startsWith('file://') &&
+      !(image_url || cover_image_url).startsWith('blob:')
+        ? image_url || cover_image_url
+        : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800';
+
+    // Formatted ingredients according to schema
+    const formattedIngredients = ingredients.map(ing => ({
+      ingredient_name: ing.ingredient_name || ing.name || 'Nguyên liệu',
+      quantity: Number(ing.quantity || ing.amount) || 1,
+      unit: ing.unit || 'g',
+    }));
+
+    // Formatted steps according to schema
+    const formattedSteps = steps.map((st, idx) => ({
+      step_number: idx + 1,
+      instruction: typeof st === 'string' ? st : st.instruction || st.description || `Bước ${idx + 1}`,
+      image_url: typeof st === 'object' && (st.image_url || st.cover_image_url) ? (st.image_url || st.cover_image_url) : '',
+    }));
+
+    // Calculate Nutrition Facts
     let totalCalories = 0;
     let totalProtein = 0;
     let totalCarb = 0;
     let totalFat = 0;
     let totalGL = 0;
 
-    for (const ing of ingredients) {
-      const amountGrams = Number(ing.amount) || 50;
+    for (const ing of formattedIngredients) {
+      const amountGrams = ing.quantity || 50;
       let foodDoc = null;
 
-      if (ing.food_item_id && ing.food_item_id.match(/^[0-9a-fA-F]{24}$/)) {
-        foodDoc = await FoodItem.findById(ing.food_item_id).lean();
-      }
-
-      if (!foodDoc && ing.name) {
+      if (ing.ingredient_name) {
         foodDoc = await FoodItem.findOne({
           $or: [
-            { name: new RegExp(ing.name.trim(), 'i') },
-            { aliases: new RegExp(ing.name.trim(), 'i') },
+            { name: new RegExp(ing.ingredient_name.trim(), 'i') },
+            { aliases: new RegExp(ing.ingredient_name.trim(), 'i') },
           ],
         }).lean();
       }
@@ -177,7 +150,7 @@ class RecipeService {
       if (foodDoc) {
         const ratio = amountGrams / 100;
         const ingCarb = (foodDoc.carb_per_100g || 0) * ratio;
-        const ingGI = foodDoc.gi_index || foodDoc.gi || 55; // Default average GI
+        const ingGI = foodDoc.gi_index || 55;
 
         totalCalories += (foodDoc.calories_per_100g || 0) * ratio;
         totalProtein += (foodDoc.protein_per_100g || 0) * ratio;
@@ -185,7 +158,6 @@ class RecipeService {
         totalFat += (foodDoc.fat_per_100g || 0) * ratio;
         totalGL += (ingGI * ingCarb) / 100;
       } else {
-        // Fallback default nutrition estimate per amountGrams
         const ratio = amountGrams / 100;
         const ingCarb = 10 * ratio;
         totalCalories += 100 * ratio;
@@ -196,79 +168,61 @@ class RecipeService {
       }
     }
 
-    const servingDivisor = Math.max(1, Number(servings) || 1);
-    const calories = Math.round(totalCalories / servingDivisor);
-    const protein_g = Number((totalProtein / servingDivisor).toFixed(1));
-    const carb_g = Number((totalCarb / servingDivisor).toFixed(1));
-    const fat_g = Number((totalFat / servingDivisor).toFixed(1));
-    const glycemic_load = Math.max(1, Math.round(totalGL / servingDivisor));
+    const caloriesPerServing = Math.round(totalCalories / servingDivisor);
+    const proteinG = Number((totalProtein / servingDivisor).toFixed(1));
+    const carbG = Number((totalCarb / servingDivisor).toFixed(1));
+    const fatG = Number((totalFat / servingDivisor).toFixed(1));
+    const glycemicLoad = Math.max(1, Math.round(totalGL / servingDivisor));
 
     const newRecipe = new Recipe({
       title,
-      description,
-      prep_time_min: Number(prep_time_min) || 10,
-      cook_time_min: Number(cook_time_min) || 15,
+      description: description || '',
+      image_url: imageUrl,
+      prep_time_minutes: prepTime,
+      cook_time_minutes: cookTime,
       servings: servingDivisor,
-      is_private: Boolean(is_private),
-      cover_image_url:
-        cover_image_url &&
-        !cover_image_url.startsWith('file://') &&
-        !cover_image_url.startsWith('blob:')
-          ? cover_image_url
-          : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800',
-      author: {
-        user_id: userId,
-        name: userName || 'Người dùng',
-        avatar_url: userAvatar || '',
-      },
-      ingredients: ingredients.map(ing => ({
-        name: ing.name,
-        amount: Number(ing.amount) || 1,
-        unit: ing.unit || 'g',
-        icon_url: ing.icon_url || '🥗',
-      })),
-      steps: steps.map((st, idx) => ({
-        step_number: idx + 1,
-        title: st.title || `Bước ${idx + 1}`,
-        description: st.description || st,
-      })),
+      calories_per_serving: caloriesPerServing || 150,
+      protein_g: proteinG || 10,
+      carb_g: carbG || 15,
+      fat_g: fatG || 5,
+      avg_rating: 5.0,
+      comment_count: 0,
+      source_type: 'community',
+      created_by_user_id: userId || null,
+      status: 'approved',
+      ingredients: formattedIngredients,
+      steps: formattedSteps,
       nutrition_facts: {
-        calories: calories || 150,
-        protein_g: protein_g || 10,
-        carb_g: carb_g || 15,
-        fat_g: fat_g || 5,
-        glycemic_load: glycemic_load || 4,
-        saturated_fat_g: Number((fat_g * 0.3).toFixed(1)),
+        energy_kcal: caloriesPerServing || 150,
+        protein_g: proteinG || 10,
+        carbohydrate_g: carbG || 15,
+        fat_g: fatG || 5,
+        glycemic_load: glycemicLoad || 4,
+        saturated_fat_g: Number((fatG * 0.3).toFixed(1)),
         trans_fat_g: 0,
-        unsaturated_fat_g: Number((fat_g * 0.7).toFixed(1)),
-        fiber_g: Number((carb_g * 0.1).toFixed(1)),
-        cholesterol_mg: Math.round(protein_g * 2.5),
-        sodium_mg: Math.round(calories * 0.8),
-        vitamin_a_ug: 12,
+        unsaturated_fat_g: Number((fatG * 0.7).toFixed(1)),
+        fiber_g: Number((carbG * 0.1).toFixed(1)),
+        cholesterol_mg: Math.round(proteinG * 2.5),
+        sodium_mg: Math.round(caloriesPerServing * 0.8),
+        vitamin_a_mcg: 12,
         vitamin_c_mg: 5,
         calcium_mg: 35,
         iron_mg: 1.2,
       },
-      rating: 5.0,
-      rating_count: 1,
-      saved_count: 0,
     });
 
     await newRecipe.save();
-    return newRecipe;
+    return this.getRecipeById(newRecipe._id);
   }
 
   async updateRecipe(recipeId, userId, payload) {
-    const FoodItem = require('../models/food_item.model');
-
     const recipe = await Recipe.findById(recipeId);
     if (!recipe) {
       throw new Error('Không tìm thấy món ăn');
     }
 
-    // Check ownership if author exists
-    if (recipe.author && recipe.author.user_id && userId) {
-      if (recipe.author.user_id.toString() !== userId.toString()) {
+    if (recipe.created_by_user_id && userId) {
+      if (recipe.created_by_user_id.toString() !== userId.toString()) {
         throw new Error('Bạn không có quyền chỉnh sửa công thức này');
       }
     }
@@ -276,10 +230,12 @@ class RecipeService {
     const {
       title,
       description,
+      prep_time_minutes,
       prep_time_min,
+      cook_time_minutes,
       cook_time_min,
       servings,
-      is_private,
+      image_url,
       cover_image_url,
       ingredients,
       steps,
@@ -287,100 +243,34 @@ class RecipeService {
 
     if (title) recipe.title = title;
     if (description !== undefined) recipe.description = description;
-    if (prep_time_min) recipe.prep_time_min = Number(prep_time_min);
-    if (cook_time_min) recipe.cook_time_min = Number(cook_time_min);
+    if (prep_time_minutes || prep_time_min) recipe.prep_time_minutes = Number(prep_time_minutes || prep_time_min);
+    if (cook_time_minutes || cook_time_min) recipe.cook_time_minutes = Number(cook_time_minutes || cook_time_min);
     if (servings) recipe.servings = Number(servings);
-    if (is_private !== undefined) recipe.is_private = Boolean(is_private);
-    if (cover_image_url && !cover_image_url.startsWith('file://') && !cover_image_url.startsWith('blob:')) {
-      recipe.cover_image_url = cover_image_url;
+    if (image_url || cover_image_url) {
+      const img = image_url || cover_image_url;
+      if (!img.startsWith('file://') && !img.startsWith('blob:')) {
+        recipe.image_url = img;
+      }
     }
 
     if (Array.isArray(ingredients) && ingredients.length > 0) {
       recipe.ingredients = ingredients.map(ing => ({
-        name: ing.name,
-        amount: Number(ing.amount) || 1,
+        ingredient_name: ing.ingredient_name || ing.name || 'Nguyên liệu',
+        quantity: Number(ing.quantity || ing.amount) || 1,
         unit: ing.unit || 'g',
-        icon_url: ing.icon_url || '🥗',
       }));
-
-      // Recalculate Nutrition Facts
-      let totalCalories = 0;
-      let totalProtein = 0;
-      let totalCarb = 0;
-      let totalFat = 0;
-      let totalGL = 0;
-
-      for (const ing of ingredients) {
-        const amountGrams = Number(ing.amount) || 50;
-        let foodDoc = null;
-
-        if (ing.food_item_id && ing.food_item_id.match(/^[0-9a-fA-F]{24}$/)) {
-          foodDoc = await FoodItem.findById(ing.food_item_id).lean();
-        }
-
-        if (!foodDoc && ing.name) {
-          foodDoc = await FoodItem.findOne({
-            $or: [
-              { name: new RegExp(ing.name.trim(), 'i') },
-              { aliases: new RegExp(ing.name.trim(), 'i') },
-            ],
-          }).lean();
-        }
-
-        if (foodDoc) {
-          const ratio = amountGrams / 100;
-          const ingCarb = (foodDoc.carb_per_100g || 0) * ratio;
-          const ingGI = foodDoc.gi_index || foodDoc.gi || 55;
-
-          totalCalories += (foodDoc.calories_per_100g || 0) * ratio;
-          totalProtein += (foodDoc.protein_per_100g || 0) * ratio;
-          totalCarb += ingCarb;
-          totalFat += (foodDoc.fat_per_100g || 0) * ratio;
-          totalGL += (ingGI * ingCarb) / 100;
-        } else {
-          const ratio = amountGrams / 100;
-          const ingCarb = 10 * ratio;
-          totalCalories += 100 * ratio;
-          totalProtein += 5 * ratio;
-          totalCarb += ingCarb;
-          totalFat += 3 * ratio;
-          totalGL += (50 * ingCarb) / 100;
-        }
-      }
-
-      const servingDivisor = Math.max(1, Number(recipe.servings) || 1);
-      const calories = Math.round(totalCalories / servingDivisor);
-      const protein_g = Number((totalProtein / servingDivisor).toFixed(1));
-      const carb_g = Number((totalCarb / servingDivisor).toFixed(1));
-      const fat_g = Number((totalFat / servingDivisor).toFixed(1));
-      const glycemic_load = Math.max(1, Math.round(totalGL / servingDivisor));
-
-      recipe.nutrition_facts = {
-        ...(recipe.nutrition_facts || {}),
-        calories: calories || 150,
-        protein_g: protein_g || 10,
-        carb_g: carb_g || 15,
-        fat_g: fat_g || 5,
-        glycemic_load: glycemic_load || 4,
-        saturated_fat_g: Number((fat_g * 0.3).toFixed(1)),
-        trans_fat_g: 0,
-        unsaturated_fat_g: Number((fat_g * 0.7).toFixed(1)),
-        fiber_g: Number((carb_g * 0.1).toFixed(1)),
-        cholesterol_mg: Math.round(protein_g * 2.5),
-        sodium_mg: Math.round(calories * 0.8),
-      };
     }
 
     if (Array.isArray(steps) && steps.length > 0) {
       recipe.steps = steps.map((st, idx) => ({
         step_number: idx + 1,
-        title: st.title || `Bước ${idx + 1}`,
-        description: st.description || st,
+        instruction: typeof st === 'string' ? st : st.instruction || st.description || `Bước ${idx + 1}`,
+        image_url: typeof st === 'object' && (st.image_url || st.cover_image_url) ? (st.image_url || st.cover_image_url) : '',
       }));
     }
 
     await recipe.save();
-    return recipe;
+    return this.getRecipeById(recipe._id);
   }
 
   async deleteRecipe(recipeId, userId) {
@@ -389,23 +279,15 @@ class RecipeService {
       throw new Error('Không tìm thấy món ăn');
     }
 
-    // Check ownership if author exists
-    if (recipe.author && recipe.author.user_id && userId) {
-      if (recipe.author.user_id.toString() !== userId.toString()) {
+    if (recipe.created_by_user_id && userId) {
+      if (recipe.created_by_user_id.toString() !== userId.toString()) {
         throw new Error('Bạn không có quyền xóa công thức này');
       }
     }
 
+    await RecipeComment.deleteMany({ recipe_id: recipeId });
     await Recipe.findByIdAndDelete(recipeId);
     return { success: true, message: 'Đã xóa công thức thành công' };
-  }
-
-  async seedSampleRecipe() {
-    let recipe = await Recipe.findOne({ title: 'Thịt nạc rim' });
-    if (!recipe) {
-      recipe = await Recipe.create(SAMPLE_THIT_NAC_RIM);
-    }
-    return recipe;
   }
 }
 

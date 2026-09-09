@@ -90,17 +90,21 @@ class MealService {
 
     for (const item of ingredients) {
       if (!item.food_item_id || !item.weight_g) continue;
-      const food = await FoodItem.findById(item.food_item_id).lean();
-      if (!food) continue;
+      try {
+        const food = await FoodItem.findOne({ _id: item.food_item_id }).lean();
+        if (!food) continue;
 
-      const weight = Number(item.weight_g) || 0;
-      const factor = weight / 100;
+        const weight = Number(item.weight_g) || 0;
+        const factor = weight / 100;
 
-      totalCalories += (food.calories_per_100g || 0) * factor;
-      totalProtein += (food.protein_per_100g || 0) * factor;
-      totalCarb += (food.carb_per_100g || 0) * factor;
-      totalFat += (food.fat_per_100g || 0) * factor;
-      totalGrams += weight;
+        totalCalories += (food.calories_per_100g || 0) * factor;
+        totalProtein += (food.protein_per_100g || 0) * factor;
+        totalCarb += (food.carb_per_100g || 0) * factor;
+        totalFat += (food.fat_per_100g || 0) * factor;
+        totalGrams += weight;
+      } catch (err) {
+        console.error('Lỗi calculateIngredientsNutrition item:', item, err);
+      }
     }
 
     return {
@@ -132,6 +136,8 @@ class MealService {
     recognition_summary,
     ingredients,
   }) {
+    const mongoose = require('mongoose');
+
     // If ingredients are provided (Home Cooking), compute nutrition totals
     let finalCalories = calories;
     let finalProtein = protein_g;
@@ -141,19 +147,24 @@ class MealService {
 
     if (Array.isArray(ingredients) && ingredients.length > 0) {
       const calculated = await this.calculateIngredientsNutrition(ingredients);
-      finalCalories = calculated.calories;
-      finalProtein = calculated.protein_g;
-      finalCarb = calculated.carb_g;
-      finalFat = calculated.fat_g;
-      finalGrams = calculated.total_grams;
+      if (calculated.calories > 0 || calculated.total_grams > 0) {
+        finalCalories = calculated.calories;
+        finalProtein = calculated.protein_g;
+        finalCarb = calculated.carb_g;
+        finalFat = calculated.fat_g;
+        finalGrams = calculated.total_grams;
+      }
     }
+
+    const isValidObjectId = (id) => id && mongoose.Types.ObjectId.isValid(id);
+    const defaultDesc = description_text || (Array.isArray(ingredients) && ingredients.length > 0 ? `Bữa ăn tự nấu (${ingredients.length} món/nguyên liệu)` : 'Bữa ăn');
 
     const mealLog = new MealLog({
       user_id: userId,
-      food_item_id: food_item_id || null,
+      food_item_id: isValidObjectId(food_item_id) ? food_item_id : null,
       input_method,
       source_image_url: source_image_url || null,
-      description_text: description_text || null,
+      description_text: defaultDesc,
       portion_label: portion_label || null,
       portion_grams: finalGrams || null,
       calories: Number(finalCalories) || 0,
