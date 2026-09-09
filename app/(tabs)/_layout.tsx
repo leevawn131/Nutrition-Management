@@ -158,7 +158,12 @@ export default function TabLayout() {
     try {
       const token = await getAuthToken();
       if (!token) {
-        Alert.alert('Chưa đăng nhập', 'Vui lòng đăng nhập để lưu bữa ăn.');
+        const msg = 'Bạn chưa đăng nhập! Vui lòng đăng nhập để lưu bữa ăn vào nhật ký.';
+        if (Platform.OS === 'web') {
+          window.alert(msg);
+        } else {
+          Alert.alert('Chưa đăng nhập', msg);
+        }
         return;
       }
 
@@ -170,12 +175,25 @@ export default function TabLayout() {
         carb_g: data.totalCarb,
         fat_g: data.totalFat,
         ingredients: data.ingredients,
+        description_text: `Bữa ăn tự nấu (${data.ingredients.length} nguyên liệu)`,
       });
 
       setManualLogVisible(false);
-      Alert.alert('Thành công 🎉', `Đã lưu bữa ăn tự nấu (${data.totalCalories} kcal) vào nhật ký!`);
+      const successMsg = `Đã lưu bữa ăn tự nấu (${data.totalCalories} kcal) vào nhật ký thành công!`;
+      if (Platform.OS === 'web') {
+        window.alert(`Thành công 🎉\n${successMsg}`);
+      } else {
+        Alert.alert('Thành công 🎉', successMsg);
+      }
     } catch (error: any) {
-      Alert.alert('Lỗi lưu bữa ăn', error.message || 'Không thể lưu bữa ăn tự nấu.');
+      console.error('Lỗi handleSaveManualMeal:', error);
+      const errorMsg = error.message || 'Không thể lưu bữa ăn tự nấu.';
+      if (Platform.OS === 'web') {
+        window.alert(`Lỗi lưu bữa ăn: ${errorMsg}`);
+      } else {
+        Alert.alert('Lỗi lưu bữa ăn', errorMsg);
+      }
+      throw error;
     }
   };
 

@@ -9,6 +9,7 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFoodSearch } from '@/hooks/useFoodSearch';
@@ -30,7 +31,7 @@ interface ManualMealLogModalProps {
     totalProtein: number;
     totalCarb: number;
     totalFat: number;
-  }) => void;
+  }) => Promise<void> | void;
 }
 
 export const ManualMealLogModal: React.FC<ManualMealLogModalProps> = ({
@@ -41,6 +42,7 @@ export const ManualMealLogModal: React.FC<ManualMealLogModalProps> = ({
   const { searchQuery, setSearchQuery, foods, loading } = useFoodSearch();
   const [selectedIngredients, setSelectedIngredients] = useState<SelectedIngredient[]>([]);
   const [mealType, setMealType] = useState<MealType>('lunch');
+  const [submitting, setSubmitting] = useState(false);
 
   // Toggle selection of food item
   const handleToggleSelectFood = (item: FoodItem) => {
@@ -101,23 +103,34 @@ export const ManualMealLogModal: React.FC<ManualMealLogModalProps> = ({
 
   const totals = calculateTotals();
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selectedIngredients.length === 0) {
-      Alert.alert('Thông báo', 'Vui lòng chọn ít nhất 1 nguyên liệu/món ăn.');
+      if (Platform.OS === 'web') {
+        window.alert('Thông báo: Vui lòng chọn ít nhất 1 nguyên liệu/món ăn.');
+      } else {
+        Alert.alert('Thông báo', 'Vui lòng chọn ít nhất 1 nguyên liệu/món ăn.');
+      }
       return;
     }
 
-    onConfirmSave({
-      meal_type: mealType,
-      ingredients: selectedIngredients.map((ing) => ({
-        food_item_id: ing.food_item_id,
-        weight_g: ing.weight_g,
-      })),
-      totalCalories: totals.calories,
-      totalProtein: totals.protein,
-      totalCarb: totals.carb,
-      totalFat: totals.fat,
-    });
+    try {
+      setSubmitting(true);
+      await onConfirmSave({
+        meal_type: mealType,
+        ingredients: selectedIngredients.map((ing) => ({
+          food_item_id: ing.food_item_id,
+          weight_g: ing.weight_g,
+        })),
+        totalCalories: totals.calories,
+        totalProtein: totals.protein,
+        totalCarb: totals.carb,
+        totalFat: totals.fat,
+      });
+    } catch (err: any) {
+      console.error('Lỗi khi nhấn lưu bữa ăn:', err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -237,8 +250,15 @@ export const ManualMealLogModal: React.FC<ManualMealLogModalProps> = ({
 
           {/* Save Button */}
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.saveBtnText}>Lưu bữa ăn ({totals.calories} kcal)</Text>
+            <TouchableOpacity
+              style={[styles.saveBtn, submitting && { opacity: 0.7 }]}
+              onPress={handleSave}
+              disabled={submitting}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.saveBtnText}>
+                {submitting ? 'Đang lưu bữa ăn...' : `Lưu bữa ăn (${totals.calories} kcal)`}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -414,6 +434,8 @@ const styles = StyleSheet.create({
     right: 16,
     backgroundColor: '#FFFFFF',
     paddingTop: 8,
+    zIndex: 9999,
+    elevation: 20,
   },
   saveBtn: {
     backgroundColor: '#059669',

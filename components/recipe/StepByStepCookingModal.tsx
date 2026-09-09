@@ -12,6 +12,7 @@ import {
   Alert,
   ActivityIndicator,
   PanResponder,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Recipe, IngredientItem, RecipeStep } from '@/types/recipe.types';
@@ -64,7 +65,7 @@ export const StepByStepCookingModal: React.FC<StepByStepCookingModalProps> = ({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const steps: RecipeStep[] = recipe.steps && recipe.steps.length > 0
+  const steps: RecipeStep[] = recipe?.steps && recipe.steps.length > 0
     ? recipe.steps
     : [
         { step_number: 1, title: 'Sơ chế nguyên liệu', description: 'Chuẩn bị và làm sạch tất cả nguyên liệu.' },
@@ -97,7 +98,12 @@ export const StepByStepCookingModal: React.FC<StepByStepCookingModalProps> = ({
         setTimerSeconds((prev) => {
           if (prev <= 1) {
             setIsTimerRunning(false);
-            Alert.alert('⏰ Hết giờ!', 'Thời gian đếm ngược của bước nấu ăn đã hoàn thành.');
+            const alertMsg = 'Thời gian đếm ngược của bước nấu ăn đã hoàn thành.';
+            if (Platform.OS === 'web') {
+              window.alert(`⏰ Hết giờ!\n${alertMsg}`);
+            } else {
+              Alert.alert('⏰ Hết giờ!', alertMsg);
+            }
             return 0;
           }
           return prev - 1;
@@ -144,14 +150,19 @@ export const StepByStepCookingModal: React.FC<StepByStepCookingModalProps> = ({
 
   const handleClosePrompt = () => {
     if (!isCompleted) {
-      Alert.alert(
-        'Thoát chế độ nấu ăn?',
-        'Bạn có chắc chắn muốn thoát khỏi hướng dẫn từng bước?',
-        [
-          { text: 'Hủy', style: 'cancel' },
-          { text: 'Thoát', style: 'destructive', onPress: onClose },
-        ]
-      );
+      if (Platform.OS === 'web') {
+        const confirmed = window.confirm('Bạn có chắc chắn muốn thoát khỏi hướng dẫn từng bước?');
+        if (confirmed) onClose();
+      } else {
+        Alert.alert(
+          'Thoát chế độ nấu ăn?',
+          'Bạn có chắc chắn muốn thoát khỏi hướng dẫn từng bước?',
+          [
+            { text: 'Hủy', style: 'cancel' },
+            { text: 'Thoát', style: 'destructive', onPress: onClose },
+          ]
+        );
+      }
     } else {
       onClose();
     }
@@ -170,7 +181,7 @@ export const StepByStepCookingModal: React.FC<StepByStepCookingModalProps> = ({
   const handlePostReview = async () => {
     try {
       setIsSubmitting(true);
-      const recipeId = recipe._id || (recipe as any).id || 'thit-nac-rim';
+      const recipeId = recipe?._id || (recipe as any)?.id || 'thit-nac-rim';
       const result = await recipeService.submitReview(userToken || null, recipeId, {
         rating,
         quick_tags: selectedTags,
@@ -178,7 +189,12 @@ export const StepByStepCookingModal: React.FC<StepByStepCookingModalProps> = ({
       });
 
       setIsSubmitting(false);
-      Alert.alert('Thành công', 'Cảm ơn bạn đã gửi đánh giá cho công thức này!');
+      const successMsg = 'Cảm ơn bạn đã gửi đánh giá cho công thức này!';
+      if (Platform.OS === 'web') {
+        window.alert(`Thành công 🎉\n${successMsg}`);
+      } else {
+        Alert.alert('Thành công 🎉', successMsg);
+      }
       if (onReviewSubmitted && result.data) {
         onReviewSubmitted(result.data);
       }
@@ -186,7 +202,12 @@ export const StepByStepCookingModal: React.FC<StepByStepCookingModalProps> = ({
     } catch (error: any) {
       setIsSubmitting(false);
       console.error('Lỗi handlePostReview:', error);
-      Alert.alert('Lỗi', error.message || 'Không thể gửi đánh giá. Vui lòng thử lại.');
+      const errorMsg = error.message || 'Không thể gửi đánh giá. Vui lòng thử lại.';
+      if (Platform.OS === 'web') {
+        window.alert(`Lỗi: ${errorMsg}`);
+      } else {
+        Alert.alert('Lỗi', errorMsg);
+      }
     }
   };
 
@@ -208,6 +229,8 @@ export const StepByStepCookingModal: React.FC<StepByStepCookingModalProps> = ({
       },
     })
   ).current;
+
+  if (!visible || !recipe) return null;
 
   // Progress Bar %
   const progressPercent = Math.min(100, Math.max(0, ((currentStepIndex + 1) / totalSteps) * 100));
@@ -258,6 +281,15 @@ export const StepByStepCookingModal: React.FC<StepByStepCookingModalProps> = ({
                   ))}
                 </View>
               )}
+
+              {/* Step Image if uploaded */}
+              {currentStep.image_url ? (
+                <Image
+                  source={{ uri: currentStep.image_url }}
+                  style={{ width: '100%', height: 200, borderRadius: 16, marginBottom: 16 }}
+                  resizeMode="cover"
+                />
+              ) : null}
 
               {/* Step Title & Instruction Body */}
               <View style={styles.instructionCard}>

@@ -79,18 +79,18 @@ export default function EditRecipeScreen() {
         const r = res.data;
         setTitle(r.title || '');
         setDescription(r.description || '');
-        setPrepTime(String(r.prep_time_min || 15));
-        setCookTime(String(r.cook_time_min || 20));
+        setPrepTime(String(r.prep_time_minutes || r.prep_time_min || 15));
+        setCookTime(String(r.cook_time_minutes || r.cook_time_min || 20));
         setServings(r.servings || 1);
         setIsPrivate(Boolean(r.is_private));
-        setCoverImage(r.cover_image_url || null);
+        setCoverImage(r.image_url || r.cover_image_url || null);
 
         if (r.ingredients && r.ingredients.length > 0) {
           setIngredients(
             r.ingredients.map((ing: any) => ({
               food_item_id: ing.food_item_id,
-              name: ing.name,
-              amount: String(ing.amount || 100),
+              name: ing.ingredient_name || ing.name || 'Nguyên liệu',
+              amount: String(ing.quantity || ing.amount || 100),
               unit: ing.unit || 'g',
               icon_url: ing.icon_url,
             }))
@@ -104,7 +104,7 @@ export default function EditRecipeScreen() {
             r.steps.map((st: any, idx: number) => ({
               step_number: idx + 1,
               title: st.title || `Bước ${idx + 1}`,
-              description: st.description || st,
+              description: st.instruction || st.description || (typeof st === 'string' ? st : ''),
             }))
           );
         } else {
@@ -246,16 +246,21 @@ export default function EditRecipeScreen() {
       const payload = {
         title: title.trim(),
         description: description.trim(),
+        prep_time_minutes: Number(prepTime) || 15,
         prep_time_min: Number(prepTime) || 15,
+        cook_time_minutes: Number(cookTime) || 20,
         cook_time_min: Number(cookTime) || 20,
         servings: servings || 1,
         is_private: isPrivate,
+        image_url: finalCover,
         cover_image_url: finalCover,
         ingredients: ingredients
           .filter(ing => ing.name.trim() !== '')
           .map(ing => ({
             food_item_id: ing.food_item_id,
+            ingredient_name: ing.name.trim(),
             name: ing.name.trim(),
+            quantity: Number(ing.amount) || 100,
             amount: Number(ing.amount) || 100,
             unit: ing.unit || 'g',
           })),
@@ -264,6 +269,7 @@ export default function EditRecipeScreen() {
           .map((s, idx) => ({
             step_number: idx + 1,
             title: `Bước ${idx + 1}`,
+            instruction: s.description.trim(),
             description: s.description.trim(),
           })),
       };

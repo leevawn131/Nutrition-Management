@@ -91,7 +91,13 @@ class MealService {
     for (const item of ingredients) {
       if (!item.food_item_id || !item.weight_g) continue;
       try {
-        const food = await FoodItem.findOne({ _id: item.food_item_id }).lean();
+        let food = null;
+        if (FoodItem.collection) {
+          food = await FoodItem.collection.findOne({ _id: item.food_item_id });
+        }
+        if (!food) {
+          food = await FoodItem.findOne({ _id: item.food_item_id }).lean();
+        }
         if (!food) continue;
 
         const weight = Number(item.weight_g) || 0;

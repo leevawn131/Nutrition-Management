@@ -8,6 +8,7 @@ import {
   Pressable,
   Alert,
   TextInput,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -105,10 +106,19 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
                 <TouchableOpacity
                   style={styles.optionRow}
                   onPress={() => {
-                    if (onViewGuide) onViewGuide();
-                    else Alert.alert('Hướng dẫn', 'Chụp ảnh rõ ràng các món ăn trong đĩa để AI nhận diện tốt nhất!');
+                    if (onViewGuide) {
+                      onViewGuide();
+                    } else {
+                      const msg = 'Chụp ảnh rõ ràng các món ăn trong đĩa để AI nhận diện tốt nhất!\n\n• Đặt đĩa ăn ở trung tâm khuôn hình.\n• Giữ thiết bị cố định và đủ ánh sáng.';
+                      if (Platform.OS === 'web') {
+                        window.alert(`📸 Hướng dẫn quét bữa ăn:\n\n${msg}`);
+                      } else {
+                        Alert.alert('📸 Hướng dẫn quét bữa ăn', msg);
+                      }
+                    }
                   }}
                 >
+                  <Ionicons name="help-circle-outline" size={22} color="#64748B" style={styles.optionIcon} />
                   <Text style={[styles.optionText, { color: '#1E293B' }]}>Xem hướng dẫn</Text>
                 </TouchableOpacity>
 

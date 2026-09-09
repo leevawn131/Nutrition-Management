@@ -61,17 +61,28 @@ export default function RecipeOverviewScreen() {
   const {
     title,
     description,
+    image_url,
     cover_image_url,
     category,
+    prep_time_minutes,
     prep_time_min = 10,
+    cook_time_minutes,
     cook_time_min = 15,
     ingredients = [],
     steps = [],
+    avg_rating,
     rating = 5.0,
+    comment_count,
     rating_count = 0,
     nutrition_facts,
     servings = 1,
   } = recipe;
+
+  const prepTimeVal = prep_time_minutes || prep_time_min || 10;
+  const cookTimeVal = cook_time_minutes || cook_time_min || 15;
+  const recipeImg = image_url || cover_image_url;
+  const recipeRating = avg_rating || rating || 5.0;
+  const recipeRatingCount = comment_count || rating_count || 0;
 
   const computedNutrition = calculateRecipeNutritionFromIngredients(ingredients, servings);
 
@@ -90,7 +101,7 @@ export default function RecipeOverviewScreen() {
   const carbPct = Number(((carbCal / totalCalCalculated) * 100).toFixed(1));
   const fatPct = Number(((fatCal / totalCalCalculated) * 100).toFixed(1));
 
-  const totalTime = prep_time_min + cook_time_min;
+  const totalTime = prepTimeVal + cookTimeVal;
   const stepsCount = steps.length || 4;
   const ingredientsCount = ingredients.length || 9;
 
@@ -99,10 +110,10 @@ export default function RecipeOverviewScreen() {
       <ImageBackground
         source={{
           uri:
-            cover_image_url &&
-            !cover_image_url.startsWith('file://') &&
-            !cover_image_url.startsWith('blob:')
-              ? cover_image_url
+            recipeImg &&
+            !recipeImg.startsWith('file://') &&
+            !recipeImg.startsWith('blob:')
+              ? recipeImg
               : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800',
         }}
         style={styles.imageBackground}
@@ -207,12 +218,12 @@ export default function RecipeOverviewScreen() {
                       key={star}
                       name="star"
                       size={16}
-                      color={star <= Math.round(rating) ? '#FFFFFF' : '#64748B'}
+                      color={star <= Math.round(recipeRating) ? '#FFFFFF' : '#64748B'}
                     />
                   ))}
                 </View>
                 <Text style={styles.ratingText}>
-                  --- ({rating_count > 0 ? `${rating_count} đánh giá` : '--- đánh giá'})
+                  ⭐ {recipeRating} ({recipeRatingCount > 0 ? `${recipeRatingCount} đánh giá` : 'chưa có đánh giá'})
                 </Text>
               </View>
 
@@ -223,12 +234,20 @@ export default function RecipeOverviewScreen() {
                   <Feather name="upload" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
 
+                {/* View Cooking Instructions Icon */}
+                <TouchableOpacity
+                  style={styles.actionIconButtonColumn}
+                  onPress={() => router.push(`/recipe/${recipe._id}?mode=cooking` as any)}>
+                  <Ionicons name="play-circle-outline" size={26} color="#10B981" />
+                  <Text style={[styles.actionIconLabel, { color: '#10B981', fontWeight: '700' }]}>Hướng dẫn</Text>
+                </TouchableOpacity>
+
                 {/* Add / View Detail Icon */}
                 <TouchableOpacity
                   style={styles.actionIconButtonColumn}
                   onPress={() => router.push(`/recipe/${recipe._id}` as any)}>
                   <Ionicons name="add-circle-outline" size={26} color="#FFFFFF" />
-                  <Text style={styles.actionIconLabel}>Thêm</Text>
+                  <Text style={styles.actionIconLabel}>Chi tiết</Text>
                 </TouchableOpacity>
               </View>
             </View>

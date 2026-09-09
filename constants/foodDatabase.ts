@@ -523,13 +523,14 @@ export function calculateRecipeNutritionFromIngredients(ingredients: any[], serv
   }
 
   for (const item of ingredients) {
-    const nameLower = (item.name || '').toLowerCase().trim();
+    const rawIngName = item.ingredient_name || item.name || '';
+    const nameLower = rawIngName.toLowerCase().trim();
     let matched = FOOD_DATABASE_100G.find((db) => {
       const dbName = db.name.toLowerCase();
-      if (dbName === nameLower || nameLower.includes(dbName) || dbName.includes(nameLower)) return true;
+      if (dbName === nameLower || (nameLower.length > 2 && dbName.includes(nameLower)) || (dbName.length > 2 && nameLower.includes(dbName))) return true;
       return db.aliases.some((alias) => {
         const aLower = alias.toLowerCase();
-        return nameLower.includes(aLower) || aLower.includes(nameLower);
+        return (nameLower.length > 2 && aLower.includes(nameLower)) || (aLower.length > 2 && nameLower.includes(aLower));
       });
     });
 
@@ -565,8 +566,8 @@ export function calculateRecipeNutritionFromIngredients(ingredients: any[], serv
     if (!matched) {
       // Dynamic deterministic fallback based on ingredient name so different unknown items get different values
       let hash = 0;
-      for (let i = 0; i < (item.name || '').length; i++) {
-        hash = (hash << 5) - hash + (item.name || '').charCodeAt(i);
+      for (let i = 0; i < rawIngName.length; i++) {
+        hash = (hash << 5) - hash + rawIngName.charCodeAt(i);
         hash |= 0;
       }
       const positiveHash = Math.abs(hash);
@@ -576,7 +577,7 @@ export function calculateRecipeNutritionFromIngredients(ingredients: any[], serv
       const fat100 = 1 + ((positiveHash >> 6) % 10);
 
       matched = {
-        name: item.name,
+        name: rawIngName || 'Nguyên liệu',
         aliases: [],
         calories: cal100,
         protein: prot100,
@@ -604,8 +605,11 @@ export function calculateRecipeNutritionFromIngredients(ingredients: any[], serv
       };
     }
 
+    const rawAmt = Number(item.quantity !== undefined ? item.quantity : item.amount);
+    const validAmt = !isNaN(rawAmt) && rawAmt > 0 ? rawAmt : 100;
+
     const weightG = convertUnitToGrams(
-      Number(item.amount) || 1,
+      validAmt,
       item.unit,
       item.avg_weight_per_unit || matched.avg_weight_per_unit
     );

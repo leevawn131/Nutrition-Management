@@ -238,10 +238,10 @@ export default function ProfileScreen() {
                     <Image
                       source={{
                         uri:
-                          item.cover_image_url &&
-                          !item.cover_image_url.startsWith('file://') &&
-                          !item.cover_image_url.startsWith('blob:')
-                            ? item.cover_image_url
+                          (item.image_url || item.cover_image_url) &&
+                          !(item.image_url || item.cover_image_url)?.startsWith('file://') &&
+                          !(item.image_url || item.cover_image_url)?.startsWith('blob:')
+                            ? item.image_url || item.cover_image_url
                             : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800',
                       }}
                       style={styles.recipeCardCover}

@@ -105,7 +105,12 @@ class FoodService {
 
     let food = null;
     try {
-      food = await FoodItem.findOne({ _id: id }).lean();
+      if (FoodItem.collection) {
+        food = await FoodItem.collection.findOne({ _id: id });
+      }
+      if (!food) {
+        food = await FoodItem.findOne({ _id: id }).lean();
+      }
     } catch (err) {
       console.error('Lỗi getFoodById:', err);
     }

@@ -22,6 +22,7 @@ import * as Haptics from 'expo-haptics';
 
 import { recipeService } from '@/services/recipe.service';
 import { getAuthToken } from '@/services/storage.service';
+import { calculateRecipeNutritionFromIngredients } from '@/constants/foodDatabase';
 
 interface IngredientItem {
   food_item_id?: string;
@@ -72,6 +73,7 @@ export default function CreateRecipeScreen() {
 
   // Image Picker Modal State
   const [showImagePickerModal, setShowImagePickerModal] = useState<boolean>(false);
+  const [activeStepImageIndex, setActiveStepImageIndex] = useState<number | null>(null);
 
   // Created Recipe Result for Success Screen
   const [createdRecipe, setCreatedRecipe] = useState<any>(null);
@@ -154,7 +156,7 @@ export default function CreateRecipeScreen() {
     });
   };
 
-  // Pick Cover Image from Gallery
+  // Pick Cover or Step Image from Gallery
   const handlePickImage = async () => {
     setShowImagePickerModal(false);
     try {
@@ -175,14 +177,23 @@ export default function CreateRecipeScreen() {
         const asset = result.assets[0];
         const rawUri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
         const compressed = await compressImageUri(rawUri);
-        setCoverImage(compressed);
+        if (activeStepImageIndex !== null) {
+          setSteps(prev => {
+            const next = [...prev];
+            next[activeStepImageIndex].image_url = compressed;
+            return next;
+          });
+          setActiveStepImageIndex(null);
+        } else {
+          setCoverImage(compressed);
+        }
       }
     } catch (e) {
       console.error('Error picking image:', e);
     }
   };
 
-  // Take Cover Image with Camera
+  // Take Cover or Step Image with Camera
   const handleCameraImage = async () => {
     setShowImagePickerModal(false);
     try {
@@ -202,7 +213,16 @@ export default function CreateRecipeScreen() {
         const asset = result.assets[0];
         const rawUri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
         const compressed = await compressImageUri(rawUri);
-        setCoverImage(compressed);
+        if (activeStepImageIndex !== null) {
+          setSteps(prev => {
+            const next = [...prev];
+            next[activeStepImageIndex].image_url = compressed;
+            return next;
+          });
+          setActiveStepImageIndex(null);
+        } else {
+          setCoverImage(compressed);
+        }
       }
     } catch (e) {
       console.error('Error taking camera image:', e);
@@ -332,28 +352,34 @@ export default function CreateRecipeScreen() {
       const payload = {
         title: title.trim() || 'Món ăn mới',
         description: description.trim() || 'Công thức tự tạo',
+        prep_time_minutes: Number(prepTime) || 15,
         prep_time_min: Number(prepTime) || 15,
+        cook_time_minutes: Number(cookTime) || 20,
         cook_time_min: Number(cookTime) || 20,
         servings: servings || 1,
         is_private: isPrivate,
+        image_url: finalCover,
         cover_image_url: finalCover,
         ingredients: ingredients.length > 0 ? ingredients.map(ing => ({
           food_item_id: ing.food_item_id,
+          ingredient_name: ing.name,
           name: ing.name,
+          quantity: Number(ing.amount) || 100,
           amount: Number(ing.amount) || 100,
           unit: ing.unit || 'g',
-        })) : [{ name: 'Nguyên liệu mặc định', amount: 100, unit: 'g' }],
+        })) : [{ ingredient_name: 'Nguyên liệu mặc định', name: 'Nguyên liệu mặc định', quantity: 100, amount: 100, unit: 'g' }],
         steps: steps
           .filter(s => s.description.trim() !== '')
           .map((s, idx) => ({
             step_number: idx + 1,
             title: `Bước ${idx + 1}`,
+            instruction: s.description.trim(),
             description: s.description.trim(),
           })),
       };
 
       if (payload.steps.length === 0) {
-        payload.steps = [{ step_number: 1, title: 'Bước 1', description: 'Chế biến món ăn theo khẩu vị.' }];
+        payload.steps = [{ step_number: 1, title: 'Bước 1', instruction: 'Chế biến món ăn theo khẩu vị.', description: 'Chế biến món ăn theo khẩu vị.' }];
       }
 
       console.log('Submitting recipe payload:', payload);
@@ -665,14 +691,44 @@ export default function CreateRecipeScreen() {
                   />
 
                   <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Ảnh/videos</Text>
-                  <TouchableOpacity
-                    style={styles.stepMediaBox}
-                    onPress={() => {
-                      Alert.alert('Thêm ảnh bước', 'Chọn ảnh minh họa cho bước nấu này');
-                    }}>
-                    <Ionicons name="camera-outline" size={24} color="#64748B" />
-                    <Text style={styles.stepMediaText}>Thêm ảnh/video</Text>
-                  </TouchableOpacity>
+                  {st.image_url ? (
+                    <View style={styles.stepImagePreviewWrapper}>
+                      <Image source={{ uri: st.image_url }} style={styles.stepImagePreview} />
+                      <View style={styles.stepImageActionsRow}>
+                        <TouchableOpacity
+                          style={styles.stepImageActionBtn}
+                          onPress={() => {
+                            setActiveStepImageIndex(idx);
+                            setShowImagePickerModal(true);
+                          }}>
+                          <Feather name="edit-3" size={14} color="#334155" />
+                          <Text style={styles.stepImageActionText}>Đổi ảnh</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.stepImageActionBtn, { backgroundColor: '#FEE2E2' }]}
+                          onPress={() => {
+                            setSteps(prev => {
+                              const next = [...prev];
+                              next[idx].image_url = '';
+                              return next;
+                            });
+                          }}>
+                          <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                          <Text style={[styles.stepImageActionText, { color: '#EF4444' }]}>Xóa</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.stepMediaBox}
+                      onPress={() => {
+                        setActiveStepImageIndex(idx);
+                        setShowImagePickerModal(true);
+                      }}>
+                      <Ionicons name="camera-outline" size={24} color="#64748B" />
+                      <Text style={styles.stepMediaText}>Thêm ảnh/video</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))}
 
@@ -743,8 +799,38 @@ export default function CreateRecipeScreen() {
                 </View>
               </View>
 
+              {/* Nutrition Summary Block */}
+              {(() => {
+                const computedNutr = calculateRecipeNutritionFromIngredients(ingredients, servings);
+                return (
+                  <View style={[styles.reviewSectionBlock, { marginTop: 20 }]}>
+                    <Text style={styles.reviewSectionTitle}>Tổng quan dinh dưỡng (Mỗi khẩu phần)</Text>
+                    <Text style={styles.reviewSubLabel}>Tính toán chính xác từ {ingredients.length} nguyên liệu</Text>
+
+                    <View style={styles.reviewNutritionGrid}>
+                      <View style={[styles.reviewNutrItem, { backgroundColor: '#FEF3C7' }]}>
+                        <Text style={[styles.reviewNutrVal, { color: '#D97706' }]}>{computedNutr.calories}</Text>
+                        <Text style={styles.reviewNutrLbl}>Calo (kcal)</Text>
+                      </View>
+                      <View style={[styles.reviewNutrItem, { backgroundColor: '#E0F2FE' }]}>
+                        <Text style={[styles.reviewNutrVal, { color: '#0284C7' }]}>{computedNutr.protein_g}g</Text>
+                        <Text style={styles.reviewNutrLbl}>Đạm (Protein)</Text>
+                      </View>
+                      <View style={[styles.reviewNutrItem, { backgroundColor: '#DCFCE7' }]}>
+                        <Text style={[styles.reviewNutrVal, { color: '#15803D' }]}>{computedNutr.carb_g}g</Text>
+                        <Text style={styles.reviewNutrLbl}>Đường bột</Text>
+                      </View>
+                      <View style={[styles.reviewNutrItem, { backgroundColor: '#F3E8FF' }]}>
+                        <Text style={[styles.reviewNutrVal, { color: '#7E22CE' }]}>{computedNutr.fat_g}g</Text>
+                        <Text style={styles.reviewNutrLbl}>Chất béo</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })()}
+
               {/* Ingredients Summary Block */}
-              <View style={styles.reviewSectionBlock}>
+              <View style={[styles.reviewSectionBlock, { marginTop: 24 }]}>
                 <View style={styles.reviewRowSpace}>
                   <Text style={styles.reviewSectionTitle}>Nguyên liệu</Text>
                   <TouchableOpacity onPress={() => setCurrentStep(2)}>
@@ -1638,5 +1724,60 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#EF4444',
+  },
+  stepImagePreviewWrapper: {
+    marginTop: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  stepImagePreview: {
+    width: '100%',
+    height: 160,
+  },
+  stepImageActionsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    padding: 8,
+    gap: 8,
+    justifyContent: 'flex-end',
+  },
+  stepImageActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#E2E8F0',
+    gap: 4,
+  },
+  stepImageActionText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  reviewNutritionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 12,
+  },
+  reviewNutrItem: {
+    flex: 1,
+    minWidth: '45%',
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  reviewNutrVal: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  reviewNutrLbl: {
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 2,
+    fontWeight: '600',
   },
 });

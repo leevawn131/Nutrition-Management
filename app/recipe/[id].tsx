@@ -95,7 +95,10 @@ export default function RecipeDetailScreen() {
   useEffect(() => {
     fetchRecipeData();
     getAuthToken().then(setUserAuthToken);
-  }, [recipeId]);
+    if ((params as any).mode === 'cooking') {
+      setCookingModeVisible(true);
+    }
+  }, [recipeId, (params as any).mode]);
 
   const fetchRecipeData = async () => {
     setIsLoading(true);
@@ -104,10 +107,17 @@ export default function RecipeDetailScreen() {
       if (response && response.data) {
         setRecipe(response.data);
         setServings(response.data.servings || 1);
+        if ((params as any).mode === 'cooking') {
+          setCookingModeVisible(true);
+        }
       }
     } catch (error: any) {
       console.error('Error fetching recipe detail:', error);
-      Alert.alert('Lỗi', error.message || 'Không thể tải thông tin món ăn');
+      if (Platform.OS === 'web') {
+        window.alert(`Lỗi: ${error.message || 'Không thể tải thông tin món ăn'}`);
+      } else {
+        Alert.alert('Lỗi', error.message || 'Không thể tải thông tin món ăn');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -312,17 +322,17 @@ export default function RecipeDetailScreen() {
           <Image
             source={{
               uri:
-                recipe.cover_image_url &&
-                !recipe.cover_image_url.startsWith('file://') &&
-                !recipe.cover_image_url.startsWith('blob:')
-                  ? recipe.cover_image_url
+                (recipe.image_url || recipe.cover_image_url) &&
+                !(recipe.image_url || recipe.cover_image_url)?.startsWith('file://') &&
+                !(recipe.image_url || recipe.cover_image_url)?.startsWith('blob:')
+                  ? recipe.image_url || recipe.cover_image_url
                   : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800',
             }}
             style={styles.coverImage}
             resizeMode="cover"
           />
 
-          {/* Author Floating Card (Screenshot 4) */}
+          {/* Author Floating Card */}
           <View style={styles.authorCard}>
             <View style={styles.tagBadge}>
               <Text style={styles.tagBadgeText}>{recipe.category || 'Món chính'}</Text>
@@ -333,17 +343,26 @@ export default function RecipeDetailScreen() {
             <View style={styles.authorRow}>
               <Text style={styles.byText}>by </Text>
               <Image
-                source={{ uri: recipe.author?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb' }}
+                source={{
+                  uri:
+                    recipe.created_by_user_id?.avatar_url ||
+                    recipe.author?.avatar_url ||
+                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb',
+                }}
                 style={styles.authorAvatar}
               />
-              <Text style={styles.authorNameText}>{recipe.author?.name || 'Kiều Trang'}</Text>
+              <Text style={styles.authorNameText}>
+                {recipe.created_by_user_id?.full_name || recipe.author?.name || 'Thành viên'}
+              </Text>
             </View>
 
             <View style={styles.ratingStatsRow}>
-              <Text style={styles.starText}>-- ⭐ (--)</Text>
+              <Text style={styles.starText}>
+                ⭐ {recipe.avg_rating || recipe.rating || 5.0} ({recipe.comment_count || recipe.reviews?.length || recipe.rating_count || 0})
+              </Text>
               <View style={styles.savedBadge}>
                 <Ionicons name="bookmark-outline" size={14} color="#2563EB" />
-                <Text style={styles.savedCountText}>({recipe.saved_count || 19})</Text>
+                <Text style={styles.savedCountText}>({recipe.saved_count || 0})</Text>
               </View>
             </View>
           </View>
@@ -377,8 +396,8 @@ export default function RecipeDetailScreen() {
             <View style={styles.timeMetadataRow}>
               <Ionicons name="time-outline" size={16} color="#64748B" />
               <Text style={styles.timeMetaText}>
-                Chuẩn bị: <Text style={styles.boldTime}>{recipe.prep_time_min} min</Text>  Thời gian:{' '}
-                <Text style={styles.boldTime}>{recipe.cook_time_min} min</Text>
+                Chuẩn bị: <Text style={styles.boldTime}>{recipe.prep_time_minutes || recipe.prep_time_min || 10} min</Text>  Thời gian:{' '}
+                <Text style={styles.boldTime}>{recipe.cook_time_minutes || recipe.cook_time_min || 15} min</Text>
               </Text>
             </View>
 
@@ -397,7 +416,9 @@ export default function RecipeDetailScreen() {
             {/* Dynamic Scaled Ingredients List */}
             <View style={styles.ingredientsList}>
               {recipe.ingredients.map((item, index) => {
-                const scaledAmount = Number((item.amount * scaleRatio).toFixed(1));
+                const baseAmt = Number(item.quantity || item.amount || 1);
+                const ingName = item.ingredient_name || item.name || 'Nguyên liệu';
+                const scaledAmount = Number((baseAmt * scaleRatio).toFixed(1));
                 return (
                   <View key={index} style={styles.ingredientRow}>
                     <View style={styles.ingredientIconCircle}>
@@ -406,7 +427,7 @@ export default function RecipeDetailScreen() {
 
                     <Text style={styles.ingredientText}>
                       <Text style={styles.ingredientAmountBold}>{scaledAmount} {item.unit} </Text>
-                      {item.name}
+                      {ingName}
                     </Text>
 
                     <TouchableOpacity
@@ -414,7 +435,7 @@ export default function RecipeDetailScreen() {
                       onPress={() =>
                         router.push(
                           `/ingredient/${item.food_item_id || 'thit-bo-xay'}?name=${encodeURIComponent(
-                            item.name
+                            ingName
                           )}` as any
                         )
                       }>
@@ -426,7 +447,16 @@ export default function RecipeDetailScreen() {
             </View>
 
             {/* Step-by-Step Cooking Instructions */}
-            <Text style={[styles.sectionHeaderTitle, { marginTop: 24 }]}>Các bước thực hiện</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, marginBottom: 12 }}>
+              <Text style={styles.sectionHeaderTitle}>Các bước thực hiện</Text>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#10B981', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, gap: 6 }}
+                onPress={() => setCookingModeVisible(true)}
+                activeOpacity={0.85}>
+                <Ionicons name="play-circle" size={18} color="#FFFFFF" />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>Xem hướng dẫn</Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.stepsList}>
               {recipe.steps.map((step, index) => (
                 <View key={index} style={styles.stepItemCard}>
@@ -434,7 +464,10 @@ export default function RecipeDetailScreen() {
                     <Text style={styles.stepNumberText}>Bước {step.step_number}</Text>
                   </View>
                   {step.title ? <Text style={styles.stepTitleText}>{step.title}</Text> : null}
-                  <Text style={styles.stepDescText}>{step.description}</Text>
+                  <Text style={styles.stepDescText}>{step.instruction || step.description}</Text>
+                  {step.image_url ? (
+                    <Image source={{ uri: step.image_url }} style={{ width: '100%', height: 160, borderRadius: 12, marginTop: 10 }} />
+                  ) : null}
                 </View>
               ))}
             </View>
