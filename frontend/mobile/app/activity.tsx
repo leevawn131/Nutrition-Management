@@ -49,8 +49,8 @@ const getActivityVisuals = (name: string) => {
 
 export default function ActivityScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ planDate?: string }>();
-  const planDate = params.planDate || new Date().toISOString().split('T')[0];
+  const params = useLocalSearchParams<{ planDate?: string; date?: string }>();
+  const planDate = params.planDate || params.date || new Date().toISOString().split('T')[0];
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('Tất cả');
@@ -119,10 +119,12 @@ export default function ActivityScreen() {
           onPress: () => router.back(),
         },
       ]);
-    } catch (err) {
-      Alert.alert('Thông báo', 'Đã thêm hoạt động vào kế hoạch thành công!', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+    } catch (err: any) {
+      console.error('Error scheduling activity:', err);
+      Alert.alert(
+        'Lỗi',
+        err?.message || 'Không thể thêm hoạt động vào kế hoạch. Vui lòng kiểm tra lại kết nối mạng.'
+      );
     } finally {
       setSubmitting(false);
     }

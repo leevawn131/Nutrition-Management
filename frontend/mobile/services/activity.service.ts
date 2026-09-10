@@ -1,15 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '@/constants/api';
+import { getAuthToken } from '@/services/storage.service';
 import { Activity, ActivityLog } from '@/types/activity.types';
-
-const API_BASE_URL = 'http://localhost:5000/api';
-
-const getAuthToken = async () => {
-  try {
-    return await AsyncStorage.getItem('userToken');
-  } catch (e) {
-    return null;
-  }
-};
 
 export const activityService = {
   /**
