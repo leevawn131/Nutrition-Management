@@ -59,4 +59,8 @@ const foodController = {
   },
 };
 
+// Aliases for develop branch compatibility
+foodController.getFoodItems = foodController.getFoods;
+foodController.getFoodItemById = foodController.getFoodById;
+
 module.exports = foodController;

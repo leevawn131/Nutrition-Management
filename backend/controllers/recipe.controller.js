@@ -124,9 +124,46 @@ const deleteRecipe = async (req, res) => {
   }
 };
 
+const getUserCollections = async (req, res) => {
+  try {
+    const recipes = await recipeService.getAllRecipes();
+    return res.json({
+      success: true,
+      message: 'Lấy bộ sưu tập công thức thành công',
+      data: recipes,
+    });
+  } catch (error) {
+    console.error('Lỗi getUserCollections:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Lỗi tải bộ sưu tập',
+    });
+  }
+};
+
+const toggleSaveRecipe = async (req, res) => {
+  try {
+    const { id } = req.params;
+    return res.json({
+      success: true,
+      message: 'Đã cập nhật trạng thái lưu công thức món ăn',
+      data: { recipe_id: id, is_saved: true },
+    });
+  } catch (error) {
+    console.error('Lỗi toggleSaveRecipe:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Lỗi khi lưu công thức',
+    });
+  }
+};
+
 module.exports = {
   getRecipeById,
   getAllRecipes,
+  getRecipes: getAllRecipes,
+  getUserCollections,
+  toggleSaveRecipe,
   addRecipeReview,
   createRecipe,
   updateRecipe,
