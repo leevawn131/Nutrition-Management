@@ -75,7 +75,7 @@ export const userService = {
   },
 
   /**
-   * Update current user profile
+   * Update current user profile (e.g. weight, height, name, macro targets)
    */
   async updateProfile(token: string, updateData: Partial<User>): Promise<User | null> {
     try {
@@ -89,7 +89,7 @@ export const userService = {
       });
 
       const data: ProfileResponse = await response.json();
-      if (response.ok && data.success) {
+      if (response.ok && data.success && data.data) {
         return data.data.user;
       }
       return null;

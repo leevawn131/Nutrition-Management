@@ -13,10 +13,24 @@ const MealPlanTemplateItemSchema = new mongoose.Schema(
     recipe_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Recipe",
-      required: [true, "recipe_id là bắt buộc"],
+      default: null,
+    },
+    food_item_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "FoodItem",
+      default: null,
+    },
+    day_number: {
+      type: Number,
+      default: 1,
+    },
+    quantity_text: {
+      type: String,
+      default: null,
+      trim: true,
     },
   },
-  { _id: false },
+  { _id: true },
 );
 
 const MealPlanTemplateSchema = new mongoose.Schema(
@@ -31,14 +45,28 @@ const MealPlanTemplateSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
+    image_url: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    duration_days: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
     created_by_admin_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "created_by_admin_id là bắt buộc"],
+      default: null,
     },
     items: {
       type: [MealPlanTemplateItemSchema],
       default: [],
+    },
+    created_at: {
+      type: Date,
+      default: Date.now,
     },
   },
   {
@@ -49,6 +77,7 @@ const MealPlanTemplateSchema = new mongoose.Schema(
 );
 
 MealPlanTemplateSchema.index({ created_by_admin_id: 1 });
+MealPlanTemplateSchema.index({ name: "text" });
 
 const MealPlanTemplate =
   mongoose.models.MealPlanTemplate ||

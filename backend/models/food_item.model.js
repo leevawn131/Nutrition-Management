@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const FoodItemSchema = new mongoose.Schema(
+const foodItemSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -24,17 +24,17 @@ const FoodItemSchema = new mongoose.Schema(
     },
     protein_per_100g: {
       type: Number,
-      default: null,
+      default: 0,
       min: [0, "Protein không thể âm"],
     },
     carb_per_100g: {
       type: Number,
-      default: null,
+      default: 0,
       min: [0, "Carb không thể âm"],
     },
     fat_per_100g: {
       type: Number,
-      default: null,
+      default: 0,
       min: [0, "Fat không thể âm"],
     },
     image_url: {
@@ -67,10 +67,10 @@ const FoodItemSchema = new mongoose.Schema(
   },
 );
 
-FoodItemSchema.index({ name: "text", aliases: "text" });
-FoodItemSchema.index({ category: 1 });
+foodItemSchema.index({ name: "text", aliases: "text" });
+foodItemSchema.index({ category: 1 });
 
 const FoodItem =
-  mongoose.models.FoodItem || mongoose.model("FoodItem", FoodItemSchema);
+  mongoose.models.FoodItem || mongoose.model("FoodItem", foodItemSchema);
 
 module.exports = FoodItem;

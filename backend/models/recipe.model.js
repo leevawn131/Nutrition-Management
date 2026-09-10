@@ -25,12 +25,12 @@ const RecipeStepSchema = new mongoose.Schema(
   {
     step_number: {
       type: Number,
-      required: true,
+      required: [true, "Thứ tự bước không được để trống"],
       min: 1,
     },
     instruction: {
       type: String,
-      required: true,
+      required: [true, "Nội dung hướng dẫn không được để trống"],
       trim: true,
     },
   },
@@ -99,6 +99,7 @@ const RecipeSchema = new mongoose.Schema(
     servings: {
       type: Number,
       required: [true, "Khẩu phần là bắt buộc"],
+      default: 1,
       min: [0.1, "Khẩu phần phải lớn hơn 0"],
     },
     calories_per_serving: {

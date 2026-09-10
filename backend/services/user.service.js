@@ -73,17 +73,7 @@ const updateUserProfile = async (userId, updateData) => {
     throw error;
   }
 
-  if (
-    updateData.target_protein_g !== undefined ||
-    updateData.target_carb_g !== undefined ||
-    updateData.target_fat_g !== undefined
-  ) {
-    const error = new Error(
-      'Các trường mục tiêu macros (protein, carb, fat) chưa được hỗ trợ cập nhật qua Profile API.'
-    );
-    error.statusCode = 400;
-    throw error;
-  }
+
 
   if (
     updateData.role !== undefined ||
@@ -225,6 +215,46 @@ const updateUserProfile = async (userId, updateData) => {
     }
 
     user.food_preferences = sanitizedPreferences;
+  }
+
+  // 9. Validate & update macro targets if provided
+  if (updateData.target_protein_g !== undefined) {
+    if (updateData.target_protein_g !== null) {
+      if (typeof updateData.target_protein_g !== 'number' || isNaN(updateData.target_protein_g) || updateData.target_protein_g < 0) {
+        const error = new Error('Mục tiêu protein (g) phải là số không âm');
+        error.statusCode = 400;
+        throw error;
+      }
+      user.target_protein_g = updateData.target_protein_g;
+    } else {
+      user.target_protein_g = null;
+    }
+  }
+
+  if (updateData.target_carb_g !== undefined) {
+    if (updateData.target_carb_g !== null) {
+      if (typeof updateData.target_carb_g !== 'number' || isNaN(updateData.target_carb_g) || updateData.target_carb_g < 0) {
+        const error = new Error('Mục tiêu carb (g) phải là số không âm');
+        error.statusCode = 400;
+        throw error;
+      }
+      user.target_carb_g = updateData.target_carb_g;
+    } else {
+      user.target_carb_g = null;
+    }
+  }
+
+  if (updateData.target_fat_g !== undefined) {
+    if (updateData.target_fat_g !== null) {
+      if (typeof updateData.target_fat_g !== 'number' || isNaN(updateData.target_fat_g) || updateData.target_fat_g < 0) {
+        const error = new Error('Mục tiêu chất béo (g) phải là số không âm');
+        error.statusCode = 400;
+        throw error;
+      }
+      user.target_fat_g = updateData.target_fat_g;
+    } else {
+      user.target_fat_g = null;
+    }
   }
 
   // Save updated user (timestamps will automatically update updated_at)
