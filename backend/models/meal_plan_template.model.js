@@ -1,20 +1,23 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const mealPlanTemplateItemSchema = new mongoose.Schema(
+const MealPlanTemplateItemSchema = new mongoose.Schema(
   {
     meal_type: {
       type: String,
-      enum: ['breakfast', 'lunch', 'dinner', 'snack'],
-      required: [true, 'meal_type is required'],
+      enum: {
+        values: ["breakfast", "lunch", "dinner", "snack"],
+        message: "meal_type chỉ có thể là breakfast, lunch, dinner hoặc snack",
+      },
+      required: [true, "Loại bữa ăn (meal_type) là bắt buộc"],
     },
     recipe_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Recipe',
+      ref: "Recipe",
       default: null,
     },
     food_item_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'FoodItem',
+      ref: "FoodItem",
       default: null,
     },
     day_number: {
@@ -24,16 +27,17 @@ const mealPlanTemplateItemSchema = new mongoose.Schema(
     quantity_text: {
       type: String,
       default: null,
+      trim: true,
     },
   },
-  { _id: true }
+  { _id: true },
 );
 
-const mealPlanTemplateSchema = new mongoose.Schema(
+const MealPlanTemplateSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, 'Tên thực đơn mẫu không được để trống'],
+      required: [true, "Tên thực đơn mẫu là bắt buộc"],
       trim: true,
     },
     description: {
@@ -44,18 +48,20 @@ const mealPlanTemplateSchema = new mongoose.Schema(
     image_url: {
       type: String,
       default: null,
+      trim: true,
     },
     duration_days: {
       type: Number,
       default: 1,
+      min: 1,
     },
     created_by_admin_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       default: null,
     },
     items: {
-      type: [mealPlanTemplateItemSchema],
+      type: [MealPlanTemplateItemSchema],
       default: [],
     },
     created_at: {
@@ -64,13 +70,17 @@ const mealPlanTemplateSchema = new mongoose.Schema(
     },
   },
   {
+    collection: "meal_plan_templates",
     timestamps: false,
-    collection: 'meal_plan_templates',
-  }
+    versionKey: false,
+  },
 );
 
-mealPlanTemplateSchema.index({ name: 'text' });
+MealPlanTemplateSchema.index({ created_by_admin_id: 1 });
+MealPlanTemplateSchema.index({ name: "text" });
 
-const MealPlanTemplate = mongoose.model('MealPlanTemplate', mealPlanTemplateSchema);
+const MealPlanTemplate =
+  mongoose.models.MealPlanTemplate ||
+  mongoose.model("MealPlanTemplate", MealPlanTemplateSchema);
 
 module.exports = MealPlanTemplate;

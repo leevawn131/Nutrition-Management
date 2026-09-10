@@ -1,15 +1,16 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const recipeIngredientSchema = new mongoose.Schema(
+const RecipeIngredientSchema = new mongoose.Schema(
   {
     ingredient_name: {
       type: String,
-      required: [true, 'Tên nguyên liệu không được để trống'],
+      required: true,
       trim: true,
     },
     quantity: {
       type: Number,
       default: null,
+      min: 0,
     },
     unit: {
       type: String,
@@ -17,61 +18,62 @@ const recipeIngredientSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
-const recipeStepSchema = new mongoose.Schema(
+const RecipeStepSchema = new mongoose.Schema(
   {
     step_number: {
       type: Number,
-      required: [true, 'Thứ tự bước không được để trống'],
+      required: [true, "Thứ tự bước không được để trống"],
+      min: 1,
     },
     instruction: {
       type: String,
-      required: [true, 'Nội dung hướng dẫn không được để trống'],
+      required: [true, "Nội dung hướng dẫn không được để trống"],
       trim: true,
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
-const recipeNutritionFactsSchema = new mongoose.Schema(
+const RecipeNutritionFactsSchema = new mongoose.Schema(
   {
-    energy_kcal: { type: Number, default: null },
-    protein_g: { type: Number, default: null },
-    carbohydrate_g: { type: Number, default: null },
-    fat_g: { type: Number, default: null },
-    fiber_g: { type: Number, default: null },
-    saturated_fat_g: { type: Number, default: null },
-    trans_fat_g: { type: Number, default: null },
-    unsaturated_fat_g: { type: Number, default: null },
-    cholesterol_mg: { type: Number, default: null },
-    salt_g: { type: Number, default: null },
-    sodium_mg: { type: Number, default: null },
-    glycemic_load: { type: Number, default: null },
-    vitamin_a_mcg: { type: Number, default: null },
-    vitamin_d_mcg: { type: Number, default: null },
-    vitamin_e_mg: { type: Number, default: null },
-    vitamin_k_mcg: { type: Number, default: null },
-    vitamin_c_mg: { type: Number, default: null },
-    vitamin_b12_mcg: { type: Number, default: null },
-    folic_acid_mcg: { type: Number, default: null },
-    calcium_mg: { type: Number, default: null },
-    iron_mg: { type: Number, default: null },
-    zinc_mg: { type: Number, default: null },
-    magnesium_mg: { type: Number, default: null },
-    potassium_mg: { type: Number, default: null },
-    phosphorus_mg: { type: Number, default: null },
+    energy_kcal: { type: Number, default: null, min: 0 },
+    protein_g: { type: Number, default: null, min: 0 },
+    carbohydrate_g: { type: Number, default: null, min: 0 },
+    fat_g: { type: Number, default: null, min: 0 },
+    fiber_g: { type: Number, default: null, min: 0 },
+    saturated_fat_g: { type: Number, default: null, min: 0 },
+    trans_fat_g: { type: Number, default: null, min: 0 },
+    unsaturated_fat_g: { type: Number, default: null, min: 0 },
+    cholesterol_mg: { type: Number, default: null, min: 0 },
+    salt_g: { type: Number, default: null, min: 0 },
+    sodium_mg: { type: Number, default: null, min: 0 },
+    glycemic_load: { type: Number, default: null, min: 0 },
+    vitamin_a_mcg: { type: Number, default: null, min: 0 },
+    vitamin_d_mcg: { type: Number, default: null, min: 0 },
+    vitamin_e_mg: { type: Number, default: null, min: 0 },
+    vitamin_k_mcg: { type: Number, default: null, min: 0 },
+    vitamin_c_mg: { type: Number, default: null, min: 0 },
+    vitamin_b12_mcg: { type: Number, default: null, min: 0 },
+    folic_acid_mcg: { type: Number, default: null, min: 0 },
+    calcium_mg: { type: Number, default: null, min: 0 },
+    iron_mg: { type: Number, default: null, min: 0 },
+    zinc_mg: { type: Number, default: null, min: 0 },
+    magnesium_mg: { type: Number, default: null, min: 0 },
+    potassium_mg: { type: Number, default: null, min: 0 },
+    phosphorus_mg: { type: Number, default: null, min: 0 },
     updated_at: { type: Date, default: null },
   },
-  { _id: false }
+  { _id: false },
 );
 
-const recipeSchema = new mongoose.Schema(
+const RecipeSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: [true, 'Tên công thức không được để trống'],
+      required: [true, "Tên công thức là bắt buộc"],
       trim: true,
     },
     description: {
@@ -82,88 +84,107 @@ const recipeSchema = new mongoose.Schema(
     image_url: {
       type: String,
       default: null,
+      trim: true,
     },
     prep_time_minutes: {
       type: Number,
       default: null,
+      min: 0,
     },
     cook_time_minutes: {
       type: Number,
       default: null,
+      min: 0,
     },
     servings: {
       type: Number,
-      required: [true, 'Khẩu phần không được để trống'],
+      required: [true, "Khẩu phần là bắt buộc"],
       default: 1,
-      min: [0.1, 'Khẩu phần phải lớn hơn 0'],
+      min: [0.1, "Khẩu phần phải lớn hơn 0"],
     },
     calories_per_serving: {
       type: Number,
       default: null,
+      min: 0,
     },
     protein_g: {
       type: Number,
       default: null,
+      min: 0,
     },
     carb_g: {
       type: Number,
       default: null,
+      min: 0,
     },
     fat_g: {
       type: Number,
       default: null,
+      min: 0,
     },
     avg_rating: {
       type: Number,
       default: 0,
+      min: 0,
+      max: 5,
     },
     comment_count: {
       type: Number,
       default: 0,
+      min: 0,
     },
     source_type: {
       type: String,
-      enum: ['system', 'community'],
-      required: true,
-      default: 'system',
+      enum: {
+        values: ["system", "community"],
+        message: "source_type chỉ có thể là system hoặc community",
+      },
+      required: [true, "Nguồn công thức (source_type) là bắt buộc"],
+      default: "system",
     },
     created_by_user_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       default: null,
     },
     status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected'],
-      default: 'approved',
-    },
-    ingredients: {
-      type: [recipeIngredientSchema],
-      default: [],
-    },
-    steps: {
-      type: [recipeStepSchema],
-      default: [],
-    },
-    nutrition_facts: {
-      type: recipeNutritionFactsSchema,
-      default: null,
+      enum: {
+        values: ["pending", "approved", "rejected"],
+        message: "status chỉ có thể là pending, approved hoặc rejected",
+      },
+      required: [true, "Trạng thái (status) là bắt buộc"],
+      default: "approved",
     },
     created_at: {
       type: Date,
+      required: true,
       default: Date.now,
+    },
+    ingredients: {
+      type: [RecipeIngredientSchema],
+      default: [],
+    },
+    steps: {
+      type: [RecipeStepSchema],
+      default: [],
+    },
+    nutrition_facts: {
+      type: RecipeNutritionFactsSchema,
+      default: null,
     },
   },
   {
+    collection: "recipes",
     timestamps: false,
-    collection: 'recipes',
-  }
+    versionKey: false,
+  },
 );
 
-recipeSchema.index({ title: 'text' });
-recipeSchema.index({ source_type: 1, status: 1 });
-recipeSchema.index({ created_by_user_id: 1 });
+RecipeSchema.index({ title: "text" });
+RecipeSchema.index({ source_type: 1, status: 1 });
+RecipeSchema.index({ created_by_user_id: 1 });
 
-const Recipe = mongoose.model('Recipe', recipeSchema);
+const Recipe = mongoose.models.Recipe || mongoose.model("Recipe", RecipeSchema);
 
 module.exports = Recipe;

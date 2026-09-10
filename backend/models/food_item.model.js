@@ -1,10 +1,10 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const foodItemSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, 'Tên món ăn không được để trống'],
+      required: [true, "Tên món ăn là bắt buộc"],
       trim: true,
     },
     name_en: {
@@ -19,27 +19,28 @@ const foodItemSchema = new mongoose.Schema(
     },
     calories_per_100g: {
       type: Number,
-      required: [true, 'Calo/100g không được để trống'],
-      min: [0, 'Calo không được âm'],
+      required: [true, "Lượng calo/100g là bắt buộc"],
+      min: [0, "Calo không thể âm"],
     },
     protein_per_100g: {
       type: Number,
-      default: null,
-      min: [0, 'Đạm không được âm'],
+      default: 0,
+      min: [0, "Protein không thể âm"],
     },
     carb_per_100g: {
       type: Number,
-      default: null,
-      min: [0, 'Đường bột không được âm'],
+      default: 0,
+      min: [0, "Carb không thể âm"],
     },
     fat_per_100g: {
       type: Number,
-      default: null,
-      min: [0, 'Chất béo không được âm'],
+      default: 0,
+      min: [0, "Fat không thể âm"],
     },
     image_url: {
       type: String,
       default: null,
+      trim: true,
     },
     is_verified: {
       type: Boolean,
@@ -51,7 +52,7 @@ const foodItemSchema = new mongoose.Schema(
     },
     created_by_admin_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       default: null,
     },
     created_at: {
@@ -60,14 +61,16 @@ const foodItemSchema = new mongoose.Schema(
     },
   },
   {
+    collection: "food_items",
     timestamps: false,
-    collection: 'food_items',
-  }
+    versionKey: false,
+  },
 );
 
-foodItemSchema.index({ name: 'text', aliases: 'text' });
+foodItemSchema.index({ name: "text", aliases: "text" });
 foodItemSchema.index({ category: 1 });
 
-const FoodItem = mongoose.model('FoodItem', foodItemSchema);
+const FoodItem =
+  mongoose.models.FoodItem || mongoose.model("FoodItem", foodItemSchema);
 
 module.exports = FoodItem;
