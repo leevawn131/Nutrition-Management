@@ -7,17 +7,33 @@ const mealController = {
    */
   async analyzeImage(req, res) {
     try {
-      if (!req.file) {
+      let imageBuffer;
+      let mimeType = 'image/jpeg';
+      const descriptionText = req.body.description_text;
+
+      if (req.file) {
+        imageBuffer = req.file.buffer;
+        mimeType = req.file.mimetype || mimeType;
+      } else if (req.body && req.body.image_base64) {
+        let base64Data = req.body.image_base64;
+        if (base64Data.includes(',')) {
+          const parts = base64Data.split(',');
+          base64Data = parts[1];
+          const match = parts[0].match(/:(.*?);/);
+          if (match) mimeType = match[1];
+        }
+        if (req.body.mimeType) {
+          mimeType = req.body.mimeType;
+        }
+        imageBuffer = Buffer.from(base64Data, 'base64');
+      } else {
         return res.status(400).json({
           success: false,
-          message: 'Vui lòng tải lên một tệp ảnh món ăn',
+          message: 'Vui lòng tải lên một tệp ảnh món ăn hoặc dữ liệu base64',
         });
       }
 
       const userId = req.user.id;
-      const imageBuffer = req.file.buffer;
-      const mimeType = req.file.mimetype;
-      const descriptionText = req.body.description_text;
 
       const result = await mealService.analyzeMealImage({
         userId,

@@ -1,10 +1,11 @@
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import { API_BASE_URL } from '@/constants/api';
 import { AIRecognitionResult, MealLogPayload, MealLogResponse } from '@/types/meal.types';
 
 export const mealService = {
   /**
-   * Upload image file to backend AI vision endpoint
+   * Upload image file to backend AI vision endpoint via base64 JSON payload
    */
   async analyzeImage(
     token: string,
@@ -13,41 +14,44 @@ export const mealService = {
     descriptionText?: string
   ): Promise<{ success: boolean; data: AIRecognitionResult }> {
     try {
-      const formData = new FormData();
-      const filename = imageUri.split('/').pop() || 'meal_photo.jpg';
+      let base64Image = '';
 
       if (Platform.OS === 'web') {
         const res = await fetch(imageUri);
         const blob = await res.blob();
-        const file = new File([blob], filename, { type: mimeType });
-        formData.append('image', file);
+        base64Image = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            const base64 = result.split(',')[1] || result;
+            resolve(base64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
       } else {
-        formData.append('image', {
-          uri: imageUri,
-          name: filename,
-          type: mimeType,
-        } as any);
-      }
-
-      if (descriptionText) {
-        formData.append('description_text', descriptionText);
+        base64Image = await FileSystem.readAsStringAsync(imageUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
       }
 
       const response = await fetch(`${API_BASE_URL}/meals/analyze-image`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
-          // Content-Type is auto set by fetch with FormData
+          'Content-Type': 'application/json',
         },
-        body: formData,
+        body: JSON.stringify({
+          image_base64: base64Image,
+          mimeType: mimeType || 'image/jpeg',
+          description_text: descriptionText,
+        }),
       });
 
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data.message || 'Lỗi nhận diện ảnh món ăn');
       }
-
       return data;
     } catch (error: any) {
       console.error('Lỗi mealService analyzeImage:', error);

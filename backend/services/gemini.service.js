@@ -25,15 +25,15 @@ class GeminiService {
    * Helper to generate content with fallback model names
    */
   async generateContentWithFallback(genAI, contents) {
-    const modelsToTry = [
-      process.env.GEMINI_MODEL,
-      'gemini-3.5-flash',
-      'gemini-flash-latest',
-      'gemini-3.7-flash',
-      'gemini-3.8-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-pro-latest',
-    ].filter(Boolean);
+    const defaultModels = [
+      'gemini-1.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-pro',
+      'gemini-2.0-flash-lite',
+    ];
+    const userModel = process.env.GEMINI_MODEL;
+    const rawList = userModel ? [userModel, ...defaultModels] : defaultModels;
+    const modelsToTry = Array.from(new Set(rawList)).filter(Boolean);
 
     let lastError;
     for (const modelName of modelsToTry) {
