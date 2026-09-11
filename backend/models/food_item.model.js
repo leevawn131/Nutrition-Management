@@ -44,7 +44,7 @@ const foodItemSchema = new mongoose.Schema(
     },
     is_verified: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     aliases: {
       type: [String],
@@ -64,13 +64,13 @@ const foodItemSchema = new mongoose.Schema(
     collection: "food_items",
     timestamps: false,
     versionKey: false,
-  },
+  }
 );
 
 foodItemSchema.index({ name: "text", aliases: "text" });
 foodItemSchema.index({ category: 1 });
 
 const FoodItem =
-  mongoose.models.FoodItem || mongoose.model("FoodItem", foodItemSchema);
+  mongoose.models.FoodItem || mongoose.model("FoodItem", foodItemSchema, "food_items");
 
 module.exports = FoodItem;

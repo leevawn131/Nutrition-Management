@@ -2,9 +2,14 @@ const mongoose = require("mongoose");
 
 const RecipeIngredientSchema = new mongoose.Schema(
   {
+    food_item_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "FoodItem",
+      default: null,
+    },
     ingredient_name: {
       type: String,
-      required: true,
+      required: [true, "Tên nguyên liệu không được để trống"],
       trim: true,
     },
     quantity: {
@@ -18,7 +23,7 @@ const RecipeIngredientSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { _id: false },
+  { _id: false }
 );
 
 const RecipeStepSchema = new mongoose.Schema(
@@ -33,40 +38,44 @@ const RecipeStepSchema = new mongoose.Schema(
       required: [true, "Nội dung hướng dẫn không được để trống"],
       trim: true,
     },
+    image_url: {
+      type: String,
+      default: null,
+    },
   },
-  { _id: false },
+  { _id: false }
 );
 
 const RecipeNutritionFactsSchema = new mongoose.Schema(
   {
-    energy_kcal: { type: Number, default: null, min: 0 },
-    protein_g: { type: Number, default: null, min: 0 },
-    carbohydrate_g: { type: Number, default: null, min: 0 },
-    fat_g: { type: Number, default: null, min: 0 },
-    fiber_g: { type: Number, default: null, min: 0 },
-    saturated_fat_g: { type: Number, default: null, min: 0 },
-    trans_fat_g: { type: Number, default: null, min: 0 },
-    unsaturated_fat_g: { type: Number, default: null, min: 0 },
-    cholesterol_mg: { type: Number, default: null, min: 0 },
-    salt_g: { type: Number, default: null, min: 0 },
-    sodium_mg: { type: Number, default: null, min: 0 },
-    glycemic_load: { type: Number, default: null, min: 0 },
-    vitamin_a_mcg: { type: Number, default: null, min: 0 },
-    vitamin_d_mcg: { type: Number, default: null, min: 0 },
-    vitamin_e_mg: { type: Number, default: null, min: 0 },
-    vitamin_k_mcg: { type: Number, default: null, min: 0 },
-    vitamin_c_mg: { type: Number, default: null, min: 0 },
-    vitamin_b12_mcg: { type: Number, default: null, min: 0 },
-    folic_acid_mcg: { type: Number, default: null, min: 0 },
-    calcium_mg: { type: Number, default: null, min: 0 },
-    iron_mg: { type: Number, default: null, min: 0 },
-    zinc_mg: { type: Number, default: null, min: 0 },
-    magnesium_mg: { type: Number, default: null, min: 0 },
-    potassium_mg: { type: Number, default: null, min: 0 },
-    phosphorus_mg: { type: Number, default: null, min: 0 },
-    updated_at: { type: Date, default: null },
+    energy_kcal: { type: Number, default: 0, min: 0 },
+    protein_g: { type: Number, default: 0, min: 0 },
+    carbohydrate_g: { type: Number, default: 0, min: 0 },
+    fat_g: { type: Number, default: 0, min: 0 },
+    fiber_g: { type: Number, default: 0, min: 0 },
+    saturated_fat_g: { type: Number, default: 0, min: 0 },
+    trans_fat_g: { type: Number, default: 0, min: 0 },
+    unsaturated_fat_g: { type: Number, default: 0, min: 0 },
+    cholesterol_mg: { type: Number, default: 0, min: 0 },
+    salt_g: { type: Number, default: 0, min: 0 },
+    sodium_mg: { type: Number, default: 0, min: 0 },
+    glycemic_load: { type: Number, default: 0, min: 0 },
+    vitamin_a_mcg: { type: Number, default: 0, min: 0 },
+    vitamin_d_mcg: { type: Number, default: 0, min: 0 },
+    vitamin_e_mg: { type: Number, default: 0, min: 0 },
+    vitamin_k_mcg: { type: Number, default: 0, min: 0 },
+    vitamin_c_mg: { type: Number, default: 0, min: 0 },
+    vitamin_b12_mcg: { type: Number, default: 0, min: 0 },
+    folic_acid_mcg: { type: Number, default: 0, min: 0 },
+    calcium_mg: { type: Number, default: 0, min: 0 },
+    iron_mg: { type: Number, default: 0, min: 0 },
+    zinc_mg: { type: Number, default: 0, min: 0 },
+    magnesium_mg: { type: Number, default: 0, min: 0 },
+    potassium_mg: { type: Number, default: 0, min: 0 },
+    phosphorus_mg: { type: Number, default: 0, min: 0 },
+    updated_at: { type: Date, default: Date.now },
   },
-  { _id: false },
+  { _id: false }
 );
 
 const RecipeSchema = new mongoose.Schema(
@@ -88,12 +97,12 @@ const RecipeSchema = new mongoose.Schema(
     },
     prep_time_minutes: {
       type: Number,
-      default: null,
+      default: 0,
       min: 0,
     },
     cook_time_minutes: {
       type: Number,
-      default: null,
+      default: 0,
       min: 0,
     },
     servings: {
@@ -104,22 +113,22 @@ const RecipeSchema = new mongoose.Schema(
     },
     calories_per_serving: {
       type: Number,
-      default: null,
+      default: 0,
       min: 0,
     },
     protein_g: {
       type: Number,
-      default: null,
+      default: 0,
       min: 0,
     },
     carb_g: {
       type: Number,
-      default: null,
+      default: 0,
       min: 0,
     },
     fat_g: {
       type: Number,
-      default: null,
+      default: 0,
       min: 0,
     },
     avg_rating: {
@@ -171,20 +180,20 @@ const RecipeSchema = new mongoose.Schema(
     },
     nutrition_facts: {
       type: RecipeNutritionFactsSchema,
-      default: null,
+      default: () => ({}),
     },
   },
   {
     collection: "recipes",
     timestamps: false,
     versionKey: false,
-  },
+  }
 );
 
 RecipeSchema.index({ title: "text" });
 RecipeSchema.index({ source_type: 1, status: 1 });
 RecipeSchema.index({ created_by_user_id: 1 });
 
-const Recipe = mongoose.models.Recipe || mongoose.model("Recipe", RecipeSchema);
+const Recipe = mongoose.models.Recipe || mongoose.model("Recipe", RecipeSchema, "recipes");
 
 module.exports = Recipe;

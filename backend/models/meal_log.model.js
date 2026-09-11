@@ -5,7 +5,7 @@ const mealLogSchema = new mongoose.Schema(
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'user_id is required'],
+      required: [true, 'user_id là bắt buộc'],
     },
     food_item_id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -14,8 +14,8 @@ const mealLogSchema = new mongoose.Schema(
     },
     input_method: {
       type: String,
-      enum: ['photo', 'gallery', 'text'],
-      required: [true, 'input_method is required'],
+      enum: ['photo', 'gallery', 'text', 'manual'],
+      required: [true, 'input_method là bắt buộc'],
       default: 'text',
     },
     source_image_url: {
@@ -37,7 +37,8 @@ const mealLogSchema = new mongoose.Schema(
     },
     calories: {
       type: Number,
-      required: [true, 'calories is required'],
+      required: [true, 'calories là bắt buộc'],
+      min: [0, 'Calo không được âm'],
     },
     protein_g: {
       type: Number,
@@ -54,11 +55,11 @@ const mealLogSchema = new mongoose.Schema(
     meal_type: {
       type: String,
       enum: ['breakfast', 'lunch', 'dinner', 'snack'],
-      required: [true, 'meal_type is required'],
+      required: [true, 'meal_type là bắt buộc'],
     },
     logged_at: {
       type: Date,
-      required: [true, 'logged_at is required'],
+      required: [true, 'logged_at là bắt buộc'],
       default: Date.now,
     },
     created_at: {
@@ -68,6 +69,7 @@ const mealLogSchema = new mongoose.Schema(
     recognition_summary: {
       recognition_id: {
         type: mongoose.Schema.Types.ObjectId,
+        ref: 'RecognitionHistory',
         default: null,
       },
       predicted_label: {
@@ -93,6 +95,6 @@ const mealLogSchema = new mongoose.Schema(
 mealLogSchema.index({ user_id: 1, logged_at: -1 });
 mealLogSchema.index({ food_item_id: 1 });
 
-const MealLog = mongoose.model('MealLog', mealLogSchema);
+const MealLog = mongoose.models.MealLog || mongoose.model('MealLog', mealLogSchema, 'meal_logs');
 
 module.exports = MealLog;

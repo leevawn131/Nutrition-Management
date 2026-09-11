@@ -9,6 +9,7 @@ export interface RecipeIngredient {
 export interface RecipeStep {
   step_number: number;
   instruction: string;
+  image_url?: string | null;
 }
 
 export interface RecipeNutritionFacts {

@@ -18,7 +18,9 @@ import * as Haptics from 'expo-haptics';
 interface QuickActionsModalProps {
   visible: boolean;
   onClose: () => void;
+  onOpenMealScan?: () => void;
 }
+
 
 interface OtherFeatureItem {
   id: string;
@@ -88,7 +90,7 @@ const OTHER_FEATURES: OtherFeatureItem[] = [
   },
 ];
 
-export function QuickActionsModal({ visible, onClose }: QuickActionsModalProps) {
+export function QuickActionsModal({ visible, onClose, onOpenMealScan }: QuickActionsModalProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -115,12 +117,15 @@ export function QuickActionsModal({ visible, onClose }: QuickActionsModalProps) 
       } catch {}
     }
     onClose();
-
     if (type === 'Bữa ăn') {
-      router.push({
-        pathname: '/plan',
-        params: { tab: 'meals' },
-      });
+      if (onOpenMealScan) {
+        onOpenMealScan();
+      } else {
+        router.push({
+          pathname: '/plan',
+          params: { tab: 'meals' },
+        });
+      }
       return;
     }
     if (type === 'Hoạt động') {
@@ -140,6 +145,7 @@ export function QuickActionsModal({ visible, onClose }: QuickActionsModalProps) 
       `Tính năng ghi nhận ${type} thuộc Module chuyên trách và sẽ sớm kết nối trực tiếp!`
     );
   };
+
 
   return (
     <Modal

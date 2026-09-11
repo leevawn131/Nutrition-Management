@@ -3,14 +3,15 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,8 +22,10 @@ import { groceryService } from '@/services/grocery.service';
 import { mealLogService } from '@/services/meal_log.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { HealthMetrics, userService } from '@/services/user.service';
+import { mealService } from '@/services/meal.service';
 import { User } from '@/types/auth.types';
 import { DailySummary } from '@/types/meal_log.types';
+
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -60,6 +63,8 @@ export default function HomeScreen() {
     }
   };
 
+  const [todayLogs, setTodayLogs] = useState<any[]>([]);
+
   const loadData = useCallback(async () => {
     // 1. Try to load cached user first for instantaneous UI render
     const cached = await getCachedUser();
@@ -70,10 +75,12 @@ export default function HomeScreen() {
     // 2. Fetch live data from backend APIs
     const token = await getAuthToken();
     if (token) {
-      const [profileData, healthData, summaryData] = await Promise.all([
+      const todayStr = new Date().toISOString().split('T')[0];
+      const [profileData, healthData, summaryData, mealLogsData] = await Promise.all([
         userService.getProfile(token),
         userService.getHealthMetrics(token),
         mealLogService.getDailySummary(),
+        mealService.getMealLogs(token, todayStr).catch(() => ({ success: false, data: [] })),
       ]);
 
       if (profileData) {
@@ -84,6 +91,9 @@ export default function HomeScreen() {
       }
       if (summaryData) {
         setSummary(summaryData);
+      }
+      if (mealLogsData && mealLogsData.data) {
+        setTodayLogs(mealLogsData.data);
       }
     }
 
@@ -100,6 +110,7 @@ export default function HomeScreen() {
       setGroceryCount(items.length);
     } catch {}
   }, []);
+
 
   useEffect(() => {
     loadData();
@@ -447,6 +458,61 @@ export default function HomeScreen() {
               <Ionicons name="chevron-forward" size={18} color="#10B981" />
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* 9. FEATURED RECIPE CARD */}
+        <View style={{ marginTop: 24 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: '#0F172A' }}>Món ăn gợi ý hôm nay</Text>
+            <TouchableOpacity onPress={() => router.push('/recipes')}>
+              <Text style={{ fontSize: 13, color: '#10B981', fontWeight: '600' }}>Xem tất cả</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 16,
+              overflow: 'hidden',
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 6,
+              elevation: 2,
+            }}
+            onPress={() => router.push('/recipes')}
+            activeOpacity={0.9}>
+            <Image
+              source={{ uri: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80' }}
+              style={{ width: '100%', height: 160 }}
+              resizeMode="cover"
+            />
+            <View style={{ padding: 14 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>Thịt nạc rim</Text>
+                <View style={{ backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#059669' }}>170 Calo</Text>
+                </View>
+              </View>
+
+              <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 10 }}>
+                Đạm: 14.1g | Tinh bột: 6.3g | Chất béo: 9.9g
+              </Text>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Image
+                    source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200' }}
+                    style={{ width: 20, height: 20, borderRadius: 10 }}
+                  />
+                  <Text style={{ fontSize: 12, color: '#475569', fontWeight: '500' }}>by Kiều Trang</Text>
+                </View>
+                <Text style={{ fontSize: 12, color: '#F59E0B', fontWeight: '600' }}>5 ⭐ (2 đánh giá)</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 

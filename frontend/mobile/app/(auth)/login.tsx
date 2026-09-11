@@ -92,7 +92,6 @@ export default function LoginScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } catch {}
         }
-        // Navigate immediately to avoid being blocked by platform-specific Alert behavior.
         router.replace('/(tabs)');
       }
     } catch (error: any) {
