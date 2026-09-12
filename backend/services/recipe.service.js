@@ -76,8 +76,11 @@ const INITIAL_RECIPES = [
   },
 ];
 
+let recipesInitialized = false;
+
 class RecipeService {
   async ensureInitialRecipes() {
+    if (recipesInitialized) return;
     try {
       const count = await Recipe.countDocuments();
       if (count < 3) {
@@ -88,13 +91,16 @@ class RecipeService {
           }
         }
       }
+      recipesInitialized = true;
     } catch (e) {
       // Ignore background init error
     }
   }
 
   async getRecipes({ search = '', tab = 'recipes', userId = null, limit = 50, page = 1 } = {}) {
-    await this.ensureInitialRecipes();
+    if (!recipesInitialized) {
+      await this.ensureInitialRecipes();
+    }
 
     const query = { status: 'approved' };
 
@@ -326,17 +332,35 @@ class RecipeService {
     let totalFat = 0;
     let totalGL = 0;
 
+    // Batch query all ingredients in a single roundtrip to eliminate N+1 loop queries
+    const ingredientNames = formattedIngredients
+      .map((ing) => ing.ingredient_name && ing.ingredient_name.trim())
+      .filter(Boolean);
+
+    let matchedFoods = [];
+    if (ingredientNames.length > 0) {
+      const orConditions = [];
+      for (const name of ingredientNames) {
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        orConditions.push({ name: new RegExp(`^${escaped}$`, 'i') });
+        orConditions.push({ aliases: new RegExp(`^${escaped}$`, 'i') });
+      }
+      try {
+        matchedFoods = await FoodItem.find({ $or: orConditions }).lean();
+      } catch (err) {
+        // Fallback to empty if query error
+        matchedFoods = [];
+      }
+    }
+
     for (const ing of formattedIngredients) {
       const amountGrams = ing.quantity || 50;
-      let foodDoc = null;
-      if (ing.ingredient_name) {
-        foodDoc = await FoodItem.findOne({
-          $or: [
-            { name: new RegExp(ing.ingredient_name.trim(), 'i') },
-            { aliases: new RegExp(ing.ingredient_name.trim(), 'i') },
-          ],
-        }).lean();
-      }
+      const ingNameLower = (ing.ingredient_name || '').trim().toLowerCase();
+      const foodDoc = matchedFoods.find(
+        (f) =>
+          (f.name && f.name.toLowerCase() === ingNameLower) ||
+          (Array.isArray(f.aliases) && f.aliases.some((a) => typeof a === 'string' && a.toLowerCase() === ingNameLower))
+      );
 
       if (foodDoc) {
         const ratio = amountGrams / 100;

@@ -11,7 +11,11 @@ const RecipeCommentSchema = new mongoose.Schema(
   },
   {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
+    collection: 'recipe_comments',
   }
 );
 
-module.exports = mongoose.model('RecipeComment', RecipeCommentSchema);
+RecipeCommentSchema.index({ recipe_id: 1, status: 1, created_at: -1 });
+RecipeCommentSchema.index({ user_id: 1 });
+
+module.exports = mongoose.models.RecipeComment || mongoose.model('RecipeComment', RecipeCommentSchema, 'recipe_comments');

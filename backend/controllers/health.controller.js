@@ -15,7 +15,7 @@ const getCurrentHealth = async (req, res) => {
       });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).lean();
     if (!user) {
       return res.status(404).json({
         success: false,

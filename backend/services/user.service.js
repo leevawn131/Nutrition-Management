@@ -16,13 +16,14 @@ const getUserProfile = async (userId) => {
     throw error;
   }
 
-  const user = await User.findById(userId);
+  const user = await User.findById(userId).select('-password_hash').lean();
   if (!user) {
     const error = new Error('Không tìm thấy thông tin người dùng');
     error.statusCode = 404;
     throw error;
   }
 
+  user.id = user._id.toString();
   return user;
 };
 

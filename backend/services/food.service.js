@@ -28,10 +28,11 @@ class FoodService {
       filter.category = new RegExp(category.trim(), 'i');
     }
     if (searchText) {
+      const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
-        { name: new RegExp(searchText, 'i') },
-        { name_en: new RegExp(searchText, 'i') },
-        { aliases: new RegExp(searchText, 'i') },
+        { name: new RegExp(escaped, 'i') },
+        { name_en: new RegExp(escaped, 'i') },
+        { aliases: new RegExp(escaped, 'i') },
       ];
     }
 

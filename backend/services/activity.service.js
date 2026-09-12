@@ -49,11 +49,14 @@ const INITIAL_ACTIVITIES = [
   },
 ];
 
+let activitiesInitialized = false;
+
 class ActivityService {
   /**
    * Ensure standard activities exist in DB
    */
   async ensureInitialActivities() {
+    if (activitiesInitialized) return;
     try {
       const count = await Activity.countDocuments();
       if (count < 5) {
@@ -64,6 +67,7 @@ class ActivityService {
           }
         }
       }
+      activitiesInitialized = true;
     } catch (e) {
       // Ignore background init error
     }
@@ -75,7 +79,9 @@ class ActivityService {
    * @returns {Promise<Array>}
    */
   async getActivities({ search = '', category = '' } = {}) {
-    await this.ensureInitialActivities();
+    if (!activitiesInitialized) {
+      await this.ensureInitialActivities();
+    }
 
     const query = {};
     if (category && category !== 'Tất cả') {
