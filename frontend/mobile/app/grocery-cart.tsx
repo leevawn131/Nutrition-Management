@@ -1,18 +1,18 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Alert,
-  Image,
-  Modal,
-  Platform,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    Modal,
+    Platform,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -231,7 +231,7 @@ export default function GroceryCartScreen() {
       : Array.from(new Set(items.map((i) => i.recipe_name || 'Tự thêm')));
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
       {/* TOP HEADER MATCHING SCREENSHOT */}
       <View style={styles.headerRow}>
         {/* Back button */}
@@ -244,7 +244,9 @@ export default function GroceryCartScreen() {
         </TouchableOpacity>
 
         {/* Title */}
-        <Text style={styles.headerTitle}>Giỏ đi chợ của bạn!</Text>
+        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+          Giỏ đi chợ của bạn!
+        </Text>
 
         {/* Right Action Icons */}
         <View style={styles.headerRightActions}>
@@ -522,16 +524,19 @@ const styles = StyleSheet.create({
     color: '#10294B',
     flex: 1,
     marginLeft: 14,
+    minWidth: 0,
+    flexShrink: 1,
   },
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flexShrink: 0,
   },
   optionsDropdown: {
-    position: 'absolute',
-    top: 65,
-    right: 16,
+    alignSelf: 'flex-end',
+    marginTop: -4,
+    marginRight: 16,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 8,

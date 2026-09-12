@@ -1,19 +1,18 @@
+import { FontAwesome6, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  ScrollView,
-  Alert,
-  Platform,
+    Alert,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons, FontAwesome6, Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 
 interface QuickActionsModalProps {
   visible: boolean;
@@ -102,6 +101,12 @@ export function QuickActionsModal({ visible, onClose }: QuickActionsModalProps) 
     if (item.id === 'plan') {
       onClose();
       router.push('/plan');
+      return;
+    }
+
+    if (item.id === 'groceries') {
+      onClose();
+      router.push('/grocery-cart');
       return;
     }
 

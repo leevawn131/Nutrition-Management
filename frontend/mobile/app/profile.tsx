@@ -1,20 +1,19 @@
 import { FontAwesome6, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -299,13 +298,6 @@ export default function ProfileScreen() {
                     <Text style={styles.collectionTitle}>Món ăn yêu thích</Text>
                     <Text style={styles.collectionCountText}>({savedRecipes.length} món đã lưu)</Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.exploreMoreBtn}
-                    onPress={() => router.push('/recipes')}
-                    activeOpacity={0.8}>
-                    <Ionicons name="add-circle-outline" size={16} color="#10B981" />
-                    <Text style={styles.exploreMoreBtnText}>Thêm món</Text>
-                  </TouchableOpacity>
                 </View>
 
                 {/* Saved Dishes List */}
