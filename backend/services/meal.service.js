@@ -23,7 +23,7 @@ class MealService {
       raw_input: descriptionText || 'Upload ảnh món ăn',
       predicted_label: aiResult.food_name,
       confidence: aiResult.confidence,
-      ai_model: 'gemini-1.5-flash',
+      ai_model: 'gemini-2.5-flash',
       raw_response: aiResult.raw_response,
       created_at: new Date(),
     });
@@ -54,7 +54,7 @@ class MealService {
       raw_input: textDescription,
       predicted_label: aiResult.food_name,
       confidence: aiResult.confidence,
-      ai_model: 'gemini-1.5-flash',
+      ai_model: 'gemini-2.5-flash',
       raw_response: aiResult.raw_response,
       created_at: new Date(),
     });

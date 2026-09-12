@@ -37,7 +37,9 @@ export default function TabLayout() {
 
   const handleOpenMealScan = () => {
     setQuickActionsVisible(false);
-    setMealScanVisible(true);
+    setTimeout(() => {
+      setMealScanVisible(true);
+    }, 250);
   };
 
   // Step 1: Image selected from Camera or Gallery -> Open PhotoConfirmModal (Screenshot 3)
@@ -51,32 +53,39 @@ export default function TabLayout() {
   const handleAnalyzePhoto = async (descriptionText: string) => {
     if (!selectedImageUri) return;
     setPhotoConfirmVisible(false);
-    setAnalysisLoadingVisible(true);
-    setAiResult(null);
 
-    try {
-      const token = await getAuthToken();
-      if (!token) {
-        Alert.alert('Chưa đăng nhập', 'Vui lòng đăng nhập để sử dụng tính năng nhận diện AI.');
+    // Wait for PhotoConfirmModal to cleanly dismiss before opening AnalysisLoadingModal
+    setTimeout(async () => {
+      setAnalysisLoadingVisible(true);
+      setAiResult(null);
+
+      try {
+        const token = await getAuthToken();
+        if (!token) {
+          Alert.alert('Chưa đăng nhập', 'Vui lòng đăng nhập để sử dụng tính năng nhận diện AI.');
+          setAnalysisLoadingVisible(false);
+          return;
+        }
+
+        const response = await mealService.analyzeImage(
+          token,
+          selectedImageUri,
+          selectedMimeType,
+          descriptionText
+        );
+
+        setAiResult(response.data);
         setAnalysisLoadingVisible(false);
-        return;
+
+        // Wait for loading modal to dismiss before presenting nutrition result modal
+        setTimeout(() => {
+          setNutritionResultVisible(true);
+        }, 250);
+      } catch (error: any) {
+        setAnalysisLoadingVisible(false);
+        Alert.alert('Lỗi nhận diện AI', error.message || 'Không thể kết nối đến server AI.');
       }
-
-      const response = await mealService.analyzeImage(
-        token,
-        selectedImageUri,
-        selectedMimeType,
-        descriptionText
-      );
-
-      setAiResult(response.data);
-      setAnalysisLoadingVisible(false);
-      // Step 3: Open Nutrition Analysis Result Screen (Screenshots 1 & 2)
-      setNutritionResultVisible(true);
-    } catch (error: any) {
-      setAnalysisLoadingVisible(false);
-      Alert.alert('Lỗi nhận diện AI', error.message || 'Không thể kết nối đến server AI.');
-    }
+    }, 250);
   };
 
   // Handle direct text description analysis

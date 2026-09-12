@@ -11,6 +11,12 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Log all incoming requests
+app.use((req, res, next) => {
+  console.log(`[REQ ${new Date().toLocaleTimeString()}] ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 // Kết nối MongoDB
 const mongoUri =
   process.env.MONGO_URI ||

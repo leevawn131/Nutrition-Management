@@ -28,7 +28,6 @@ export const AnalysisLoadingModal: React.FC<AnalysisLoadingModalProps> = ({ visi
     };
   }, [visible]);
 
-  if (!visible) return null;
 
   return (
     <Modal visible={visible} transparent animationType="fade">

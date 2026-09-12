@@ -5,7 +5,7 @@ import { AIRecognitionResult, MealLogPayload, MealLogResponse } from '@/types/me
 
 export const mealService = {
   /**
-   * Upload image file to backend AI vision endpoint via base64 JSON payload
+   * Upload image file to backend AI vision endpoint via FileSystem.uploadAsync (native) or FormData (web)
    */
   async analyzeImage(
     token: string,
@@ -14,45 +14,57 @@ export const mealService = {
     descriptionText?: string
   ): Promise<{ success: boolean; data: AIRecognitionResult }> {
     try {
-      let base64Image = '';
-
       if (Platform.OS === 'web') {
         const res = await fetch(imageUri);
         const blob = await res.blob();
-        base64Image = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const result = reader.result as string;
-            const base64 = result.split(',')[1] || result;
-            resolve(base64);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
+        const formData = new FormData();
+        formData.append('image', blob, 'meal.jpg');
+        if (descriptionText) {
+          formData.append('description_text', descriptionText);
+        }
+
+        const response = await fetch(`${API_BASE_URL}/meals/analyze-image`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
         });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || 'Lỗi nhận diện ảnh món ăn');
+        }
+        return data;
       } else {
-        base64Image = await FileSystem.readAsStringAsync(imageUri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-      }
+        const uploadResult = await FileSystem.uploadAsync(
+          `${API_BASE_URL}/meals/analyze-image`,
+          imageUri,
+          {
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            fieldName: 'image',
+            mimeType: mimeType || 'image/jpeg',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            parameters: descriptionText ? { description_text: descriptionText } : undefined,
+          }
+        );
 
-      const response = await fetch(`${API_BASE_URL}/meals/analyze-image`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          image_base64: base64Image,
-          mimeType: mimeType || 'image/jpeg',
-          description_text: descriptionText,
-        }),
-      });
+        let data: any;
+        try {
+          data = JSON.parse(uploadResult.body);
+        } catch {
+          data = { message: uploadResult.body };
+        }
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Lỗi nhận diện ảnh món ăn');
+        if (uploadResult.status < 200 || uploadResult.status >= 300) {
+          throw new Error(data.message || 'Lỗi nhận diện ảnh món ăn');
+        }
+
+        return data;
       }
-      return data;
     } catch (error: any) {
       console.error('Lỗi mealService analyzeImage:', error);
       throw error;

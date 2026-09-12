@@ -9,6 +9,9 @@ import {
   Alert,
   TextInput,
   Platform,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -41,17 +44,28 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
       return;
     }
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.8,
-    });
+    // Close picker bottom-sheet first to avoid native modal collision
+    onClose();
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const asset = result.assets[0];
-      onClose();
-      onImageSelected(asset.uri, asset.mimeType || 'image/jpeg');
-    }
+    setTimeout(async () => {
+      try {
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const asset = result.assets[0];
+          // Give camera activity time to cleanly dismiss before opening PhotoConfirmModal
+          setTimeout(() => {
+            onImageSelected(asset.uri, asset.mimeType || 'image/jpeg');
+          }, 250);
+        }
+      } catch (err: any) {
+        console.error('Lỗi khi chụp ảnh:', err);
+      }
+    }, Platform.OS === 'ios' ? 300 : 100);
   };
 
   // Handle Gallery picker
@@ -62,17 +76,28 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.8,
-    });
+    // Close picker bottom-sheet first to avoid native modal collision
+    onClose();
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const asset = result.assets[0];
-      onClose();
-      onImageSelected(asset.uri, asset.mimeType || 'image/jpeg');
-    }
+    setTimeout(async () => {
+      try {
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const asset = result.assets[0];
+          // Give gallery activity time to cleanly dismiss before opening PhotoConfirmModal
+          setTimeout(() => {
+            onImageSelected(asset.uri, asset.mimeType || 'image/jpeg');
+          }, 250);
+        }
+      } catch (err: any) {
+        console.error('Lỗi khi chọn ảnh từ thư viện:', err);
+      }
+    }, Platform.OS === 'ios' ? 300 : 100);
   };
 
   const handleTextSubmit = () => {
@@ -88,124 +113,198 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.container} onPress={(e) => e.stopPropagation()}>
-          {!showTextInput ? (
-            <>
-              {/* Header */}
-              <View style={styles.header}>
-                <Text style={styles.title}>Quét bữa ăn của bạn</Text>
-                <Text style={styles.subtitle}>
-                  Miu miu sẽ phân tích bữa ăn của bạn và tính toán dinh dưỡng giúp bạn!
-                </Text>
-              </View>
+    <Modal
+      visible={visible}
+      transparent
+      animationType={showTextInput ? 'fade' : 'slide'}
+      onRequestClose={() => {
+        if (showTextInput) {
+          setShowTextInput(false);
+        } else {
+          onClose();
+        }
+      }}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.modalBackdrop}>
+          {/* Dismiss backdrop on press outside */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              if (showTextInput) {
+                setShowTextInput(false);
+              } else {
+                onClose();
+              }
+            }}
+          />
 
-              {/* Options list */}
-              <View style={styles.optionsList}>
-                <TouchableOpacity
-                  style={styles.optionRow}
-                  onPress={() => {
-                    if (onViewGuide) {
-                      onViewGuide();
-                    } else {
-                      const msg = 'Chụp ảnh rõ ràng các món ăn trong đĩa để AI nhận diện tốt nhất!\n\n• Đặt đĩa ăn ở trung tâm khuôn hình.\n• Giữ thiết bị cố định và đủ ánh sáng.';
-                      if (Platform.OS === 'web') {
-                        window.alert(`📸 Hướng dẫn quét bữa ăn:\n\n${msg}`);
-                      } else {
-                        Alert.alert('📸 Hướng dẫn quét bữa ăn', msg);
-                      }
-                    }
-                  }}
-                >
-                  <Ionicons name="help-circle-outline" size={22} color="#64748B" style={styles.optionIcon} />
-                  <Text style={[styles.optionText, { color: '#1E293B' }]}>Xem hướng dẫn</Text>
-                </TouchableOpacity>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={[
+              styles.keyboardAvoidingContainer,
+              showTextInput ? styles.centeredOverlay : styles.bottomOverlay,
+            ]}
+            pointerEvents="box-none"
+          >
+            <Pressable
+              style={[
+                styles.modalCard,
+                showTextInput ? styles.centeredCard : styles.bottomSheetCard,
+              ]}
+              onPress={(e) => e.stopPropagation()}
+            >
+              {!showTextInput ? (
+                <>
+                  {/* Header */}
+                  <View style={styles.header}>
+                    <Text style={styles.title}>Quét bữa ăn của bạn</Text>
+                    <Text style={styles.subtitle}>
+                      Miu miu sẽ phân tích bữa ăn của bạn và tính toán dinh dưỡng giúp bạn!
+                    </Text>
+                  </View>
 
-                <TouchableOpacity style={styles.optionRow} onPress={handleTakePhoto}>
-                  <Ionicons name="camera-outline" size={22} color="#10B981" style={styles.optionIcon} />
-                  <Text style={[styles.optionText, { color: '#10B981', fontWeight: '600' }]}>Chụp ảnh</Text>
-                </TouchableOpacity>
+                  {/* Options list */}
+                  <View style={styles.optionsList}>
+                    <TouchableOpacity
+                      style={styles.optionRow}
+                      onPress={() => {
+                        if (onViewGuide) {
+                          onViewGuide();
+                        } else {
+                          const msg =
+                            'Chụp ảnh rõ ràng các món ăn trong đĩa để AI nhận diện tốt nhất!\n\n• Đặt đĩa ăn ở trung tâm khuôn hình.\n• Giữ thiết bị cố định và đủ ánh sáng.';
+                          if (Platform.OS === 'web') {
+                            window.alert(`📸 Hướng dẫn quét bữa ăn:\n\n${msg}`);
+                          } else {
+                            Alert.alert('📸 Hướng dẫn quét bữa ăn', msg);
+                          }
+                        }
+                      }}
+                    >
+                      <Ionicons name="help-circle-outline" size={22} color="#64748B" style={styles.optionIcon} />
+                      <Text style={[styles.optionText, { color: '#1E293B' }]}>Xem hướng dẫn</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity style={styles.optionRow} onPress={handleChooseFromLibrary}>
-                  <Ionicons name="image-outline" size={22} color="#D97706" style={styles.optionIcon} />
-                  <Text style={[styles.optionText, { color: '#D97706', fontWeight: '600' }]}>Chọn từ thư viện</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity style={styles.optionRow} onPress={handleTakePhoto}>
+                      <Ionicons name="camera-outline" size={22} color="#10B981" style={styles.optionIcon} />
+                      <Text style={[styles.optionText, { color: '#10B981', fontWeight: '600' }]}>Chụp ảnh</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity style={styles.optionRow} onPress={() => setShowTextInput(true)}>
-                  <Ionicons name="sparkles-outline" size={22} color="#2563EB" style={styles.optionIcon} />
-                  <Text style={[styles.optionText, { color: '#2563EB', fontWeight: '600' }]}>Mô tả bữa ăn</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity style={styles.optionRow} onPress={handleChooseFromLibrary}>
+                      <Ionicons name="image-outline" size={22} color="#D97706" style={styles.optionIcon} />
+                      <Text style={[styles.optionText, { color: '#D97706', fontWeight: '600' }]}>Chọn từ thư viện</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.optionRow, { borderBottomWidth: 0 }]}
-                  onPress={() => {
-                    onClose();
-                    onManualCookingSelected();
-                  }}
-                >
-                  <Ionicons name="restaurant-outline" size={22} color="#8B5CF6" style={styles.optionIcon} />
-                  <Text style={[styles.optionText, { color: '#8B5CF6', fontWeight: '600' }]}>
-                    Tự nấu & Ghi thủ công
+                    <TouchableOpacity style={styles.optionRow} onPress={() => setShowTextInput(true)}>
+                      <Ionicons name="sparkles-outline" size={22} color="#2563EB" style={styles.optionIcon} />
+                      <Text style={[styles.optionText, { color: '#2563EB', fontWeight: '600' }]}>Mô tả bữa ăn</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.optionRow, { borderBottomWidth: 0 }]}
+                      onPress={() => {
+                        onClose();
+                        onManualCookingSelected();
+                      }}
+                    >
+                      <Ionicons name="restaurant-outline" size={22} color="#8B5CF6" style={styles.optionIcon} />
+                      <Text style={[styles.optionText, { color: '#8B5CF6', fontWeight: '600' }]}>
+                        Tự nấu & Ghi thủ công
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Cancel Button */}
+                  <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+                    <Text style={styles.cancelBtnText}>Hủy</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                /* CENTERED POPUP MODAL FOR MEAL DESCRIPTION */
+                <View style={styles.centeredInputContent}>
+                  <View style={styles.popupIconHeader}>
+                    <View style={styles.sparkleIconCircle}>
+                      <Ionicons name="sparkles" size={24} color="#2563EB" />
+                    </View>
+                  </View>
+
+                  <Text style={styles.popupTitle}>Mô tả bữa ăn</Text>
+                  <Text style={styles.popupSubtitle}>
+                    Ví dụ: "1 bát phở bò tái chín ít bánh, 1 quả trứng chần, 1 cốc trà đá"
                   </Text>
-                </TouchableOpacity>
-              </View>
 
-              {/* Cancel Button */}
-              <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-                <Text style={styles.cancelBtnText}>Hủy</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <View style={styles.textInputContainer}>
-              <Text style={styles.title}>Mô tả bữa ăn</Text>
-              <Text style={styles.subtitle}>Ví dụ: "1 bát phở bò tái chín ít bánh, 1 quả trứng chần"</Text>
+                  <TextInput
+                    style={styles.popupTextInput}
+                    placeholder="Nhập chi tiết các món ăn của bạn..."
+                    placeholderTextColor="#94A3B8"
+                    multiline
+                    numberOfLines={4}
+                    value={textInput}
+                    onChangeText={setTextInput}
+                    autoFocus
+                  />
 
-              <TextInput
-                style={styles.textInput}
-                placeholder="Nhập chi tiết các món ăn..."
-                placeholderTextColor="#94A3B8"
-                multiline
-                numberOfLines={4}
-                value={textInput}
-                onChangeText={setTextInput}
-                autoFocus
-              />
+                  <View style={styles.popupActions}>
+                    <TouchableOpacity
+                      style={styles.popupBackBtn}
+                      onPress={() => setShowTextInput(false)}
+                    >
+                      <Text style={styles.popupBackBtnText}>Quay lại</Text>
+                    </TouchableOpacity>
 
-              <View style={styles.textInputActions}>
-                <TouchableOpacity
-                  style={styles.backBtn}
-                  onPress={() => {
-                    setShowTextInput(false);
-                  }}
-                >
-                  <Text style={styles.backBtnText}>Quay lại</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.submitBtn} onPress={handleTextSubmit}>
-                  <Text style={styles.submitBtnText}>Phân tích</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        </Pressable>
-      </Pressable>
+                    <TouchableOpacity style={styles.popupSubmitBtn} onPress={handleTextSubmit}>
+                      <Ionicons name="sparkles-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.popupSubmitBtnText}>Phân tích</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </Pressable>
+          </KeyboardAvoidingView>
+        </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  },
+  keyboardAvoidingContainer: {
+    flex: 1,
+  },
+  bottomOverlay: {
     justifyContent: 'flex-end',
   },
-  container: {
+  centeredOverlay: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    overflow: 'hidden',
+  },
+  bottomSheetCard: {
     backgroundColor: '#F8FAFC',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
     paddingBottom: 36,
+  },
+  centeredCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
   },
   header: {
     alignItems: 'center',
@@ -266,48 +365,82 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#EF4444',
   },
-  textInputContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+  centeredInputContent: {
+    width: '100%',
+    alignItems: 'center',
   },
-  textInput: {
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    padding: 12,
+  popupIconHeader: {
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  sparkleIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  popupTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  popupSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  popupTextInput: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
     fontSize: 15,
     color: '#0F172A',
-    minHeight: 100,
+    minHeight: 110,
     textAlignVertical: 'top',
-    marginVertical: 14,
+    marginBottom: 20,
   },
-  textInputActions: {
+  popupActions: {
     flexDirection: 'row',
     gap: 12,
+    width: '100%',
   },
-  backBtn: {
+  popupBackBtn: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: 13,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#CBD5E1',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
   },
-  backBtnText: {
+  popupBackBtnText: {
     fontSize: 15,
     color: '#475569',
     fontWeight: '600',
   },
-  submitBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: '#059669',
+  popupSubmitBtn: {
+    flex: 1.3,
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: '#10B981',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  submitBtnText: {
+  popupSubmitBtnText: {
     fontSize: 15,
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

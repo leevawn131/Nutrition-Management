@@ -5,11 +5,11 @@ import {
   View,
   TouchableOpacity,
   Modal,
-  Image,
   TextInput,
   ScrollView,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 
 interface PhotoConfirmModalProps {
@@ -31,10 +31,8 @@ export const PhotoConfirmModal: React.FC<PhotoConfirmModalProps> = ({
     onAnalyze(description.trim());
   };
 
-  if (!imageUri) return null;
-
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible && !!imageUri} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
@@ -48,7 +46,9 @@ export const PhotoConfirmModal: React.FC<PhotoConfirmModalProps> = ({
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
           {/* Image Preview Card */}
           <View style={styles.imageCard}>
-            <Image source={{ uri: imageUri }} style={styles.previewImage} resizeMode="cover" />
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.previewImage} contentFit="cover" />
+            ) : null}
           </View>
 
           {/* Description prompt section */}

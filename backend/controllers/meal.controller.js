@@ -7,6 +7,7 @@ const mealController = {
    */
   async analyzeImage(req, res) {
     try {
+      console.log('[mealController.analyzeImage] Received request, body keys:', Object.keys(req.body || {}), 'hasFile:', !!req.file, 'user:', req.user && req.user.id);
       let imageBuffer;
       let mimeType = 'image/jpeg';
       const descriptionText = req.body.description_text;

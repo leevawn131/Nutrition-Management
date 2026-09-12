@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  Image,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AIRecognitionResult, MealType } from '@/types/meal.types';
 
@@ -120,7 +120,7 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
           {/* Top Banner Image */}
           {imageUri ? (
             <View style={styles.bannerImageContainer}>
-              <Image source={{ uri: imageUri }} style={styles.bannerImage} resizeMode="cover" />
+              <Image source={{ uri: imageUri }} style={styles.bannerImage} contentFit="cover" />
             </View>
           ) : null}
 
