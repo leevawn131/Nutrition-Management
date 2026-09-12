@@ -1,18 +1,18 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-  Platform,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Modal,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,7 +21,7 @@ import { activityService } from '@/services/activity.service';
 import { mealPlanService } from '@/services/meal_plan.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { userService } from '@/services/user.service';
-import { Activity, ActivityLog } from '@/types/activity.types';
+import { ActivityLog } from '@/types/activity.types';
 import { User } from '@/types/auth.types';
 import { FoodItem, MealPlanItem, MealType, Recipe } from '@/types/plan.types';
 
@@ -65,10 +65,23 @@ function getSunday(d: Date): Date {
   return date;
 }
 
-function generateWeeksData(refDate: Date = new Date()): WeekInfo[] {
+function getWeekLabel(weekStart: Date, today: Date): string {
+  const currentSunday = getSunday(today);
+  const weekSunday = getSunday(weekStart);
+  const weekDistance = Math.round(
+    (weekSunday.getTime() - currentSunday.getTime()) / (7 * 24 * 60 * 60 * 1000)
+  );
+
+  if (weekDistance === 0) return 'Tuần này';
+  if (weekDistance === -1) return 'Tuần trước';
+  if (weekDistance === 1) return 'Tuần sau';
+  if (weekDistance < 0) return `${Math.abs(weekDistance)} tuần trước`;
+  return `${weekDistance} tuần tới`;
+}
+
+function generateWeeksData(refDate: Date = new Date(), today: Date = new Date()): WeekInfo[] {
   const currentSunday = getSunday(refDate);
-  const todayStr = formatYYYYMMDD(refDate);
-  const weekLabels = ['Tuần trước', 'Tuần này', 'Tuần sau'];
+  const todayStr = formatYYYYMMDD(today);
   const weekOffsets = [-7, 0, 7];
 
   return weekOffsets.map((offset, index) => {
@@ -105,7 +118,7 @@ function generateWeeksData(refDate: Date = new Date()): WeekInfo[] {
 
     return {
       index,
-      label: weekLabels[index],
+      label: getWeekLabel(sunday, today),
       range,
       fullRange,
       days,
@@ -126,9 +139,10 @@ export default function PlanScreen() {
   const initialSection: Section = routeParams.tab === 'activities' ? 'activities' : 'meals';
   const [section, setSection] = useState<Section>(initialSection);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [weekCursor, setWeekCursor] = useState(() => new Date());
 
   const todayStr = useMemo(() => formatYYYYMMDD(new Date()), []);
-  const weeksData = useMemo(() => generateWeeksData(new Date()), []);
+  const weeksData = useMemo(() => generateWeeksData(weekCursor), [weekCursor]);
 
   const [selectedWeek, setSelectedWeek] = useState(1);
   const [selectedFullDate, setSelectedFullDate] = useState(todayStr);
@@ -211,6 +225,19 @@ export default function PlanScreen() {
         setSelectedFullDate(newDay.fullDate);
       }
     }
+  };
+
+  const handleNavigateWeek = (direction: -1 | 1) => {
+    const selectedDayIndex = currentWeek.days.findIndex((day) => day.fullDate === selectedFullDate);
+    const nextWeekStart = new Date(weekCursor);
+    nextWeekStart.setDate(nextWeekStart.getDate() + direction * 7);
+
+    const nextSelectedDate = new Date(nextWeekStart);
+    nextSelectedDate.setDate(nextSelectedDate.getDate() + Math.max(selectedDayIndex, 0));
+
+    setWeekCursor(nextWeekStart);
+    setSelectedWeek(1);
+    setSelectedFullDate(formatYYYYMMDD(nextSelectedDate));
   };
 
   const handleSelectDate = (fullDate: string) => {
@@ -352,6 +379,47 @@ export default function PlanScreen() {
     });
   };
 
+  const quickActions =
+    section === 'meals'
+      ? [
+          {
+            id: 'analysis',
+            title: 'Phân tích bữa ăn',
+            onPress: () => router.push('/habit-analysis'),
+          },
+          {
+            id: 'meal-prep',
+            title: 'Mẹo meal prep',
+            onPress: () =>
+              router.push({
+                pathname: '/recipes',
+                params: { planDate: formattedDateStr, mealType: 'breakfast' },
+              }),
+          },
+          {
+            id: 'progress',
+            title: 'Xem tiến độ',
+            onPress: () => router.push('/activity-insights'),
+          },
+        ]
+      : [
+          {
+            id: 'habits',
+            title: 'Phân tích thói quen',
+            onPress: () => router.push('/habit-analysis'),
+          },
+          {
+            id: 'add-activity',
+            title: 'Thêm hoạt động',
+            onPress: handleOpenAddActivity,
+          },
+          {
+            id: 'progress',
+            title: 'Xem tiến độ',
+            onPress: () => router.push('/activity-insights'),
+          },
+        ];
+
   // Compute total planned calories and macros for selected day
   let totalCalories = 0;
   let totalCarb = 0;
@@ -438,24 +506,42 @@ export default function PlanScreen() {
 
         {/* Week Picker when in week mode */}
         {viewMode === 'week' ? (
-          <View style={styles.weekPicker}>
-            {weeksData.map((week) => {
-              const isWeekActive = selectedWeek === week.index;
-              return (
-                <TouchableOpacity
-                  key={week.label}
-                  style={[styles.weekItem, isWeekActive && styles.weekItemActive]}
-                  onPress={() => handleSelectWeek(week.index)}
-                  activeOpacity={0.7}>
-                  <Text style={[styles.weekLabel, isWeekActive && styles.activeText]}>
-                    {week.label}
-                  </Text>
-                  <Text style={[styles.weekRange, isWeekActive && styles.activeText]}>
-                    {week.range}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.weekNavigationRow}>
+            <TouchableOpacity
+              style={styles.weekNavigationButton}
+              onPress={() => handleNavigateWeek(-1)}
+              activeOpacity={0.7}
+              accessibilityLabel="Xem tuần trước nữa">
+              <Ionicons name="chevron-back" size={20} color="#10294B" />
+            </TouchableOpacity>
+
+            <View style={styles.weekPicker}>
+              {weeksData.map((week) => {
+                const isWeekActive = selectedWeek === week.index;
+                return (
+                  <TouchableOpacity
+                    key={`${week.index}-${week.range}`}
+                    style={[styles.weekItem, isWeekActive && styles.weekItemActive]}
+                    onPress={() => handleSelectWeek(week.index)}
+                    activeOpacity={0.7}>
+                    <Text style={[styles.weekLabel, isWeekActive && styles.activeText]}>
+                      {week.label}
+                    </Text>
+                    <Text style={[styles.weekRange, isWeekActive && styles.activeText]}>
+                      {week.range}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              style={styles.weekNavigationButton}
+              onPress={() => handleNavigateWeek(1)}
+              activeOpacity={0.7}
+              accessibilityLabel="Xem tuần sau nữa">
+              <Ionicons name="chevron-forward" size={20} color="#10294B" />
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.dayPicker}>
@@ -528,43 +614,36 @@ export default function PlanScreen() {
       <View style={styles.floatingBar}>
         <TouchableOpacity
           style={styles.mascotButton}
-          onPress={() => router.push('/habit-analysis')}
+          onPress={
+            section === 'meals'
+              ? () => setMealSheetVisible(true)
+              : () => router.push('/activity-goals')
+          }
           activeOpacity={0.8}>
           <View style={styles.mascotCircle}>
             <MaterialCommunityIcons name="chef-hat" size={20} color="#49C99B" />
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.quickPill}
-          onPress={() => router.push('/habit-analysis')}
-          activeOpacity={0.8}>
-          <Text style={styles.quickPillText}>Phân tích {section === 'meals' ? 'bữa ăn' : 'thói quen'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.quickPill}
-          onPress={() =>
-            section === 'meals'
-              ? router.push({
-                  pathname: '/recipes',
-                  params: {
-                    planDate: formattedDateStr,
-                    mealType: 'breakfast',
-                  },
-                })
-              : handleOpenAddActivity()
-          }
-          activeOpacity={0.8}>
-          <Text style={styles.quickPillText}>{section === 'meals' ? 'Mẹo meal prep' : 'Thêm hoạt động'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.quickPill}
-          onPress={() => router.push('/activity-insights')}
-          activeOpacity={0.8}>
-          <Text style={styles.quickPillText}>Xem tiến độ</Text>
-        </TouchableOpacity>
+        <ScrollView
+          style={styles.quickActionsScroll}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.quickActionsContent}
+          decelerationRate="fast"
+          keyboardShouldPersistTaps="handled">
+          {quickActions.map((action) => (
+            <TouchableOpacity
+              key={action.id}
+              style={styles.quickPill}
+              onPress={action.onPress}
+              activeOpacity={0.8}>
+              <Text style={styles.quickPillText} numberOfLines={1}>
+                {action.title}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Bottom Sheet for Recipe / Ingredient Selection */}
@@ -1342,7 +1421,16 @@ const styles = StyleSheet.create({
   dayLabel: { fontSize: 13, color: '#64748B', marginBottom: 6, textAlign: 'center' },
   dayDate: { fontSize: 22, fontWeight: '800', color: '#10294B', textAlign: 'center' },
   weekend: { color: '#EF7777' },
-  weekPicker: { flexDirection: 'row', backgroundColor: '#F5F5F9', borderRadius: 18, padding: 4, marginBottom: 20 },
+  weekNavigationRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
+  weekNavigationButton: {
+    width: 36,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: '#F5F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekPicker: { flex: 1, flexDirection: 'row', backgroundColor: '#F5F5F9', borderRadius: 18, padding: 4 },
   weekItem: { flex: 1, minHeight: 76, alignItems: 'center', justifyContent: 'center', borderRadius: 16, paddingHorizontal: 4, paddingVertical: 8 },
   weekItemActive: { backgroundColor: '#49C99B' },
   weekLabel: { fontSize: 13, color: '#64748B', marginBottom: 6, textAlign: 'center' },
@@ -1622,6 +1710,7 @@ const styles = StyleSheet.create({
   },
   mascotButton: {
     marginRight: 4,
+    flexShrink: 0,
   },
   mascotCircle: {
     width: 38,
@@ -1640,7 +1729,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    flexShrink: 0,
   },
+  quickActionsScroll: { flex: 1, minWidth: 0 },
+  quickActionsContent: { gap: 8, paddingRight: 4 },
   quickPillText: {
     fontSize: 13,
     fontWeight: '700',
