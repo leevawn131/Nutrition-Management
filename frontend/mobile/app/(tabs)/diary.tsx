@@ -1,18 +1,18 @@
-import { Ionicons, MaterialCommunityIcons, FontAwesome6 } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Platform,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -58,10 +58,22 @@ function getMonday(d: Date): Date {
   return date;
 }
 
-function generateWeeksData(refDate: Date = new Date()): WeekInfo[] {
+function getWeekLabel(weekStart: Date, today: Date): string {
+  const currentMonday = getMonday(today);
+  const weekDistance = Math.round(
+    (getMonday(weekStart).getTime() - currentMonday.getTime()) / (7 * 24 * 60 * 60 * 1000)
+  );
+
+  if (weekDistance === 0) return 'Tuần này';
+  if (weekDistance === -1) return 'Tuần trước';
+  if (weekDistance === 1) return 'Tuần sau';
+  if (weekDistance < 0) return `${Math.abs(weekDistance)} tuần trước`;
+  return `${weekDistance} tuần tới`;
+}
+
+function generateWeeksData(refDate: Date = new Date(), today: Date = new Date()): WeekInfo[] {
   const currentMonday = getMonday(refDate);
   const todayStr = formatYYYYMMDD(refDate);
-  const weekLabels = ['Tuần trước', 'Tuần này', 'Tuần sau'];
   const weekOffsets = [-7, 0, 7];
 
   return weekOffsets.map((offset, index) => {
@@ -98,7 +110,7 @@ function generateWeeksData(refDate: Date = new Date()): WeekInfo[] {
 
     return {
       index,
-      label: weekLabels[index],
+      label: getWeekLabel(monday, today),
       range,
       fullRange,
       days,
@@ -117,7 +129,8 @@ export default function DiaryScreen() {
   const router = useRouter();
 
   const todayStr = useMemo(() => formatYYYYMMDD(new Date()), []);
-  const weeksData = useMemo(() => generateWeeksData(new Date()), []);
+  const [weekCursor, setWeekCursor] = useState(() => new Date());
+  const weeksData = useMemo(() => generateWeeksData(weekCursor), [weekCursor]);
 
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(1);
   const [selectedFullDate, setSelectedFullDate] = useState(todayStr);
@@ -178,6 +191,19 @@ export default function DiaryScreen() {
         setSelectedFullDate(newDay.fullDate);
       }
     }
+  };
+
+  const handleNavigateWeek = (direction: -1 | 1) => {
+    const selectedDayIndex = currentWeek.days.findIndex((day) => day.fullDate === selectedFullDate);
+    const nextWeekStart = new Date(weekCursor);
+    nextWeekStart.setDate(nextWeekStart.getDate() + direction * 7);
+
+    const nextSelectedDate = new Date(nextWeekStart);
+    nextSelectedDate.setDate(nextSelectedDate.getDate() + Math.max(selectedDayIndex, 0));
+
+    setWeekCursor(nextWeekStart);
+    setSelectedWeekIndex(1);
+    setSelectedFullDate(formatYYYYMMDD(nextSelectedDate));
   };
 
   const handleSelectDate = (fullDate: string) => {
@@ -288,24 +314,42 @@ export default function DiaryScreen() {
         </View>
 
         {/* Week Selector */}
-        <View style={styles.weekPicker}>
-          {weeksData.map((week) => {
-            const isWeekActive = selectedWeekIndex === week.index;
-            return (
-              <TouchableOpacity
-                key={week.label}
-                style={[styles.weekCell, isWeekActive && styles.weekCellActive]}
-                activeOpacity={0.7}
-                onPress={() => handleSelectWeek(week.index)}>
-                <Text style={[styles.weekLabel, isWeekActive && styles.activeText]}>
-                  {week.label}
-                </Text>
-                <Text style={[styles.weekDate, isWeekActive && styles.activeText]}>
-                  {week.range}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+        <View style={styles.weekNavigationRow}>
+          <TouchableOpacity
+            style={styles.weekNavigationButton}
+            onPress={() => handleNavigateWeek(-1)}
+            activeOpacity={0.7}
+            accessibilityLabel="Xem tuần trước nữa">
+            <Ionicons name="chevron-back" size={20} color="#10294B" />
+          </TouchableOpacity>
+
+          <View style={styles.weekPicker}>
+            {weeksData.map((week) => {
+              const isWeekActive = selectedWeekIndex === week.index;
+              return (
+                <TouchableOpacity
+                  key={`${week.index}-${week.range}`}
+                  style={[styles.weekCell, isWeekActive && styles.weekCellActive]}
+                  activeOpacity={0.7}
+                  onPress={() => handleSelectWeek(week.index)}>
+                  <Text style={[styles.weekLabel, isWeekActive && styles.activeText]}>
+                    {week.label}
+                  </Text>
+                  <Text style={[styles.weekDate, isWeekActive && styles.activeText]}>
+                    {week.range.replace(' - ', '\n')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <TouchableOpacity
+            style={styles.weekNavigationButton}
+            onPress={() => handleNavigateWeek(1)}
+            activeOpacity={0.7}
+            accessibilityLabel="Xem tuần sau nữa">
+            <Ionicons name="chevron-forward" size={20} color="#10294B" />
+          </TouchableOpacity>
         </View>
 
         {/* Day Picker */}
@@ -641,18 +685,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  weekNavigationRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  weekNavigationButton: {
+    width: 32,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   weekPicker: {
+    flex: 1,
     flexDirection: 'row',
     backgroundColor: '#F5F6F9',
     borderRadius: 16,
     padding: 4,
-    marginBottom: 12,
   },
-  weekCell: { flex: 1, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 13 },
+  weekCell: {
+    flex: 1,
+    minHeight: 108,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+  },
   weekCellActive: { backgroundColor: '#49C99B' },
   weekCellDisabled: { opacity: 0.55 },
   weekLabel: { fontSize: 13, color: '#64748B', marginBottom: 4, fontWeight: '500' },
-  weekDate: { fontSize: 14, fontWeight: '700', color: '#10294B' },
+  weekDate: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
+    color: '#10294B',
+    textAlign: 'center',
+  },
   activeText: { color: '#FFFFFF' },
   dayPicker: {
     flexDirection: 'row',
