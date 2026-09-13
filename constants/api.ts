@@ -2,6 +2,11 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 /**
+ * Active Wi-Fi IPv4 address on local network
+ */
+const CURRENT_WIFI_IP = '192.168.1.101';
+
+/**
  * Dynamically determine the local computer IP address for Expo Go on physical mobile devices
  */
 const getLocalHostIp = (): string => {
@@ -13,13 +18,24 @@ const getLocalHostIp = (): string => {
 
   if (hostUri) {
     const ip = hostUri.split(':')[0];
-    if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+    // Filter out virtual network adapters (VirtualBox 192.168.56.x, Hyper-V 172.25.x.x)
+    if (
+      ip &&
+      ip !== 'localhost' &&
+      ip !== '127.0.0.1' &&
+      !ip.startsWith('192.168.56.') &&
+      !ip.startsWith('172.25.')
+    ) {
       return ip;
     }
   }
 
-  // Fallback for Android Emulator (10.0.2.2) or iOS Simulator / Web (localhost)
-  return Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+  // Use active Wi-Fi IP for physical devices, else emulator / web fallback
+  if (Platform.OS === 'android' || Platform.OS === 'ios') {
+    return CURRENT_WIFI_IP;
+  }
+
+  return 'localhost';
 };
 
 /**

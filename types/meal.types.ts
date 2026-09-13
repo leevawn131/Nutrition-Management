@@ -6,16 +6,69 @@ export interface AIRecognitionResult {
   recognition_id?: string;
   food_name: string;
   estimated_weight_g: number;
+  estimated_eaten_weight_g?: number;
+  consumption_pct?: number;
+  container_size?: 'small' | 'medium' | 'large' | 'extra_large';
   calories: number;
   protein_g: number;
   carb_g: number;
   fat_g: number;
   confidence: number;
   glycemic_load?: number;
+  image_quality?: 'good' | 'fair' | 'poor';
+  quality_warning?: string;
+  nutrition_source?: 'ai_vision' | 'label' | 'database';
+  quantity_uncertain?: boolean;
+  hidden_base_food?: boolean;
+  fried_food?: boolean;
+  is_beverage?: boolean;
+  has_bones?: boolean;
+  sugar_level?: string;
+  dishes?: DishItem[];
   ingredients?: Array<{
+    food_item_id?: string;
     name: string;
-    estimated_weight_g: number;
+    quantity?: number;
+    portion_g?: number;
+    estimated_weight_g?: number;
+    calories?: number;
+    protein_g?: number;
+    carb_g?: number;
+    fat_g?: number;
+    source?: 'visible' | 'inferred' | 'user_added';
   }>;
+  toppings?: Array<{
+    name: string;
+    calories?: number;
+  }>;
+  alternatives?: Array<{
+    name: string;
+    confidence: number;
+  }>;
+}
+
+export interface DishIngredient {
+  food_item_id?: string;
+  name: string;
+  quantity?: number;
+  portion_g?: number;
+  estimated_weight_g?: number;
+  calories?: number;
+  protein_g?: number;
+  carb_g?: number;
+  fat_g?: number;
+  source?: 'visible' | 'inferred' | 'user_added';
+}
+
+export interface DishItem {
+  id?: string;
+  name: string;
+  estimated_weight_g?: number;
+  calories?: number;
+  protein_g?: number;
+  carb_g?: number;
+  fat_g?: number;
+  ingredients: DishIngredient[];
 }
 
 export interface IngredientInput {
