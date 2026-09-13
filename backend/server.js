@@ -46,6 +46,13 @@ const mealPlanTemplateRoutes = require('./routes/meal_plan_template.routes');
 const mealLogRoutes = require('./routes/meal_log.routes');
 const activityRoutes = require('./routes/activity.routes');
 const groceryRoutes = require('./routes/grocery.routes');
+const postRoutes = require('./routes/post.routes');
+const commentRoutes = require('./routes/comment.routes');
+const friendRoutes = require('./routes/friend.routes');
+const chatbotRoutes = require('./routes/chatbot.routes');
+const leaderboardRoutes = require('./routes/leaderboard.routes');
+const achievementRoutes = require('./routes/achievement.routes');
+const socialUserRoutes = require('./routes/social_user.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -59,6 +66,13 @@ app.use('/api/meal-plan-templates', mealPlanTemplateRoutes);
 app.use('/api/meal-logs', mealLogRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/grocery', groceryRoutes);
+app.use('/api/posts', postRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/friends', friendRoutes);
+app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/achievements', achievementRoutes);
+app.use('/api/social-users', socialUserRoutes);
 
 // Routes quản trị viên (Admin)
 const adminUserRoutes = require('./routes/admin/user.admin.routes');

@@ -122,6 +122,39 @@ const userSchema = new mongoose.Schema(
       type: streakSchema,
       default: null,
     },
+
+    // Gamification & Social fields
+    points: {
+      type: Number,
+      default: 0,
+    },
+    rank: {
+      type: String,
+      enum: ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'],
+      default: 'Bronze',
+    },
+    achievements: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Achievement',
+      },
+    ],
+    friends: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    saved_posts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Post',
+      },
+    ],
+    lastActiveDate: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
