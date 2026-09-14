@@ -2,10 +2,12 @@ const mongoose = require('mongoose');
 const ChatConversation = require('../models/chat_conversation.model');
 const ChatMessage = require('../models/chat_message.model');
 const Recipe = require('../models/recipe.model');
+const Activity = require('../models/activity.model');
 const User = require('../models/user.model');
 const recipeService = require('./recipe.service');
 const mealPlanService = require('./meal_plan.service');
 const groqService = require('./groq.service');
+const healthService = require('./health.service');
 
 class ChatWorkflowService {
   constructor() {
@@ -15,6 +17,7 @@ class ChatWorkflowService {
       meal_plan: this.handleMealPlanWorkflow.bind(this),
       goal: this.handleGoalWorkflow.bind(this), // Extension point for Quoc
       exercise: this.handleExerciseWorkflow.bind(this), // Extension point for Quoc
+      health: this.handleHealthWorkflow.bind(this),
     };
 
     this.actionHandlers = {
@@ -120,6 +123,22 @@ class ChatWorkflowService {
     const normalizedText = (typeof input.value === 'string' ? input.value : userContent).toLowerCase().trim();
     let aiResolution = null;
 
+    // Assistant shortcuts always begin a fresh flow, even if an older flow is completed.
+    const shortcutFlows = {
+      'luyện tập & vận động': 'exercise',
+      'tìm công thức nấu ăn': 'recipe',
+      'lập kế hoạch bữa ăn': 'meal_plan',
+      'thiết lập mục tiêu dinh dưỡng': 'goal',
+      'tôi muốn hỏi về sức khỏe và dinh dưỡng.': 'health',
+    };
+    if (shortcutFlows[normalizedText]) {
+      conversation.current_flow = shortcutFlows[normalizedText];
+      conversation.current_step = 'entry';
+      conversation.status = 'collecting';
+      conversation.context_data = {};
+      await conversation.save();
+    }
+
     // Reset command always works directly
     if (normalizedText === 'menu chính' || normalizedText === 'bắt đầu lại' || normalizedText === 'reset' || normalizedText === 'trợ giúp') {
       conversation.current_flow = 'general';
@@ -129,20 +148,24 @@ class ChatWorkflowService {
       await conversation.save();
     } else if (input.type === 'text' || (!input.type && typeof input.value === 'string')) {
       // User entered natural language: resolve intent and parameters with Groq GPT-OSS 20B
-      let userProfile = null;
-      try {
-        userProfile = await User.findById(userId)
-          .select('gender height_cm weight_kg activity_level goal target_calories')
-          .lean();
-      } catch (e) {
-        // Ignore DB error
-      }
+      if (shortcutFlows[normalizedText]) {
+        aiResolution = { target_flow: shortcutFlows[normalizedText], parameters: {} };
+      } else {
+        let userProfile = null;
+        try {
+          userProfile = await User.findById(userId)
+            .select('gender height_cm weight_kg activity_level goal target_calories')
+            .lean();
+        } catch (e) {
+          // Ignore DB error
+        }
 
-      aiResolution = await groqService.resolveIntentAndParameters(userContent, {
-        current_flow: conversation.current_flow,
-        current_step: conversation.current_step,
-        user_profile: userProfile,
-      });
+        aiResolution = await groqService.resolveIntentAndParameters(userContent, {
+          current_flow: conversation.current_flow,
+          current_step: conversation.current_step,
+          user_profile: userProfile,
+        });
+      }
 
       // Flow transitions when at top-level 'general'
       if (conversation.current_flow === 'general') {
@@ -400,6 +423,7 @@ class ChatWorkflowService {
       cook_time_minutes: r.cook_time_minutes || 15,
       prep_time_minutes: r.prep_time_minutes || 10,
       servings: r.servings || 1,
+      meal_type: context.meal_type || 'lunch',
       ingredients: r.ingredients || [],
       steps: r.steps || [],
       actions: [
@@ -1053,28 +1077,319 @@ class ChatWorkflowService {
   }
 
   // =========================================================================
+  // WORKFLOW C2: HEALTH (Hỏi về sức khỏe)
+  // =========================================================================
+  async handleHealthWorkflow(userId, conversation, input, normalizedText) {
+    const context = conversation.context_data || {};
+    const saveStep = async (step) => {
+      conversation.current_step = step;
+      conversation.status = 'collecting';
+      conversation.context_data = context;
+      conversation.markModified('context_data');
+      await conversation.save();
+    };
+
+    if (conversation.current_step === 'entry') {
+      await saveStep('ask_topic');
+      return {
+        message: 'Mình có thể tư vấn tham khảo về nhiều chủ đề. Bạn đang quan tâm điều gì?',
+        ui: {
+          type: 'choice',
+          payload: {
+            title: 'Chọn chủ đề sức khỏe:',
+            choices: [
+              { label: 'Dinh dưỡng và calo', value: 'health_nutrition' },
+              { label: 'Giấc ngủ và phục hồi', value: 'health_sleep' },
+              { label: 'Vận động an toàn', value: 'health_exercise' },
+              { label: 'Cân nặng và vóc dáng', value: 'health_weight' },
+              { label: 'Đường huyết và thói quen ăn uống', value: 'health_glucose' },
+              { label: 'Một vấn đề khác', value: 'health_other' },
+            ],
+          },
+        },
+        state: { flow: 'health', step: 'ask_topic', status: 'collecting' },
+      };
+    }
+
+    if (conversation.current_step === 'ask_topic') {
+      context.health_topic = normalizedText;
+      await saveStep('ask_profile_consent');
+      return {
+        message: 'Bạn có muốn mình tham khảo dữ liệu hồ sơ để câu trả lời phù hợp hơn không?',
+        ui: {
+          type: 'choice',
+          payload: {
+            title: 'Sử dụng dữ liệu hồ sơ?',
+            choices: [
+              { label: 'Có, dùng dữ liệu của tôi', value: 'health_consent_yes' },
+              { label: 'Không cần', value: 'health_consent_no' },
+            ],
+          },
+        },
+        state: { flow: 'health', step: 'ask_profile_consent', status: 'collecting' },
+      };
+    }
+
+    if (conversation.current_step === 'ask_profile_consent') {
+      context.profile_consent = normalizedText.includes('có');
+      const topic = context.health_topic;
+      let advice = 'Hãy duy trì bữa ăn cân bằng, uống đủ nước và theo dõi phản ứng của cơ thể mỗi ngày.';
+      if (topic.includes('giấc ngủ')) {
+        advice = 'Ưu tiên lịch ngủ đều đặn, hạn chế caffeine sau buổi chiều và giảm màn hình trước khi ngủ 30-60 phút.';
+      } else if (topic.includes('vận động')) {
+        advice = 'Bắt đầu với cường độ vừa phải, khởi động trước khi tập và dừng lại nếu thấy đau ngực, khó thở hoặc chóng mặt.';
+      } else if (topic.includes('cân nặng')) {
+        advice = 'Theo dõi xu hướng cân nặng theo tuần, ưu tiên thay đổi nhỏ và bền vững thay vì nhịn ăn hoặc giảm quá nhanh.';
+      } else if (topic.includes('đường huyết')) {
+        advice = 'Ưu tiên rau, đạm và tinh bột hấp thu chậm; đi bộ nhẹ sau bữa ăn có thể hỗ trợ thói quen kiểm soát đường huyết.';
+      }
+
+      conversation.current_step = 'completed';
+      conversation.status = 'completed';
+      conversation.context_data = context;
+      conversation.markModified('context_data');
+      await conversation.save();
+
+      return {
+        message: `Đây là gợi ý tham khảo cho chủ đề bạn chọn:\n\n${advice}\n\nThông tin này không thay thế chẩn đoán hoặc tư vấn y tế chuyên nghiệp. Nếu bạn có triệu chứng bất thường, hãy liên hệ nhân viên y tế.`,
+        ui: {
+          type: 'choice',
+          payload: {
+            title: 'Bạn muốn làm gì tiếp?',
+            choices: [
+              { label: 'Hỏi chủ đề khác', value: 'Tôi muốn hỏi về sức khỏe và dinh dưỡng.' },
+              { label: 'Quay lại menu chính', value: 'menu chính' },
+            ],
+          },
+        },
+        state: { flow: 'health', step: 'completed', status: 'completed' },
+      };
+    }
+
+    return {
+      message: 'Bạn có thể bắt đầu một câu hỏi sức khỏe mới bất cứ lúc nào.',
+      ui: null,
+      state: { flow: 'health', step: 'completed', status: 'completed' },
+    };
+  }
+
+  // =========================================================================
   // WORKFLOW D: EXERCISE (Extension Point for Quoc)
   // =========================================================================
   async handleExerciseWorkflow(userId, conversation, input, normalizedText, aiResolution = null) {
-    return {
-      message:
-        '🏃 [AI Assistant - Luyện tập & Vận động]\n\nPhần giao diện và cấu trúc Exercise Workflow đã sẵn sàng. Đồng đội Quoc sẽ sớm kết nối catalog bài tập và video hướng dẫn ngắn theo spec.',
-      ui: {
-        type: 'choice',
-        payload: {
-          title: 'Bạn có thể chọn quay lại:',
-          choices: [
-            { label: '🏠 Quay lại Menu chính', value: 'menu chính' },
-            { label: '🍲 Tìm công thức nấu ăn', value: 'Tìm công thức nấu ăn' },
-            { label: '📅 Lập kế hoạch bữa ăn', value: 'Lập kế hoạch bữa ăn' },
-          ],
+    const context = conversation.context_data || {};
+    const saveStep = async (step) => {
+      conversation.current_step = step;
+      conversation.status = 'collecting';
+      conversation.context_data = context;
+      conversation.markModified('context_data');
+      await conversation.save();
+    };
+
+    if (conversation.current_step === 'entry') {
+      await saveStep('ask_goal');
+      return {
+        message: 'Mình sẽ giúp bạn tạo lịch tập phù hợp. Mục tiêu vận động của bạn là gì?',
+        ui: {
+          type: 'choice',
+          payload: {
+            title: 'Mục tiêu vận động của bạn là gì?',
+            choices: [
+              { label: 'Tăng sức mạnh / cơ bắp', value: 'exercise_strength' },
+              { label: 'Giảm cân', value: 'exercise_weight_loss' },
+              { label: 'Tăng sức bền (cardio)', value: 'exercise_cardio' },
+              { label: 'Duy trì thể lực', value: 'exercise_fitness' },
+              { label: 'Sức khỏe tổng thể', value: 'exercise_health' },
+              { label: 'Một đáp án khác', value: 'exercise_other' },
+            ],
+          },
         },
-      },
-      state: {
-        flow: 'exercise',
-        step: 'entry',
-        status: 'collecting',
-      },
+        state: { flow: 'exercise', step: 'ask_goal', status: 'collecting' },
+      };
+    }
+
+    if (conversation.current_step === 'ask_goal') {
+      context.exercise_goal = normalizedText;
+      await saveStep('ask_period');
+      return {
+        message: 'Bạn muốn bắt đầu lịch tập vào thời gian nào?',
+        ui: {
+          type: 'choice',
+          payload: {
+            title: 'Chọn thời gian bắt đầu:',
+            choices: [
+              { label: 'Hôm nay', value: 'exercise_today' },
+              { label: 'Ngày mai', value: 'exercise_tomorrow' },
+              { label: 'Tuần này', value: 'exercise_this_week' },
+              { label: 'Tuần sau', value: 'exercise_next_week' },
+              { label: '7 ngày tới', value: 'exercise_next_7_days' },
+              { label: 'Một đáp án khác', value: 'exercise_custom_period' },
+            ],
+          },
+        },
+        state: { flow: 'exercise', step: 'ask_period', status: 'collecting' },
+      };
+    }
+
+    if (conversation.current_step === 'ask_period') {
+      context.exercise_period = normalizedText;
+      await saveStep('ask_frequency');
+      return {
+        message: 'Bạn muốn tập luyện bao nhiêu buổi mỗi tuần?',
+        ui: {
+          type: 'choice',
+          payload: {
+            title: 'Số buổi tập mỗi tuần:',
+            choices: [1, 2, 3, 4, 5, 6].map((count) => ({
+              label: `${count} buổi/tuần`,
+              value: `exercise_${count}_days`,
+            })),
+          },
+        },
+        state: { flow: 'exercise', step: 'ask_frequency', status: 'collecting' },
+      };
+    }
+
+    if (conversation.current_step === 'ask_frequency') {
+      context.exercise_frequency = normalizedText;
+      await saveStep('ask_health_consent');
+      return {
+        message:
+          'Mình có thể dùng dữ liệu sức khỏe gần đây để giảm cường độ vào những ngày bạn chưa hồi phục tốt. Bạn có đồng ý không?',
+        ui: {
+          type: 'choice',
+          payload: {
+            title: 'Dùng dữ liệu sức khỏe?',
+            choices: [
+              { label: 'Có, sử dụng dữ liệu', value: 'exercise_consent_yes' },
+              { label: 'Không cần', value: 'exercise_consent_no' },
+              { label: 'Một đáp án khác', value: 'exercise_consent_custom' },
+            ],
+          },
+        },
+        state: { flow: 'exercise', step: 'ask_health_consent', status: 'collecting' },
+      };
+    }
+
+    if (conversation.current_step === 'ask_health_consent') {
+      context.health_consent = normalizedText.includes('có') || normalizedText.includes('yes');
+      const days = Number((context.exercise_frequency.match(/[1-6]/) || ['3'])[0]);
+      const startDate = new Date();
+      if (context.exercise_period.includes('ngày mai')) startDate.setDate(startDate.getDate() + 1);
+      if (context.exercise_period.includes('tuần sau')) startDate.setDate(startDate.getDate() + 7);
+
+      const goalPlan = context.exercise_goal.includes('giảm cân')
+        ? {
+            name: 'Cardio đốt mỡ',
+            exercises: ['Đi bộ nhanh hoặc đạp xe', 'Squat trọng lượng cơ thể', 'Mountain climber'],
+          }
+        : context.exercise_goal.includes('sức bền')
+          ? {
+              name: 'Cardio tăng sức bền',
+              exercises: ['Khởi động cardio nhẹ', 'Chạy/đạp xe theo nhịp vừa', 'Interval nhanh - chậm'],
+            }
+          : context.exercise_goal.includes('sức mạnh') || context.exercise_goal.includes('cơ bắp')
+            ? {
+                name: 'Sức mạnh toàn thân',
+                exercises: ['Squat', 'Chống đẩy', 'Kéo dây hoặc chèo tạ', 'Plank'],
+              }
+            : {
+                name: 'Vận động toàn thân',
+                exercises: ['Đi bộ nhẹ', 'Squat', 'Giãn cơ chủ động', 'Plank cơ bản'],
+              };
+      const activityCatalog = await Activity.find({}).sort({ category: 1, name: 1 }).lean();
+      const catalogMatches = context.exercise_goal.includes('giảm cân') || context.exercise_goal.includes('sức bền')
+        ? activityCatalog.filter((activity) => activity.category.includes('Cardio'))
+        : context.exercise_goal.includes('sức mạnh') || context.exercise_goal.includes('cơ bắp')
+          ? activityCatalog.filter((activity) => activity.category.includes('Kháng lực'))
+          : activityCatalog;
+      const selectedActivities = (catalogMatches.length > 0 ? catalogMatches : activityCatalog).slice(0, 4);
+
+        let profileSnapshot = null;
+        let missingProfileFields = [];
+        if (context.health_consent) {
+          const user = await User.findById(userId)
+            .select('gender date_of_birth height_cm weight_kg activity_level goal')
+            .lean();
+          if (user) {
+            profileSnapshot = {
+              gender: user.gender || null,
+              height_cm: user.height_cm || null,
+              weight_kg: user.weight_kg || null,
+              activity_level: user.activity_level || null,
+              goal: user.goal || null,
+            };
+            if (!user.gender) missingProfileFields.push('giới tính');
+            if (!user.date_of_birth) missingProfileFields.push('ngày sinh');
+            if (!user.height_cm) missingProfileFields.push('chiều cao');
+            if (!user.weight_kg) missingProfileFields.push('cân nặng');
+            if (!user.activity_level) missingProfileFields.push('mức vận động');
+            if (missingProfileFields.length === 0) {
+              profileSnapshot.metrics = healthService.calculateHealthMetrics(user);
+            }
+          }
+        }
+
+      const sessions = Array.from({ length: days }, (_, index) => {
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + index * Math.max(1, Math.floor(7 / days)));
+        const catalogActivity = selectedActivities[index % selectedActivities.length];
+        return {
+          date: date.toISOString().split('T')[0],
+          session: index + 1,
+          activity: catalogActivity?.name || goalPlan.name,
+          activity_id: catalogActivity?._id?.toString() || null,
+          met_value: catalogActivity?.met_value || null,
+          exercises: catalogActivity ? [] : goalPlan.exercises,
+          source: catalogActivity ? 'database' : 'fallback_template',
+          warmup: 'Khởi động 5 phút',
+          cooldown: 'Thả lỏng và giãn cơ 5 phút',
+          intensity: context.health_consent ? 'Vừa phải' : 'Vừa đến khá',
+          duration_minutes: context.health_consent
+            ? profileSnapshot?.metrics?.bmi >= 30 || profileSnapshot?.activity_level === 'sedentary'
+              ? 25
+              : 30
+            : 40,
+        };
+      });
+      context.exercise_plan = sessions;
+      conversation.current_step = 'completed';
+      conversation.status = 'completed';
+      conversation.context_data = context;
+      conversation.markModified('context_data');
+      await conversation.save();
+
+      const profileNote = context.health_consent
+        ? profileSnapshot?.metrics
+          ? 'Mình đã dùng hồ sơ và các chỉ số sức khỏe có thể tính được của bạn.'
+          : profileSnapshot
+            ? `Mình đã dùng các dữ liệu hồ sơ đang có. Còn thiếu: ${missingProfileFields.join(', ')} nên chưa thể tính BMI/BMR/TDEE.`
+            : 'Database chưa có dữ liệu hồ sơ sức khỏe của bạn, nên mình dùng lịch cơ bản an toàn.'
+        : 'Mình không sử dụng dữ liệu hồ sơ của bạn.';
+
+      return {
+        message: `Đã tạo lịch tập cá nhân hóa cho bạn. ${profileNote} Hãy bắt đầu nhẹ nhàng và điều chỉnh nếu thấy mệt.`,
+        ui: {
+          type: 'result',
+          payload: {
+            exercise_guide: {
+              activity_name: 'Lịch tập cá nhân hóa',
+              goal: context.exercise_goal,
+              frequency: `${days} buổi/tuần`,
+              health_consent: context.health_consent,
+              profile_snapshot: profileSnapshot,
+              sessions,
+            },
+          },
+        },
+        state: { flow: 'exercise', step: 'completed', status: 'completed' },
+      };
+    }
+
+    return {
+      message: 'Lịch tập của bạn đã được tạo. Bạn có thể bắt đầu lại để lập lịch mới.',
+      ui: { type: 'choice', payload: { title: 'Bạn muốn làm gì tiếp?', choices: [{ label: 'Lập lịch mới', value: 'Luyện tập & vận động' }, { label: 'Quay lại menu chính', value: 'menu chính' }] } },
+      state: { flow: 'exercise', step: 'completed', status: 'completed' },
     };
   }
 

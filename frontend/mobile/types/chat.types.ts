@@ -5,7 +5,7 @@ export interface ChatInput {
   value: any;
 }
 
-export type ChatFlow = 'general' | 'recipe' | 'meal_plan' | 'goal' | 'exercise';
+export type ChatFlow = 'general' | 'recipe' | 'meal_plan' | 'goal' | 'exercise' | 'health';
 
 export type ChatFlowStatus =
   | 'collecting'
@@ -50,6 +50,7 @@ export interface ChatRecipeItem {
   cook_time_minutes?: number;
   prep_time_minutes?: number;
   servings?: number;
+  meal_type?: 'breakfast' | 'lunch' | 'dinner' | 'snack' | string;
   ingredients?: Array<{ ingredient_name: string; quantity?: number; unit?: string }>;
   steps?: Array<{ step_number: number; instruction: string; image_url?: string }>;
   actions?: ChatRecipeAction[];

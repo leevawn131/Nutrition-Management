@@ -1,17 +1,17 @@
 import { FontAwesome6, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Image,
+    Alert,
+    Image,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -22,7 +22,6 @@ import { groceryService } from '@/services/grocery.service';
 import { mealLogService } from '@/services/meal_log.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { HealthMetrics, userService } from '@/services/user.service';
-import { mealService } from '@/services/meal.service';
 import { User } from '@/types/auth.types';
 import { DailySummary } from '@/types/meal_log.types';
 
@@ -80,7 +79,7 @@ export default function HomeScreen() {
         userService.getProfile(token),
         userService.getHealthMetrics(token),
         mealLogService.getDailySummary(),
-        mealService.getMealLogs(token, todayStr).catch(() => ({ success: false, data: [] })),
+        mealLogService.getMealLogs({ date: todayStr }),
       ]);
 
       if (profileData) {
@@ -92,9 +91,7 @@ export default function HomeScreen() {
       if (summaryData) {
         setSummary(summaryData);
       }
-      if (mealLogsData && mealLogsData.data) {
-        setTodayLogs(mealLogsData.data);
-      }
+      setTodayLogs(mealLogsData);
     }
 
     // 3. Load grocery items count
@@ -133,7 +130,23 @@ export default function HomeScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } catch {}
     }
-    Alert.alert('Trợ lý dinh dưỡng', `Chức năng "${action}" đang được chuẩn bị để kết nối trực tiếp!`);
+
+    const prompts: Record<string, string> = {
+      'Bắt đầu': 'Xin chào, hãy giới thiệu các chức năng trợ lý có thể hỗ trợ tôi.',
+      'Thiết lập mục tiêu': 'Giúp tôi thiết lập mục tiêu dinh dưỡng phù hợp.',
+      'Lên kế hoạch': 'Giúp tôi lên kế hoạch bữa ăn phù hợp.',
+      'Gợi ý món ăn': 'Tìm công thức nấu ăn',
+      'Lên lịch tập': 'Luyện tập & vận động',
+      'Hỏi về sức khỏe': 'Tôi muốn hỏi về sức khỏe và dinh dưỡng.',
+    };
+
+    router.push({
+      pathname: '/chatbot',
+      params: {
+        prompt: prompts[action] || action,
+        autoSend: action === 'Lên lịch tập' || action === 'Gợi ý món ăn' || action === 'Hỏi về sức khỏe' ? '1' : '0',
+      },
+    });
   };
 
   return (
@@ -397,6 +410,30 @@ export default function HomeScreen() {
               activeOpacity={0.8}>
               <Ionicons name="calendar-outline" size={15} color="#334155" />
               <Text style={styles.secondaryPillBtnText}>Lên kế hoạch</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryPillBtn}
+              onPress={() => handleAssistantAction('Gợi ý món ăn')}
+              activeOpacity={0.8}>
+              <Ionicons name="restaurant-outline" size={15} color="#334155" />
+              <Text style={styles.secondaryPillBtnText}>Gợi ý món ăn</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryPillBtn}
+              onPress={() => handleAssistantAction('Lên lịch tập')}
+              activeOpacity={0.8}>
+              <Ionicons name="barbell-outline" size={15} color="#334155" />
+              <Text style={styles.secondaryPillBtnText}>Lên lịch tập</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryPillBtn}
+              onPress={() => handleAssistantAction('Hỏi về sức khỏe')}
+              activeOpacity={0.8}>
+              <Ionicons name="help-circle-outline" size={15} color="#334155" />
+              <Text style={styles.secondaryPillBtnText}>Hỏi về sức khỏe</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>

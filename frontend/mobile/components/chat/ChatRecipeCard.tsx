@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { ChatRecipeItem } from '@/types/chat.types';
+import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface ChatRecipeCardProps {
   recipe: ChatRecipeItem;
@@ -36,7 +36,7 @@ export const ChatRecipeCard: React.FC<ChatRecipeCardProps> = ({
     onAction('add_to_meal_plan', {
       recipe_id: recipe.id,
       title: recipe.title,
-      meal_type: 'lunch',
+      meal_type: recipe.meal_type || 'lunch',
     });
   };
 

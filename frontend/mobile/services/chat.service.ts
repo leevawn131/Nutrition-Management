@@ -1,12 +1,22 @@
 import { API_BASE_URL } from '@/constants/api';
-import { getAuthToken } from '@/services/storage.service';
+import { clearAuthData, getAuthToken } from '@/services/storage.service';
 import {
-  ChatInput,
-  ChatSendResponse,
-  ChatMessage,
-  ChatState,
-  ChatConversationSummary,
+    ChatConversationSummary,
+    ChatInput,
+    ChatMessage,
+    ChatSendResponse,
 } from '@/types/chat.types';
+
+async function throwChatResponseError(response: Response, fallbackMessage: string): Promise<never> {
+  const errJson = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    await clearAuthData();
+    const error = new Error(errJson.message || 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    error.name = 'AuthExpiredError';
+    throw error;
+  }
+  throw new Error(errJson.message || fallbackMessage);
+}
 
 export const chatService = {
   /**
@@ -36,8 +46,7 @@ export const chatService = {
     });
 
     if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson.message || `Lỗi kết nối máy chủ (${response.status})`);
+      await throwChatResponseError(response, `Lỗi kết nối máy chủ (${response.status})`);
     }
 
     return await response.json();
@@ -64,8 +73,7 @@ export const chatService = {
     });
 
     if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson.message || 'Không thể lấy cuộc trò chuyện');
+      await throwChatResponseError(response, 'Không thể lấy cuộc trò chuyện');
     }
 
     const json = await response.json();
@@ -90,8 +98,7 @@ export const chatService = {
     });
 
     if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson.message || 'Không thể làm mới cuộc trò chuyện');
+      await throwChatResponseError(response, 'Không thể làm mới cuộc trò chuyện');
     }
 
     return await response.json();
@@ -115,8 +122,7 @@ export const chatService = {
     });
 
     if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson.message || 'Không thể lấy danh sách cuộc trò chuyện');
+      await throwChatResponseError(response, 'Không thể lấy danh sách cuộc trò chuyện');
     }
 
     const json = await response.json();
@@ -144,8 +150,7 @@ export const chatService = {
     });
 
     if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson.message || 'Không thể tải cuộc trò chuyện');
+      await throwChatResponseError(response, 'Không thể tải cuộc trò chuyện');
     }
 
     const json = await response.json();
@@ -170,8 +175,7 @@ export const chatService = {
     });
 
     if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson.message || 'Không thể xóa cuộc trò chuyện');
+      await throwChatResponseError(response, 'Không thể xóa cuộc trò chuyện');
     }
 
     return await response.json();

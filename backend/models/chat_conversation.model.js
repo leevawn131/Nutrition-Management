@@ -14,7 +14,7 @@ const chatConversationSchema = new mongoose.Schema(
     },
     current_flow: {
       type: String,
-      enum: ['general', 'recipe', 'meal_plan', 'goal', 'exercise'],
+      enum: ['general', 'recipe', 'meal_plan', 'goal', 'exercise', 'health'],
       default: 'general',
     },
     current_step: {

@@ -1,34 +1,39 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  StyleSheet,
-  Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { ChatHistoryModal } from '@/components/chat/ChatHistoryModal';
+import { ChatMessageItem } from '@/components/chat/ChatMessageItem';
+import { ChatOptionsModal } from '@/components/chat/ChatOptionsModal';
+import { ChatRecipeDetailModal } from '@/components/chat/ChatRecipeDetailModal';
 import { chatService } from '@/services/chat.service';
 import { recipeService } from '@/services/recipe.service';
-import { ChatMessage, ChatInput } from '@/types/chat.types';
-import { ChatMessageItem } from '@/components/chat/ChatMessageItem';
-import { ChatRecipeDetailModal } from '@/components/chat/ChatRecipeDetailModal';
-import { ChatOptionsModal } from '@/components/chat/ChatOptionsModal';
-import { ChatHistoryModal } from '@/components/chat/ChatHistoryModal';
+import { ChatInput, ChatMessage } from '@/types/chat.types';
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ChatbotScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ prompt?: string; autoSend?: string }>();
   const flatListRef = useRef<FlatList>(null);
+  const autoSentPromptRef = useRef(false);
+  const conversationIdRef = useRef<string | null>(null);
 
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState(
+    typeof params.prompt === 'string' ? params.prompt : ''
+  );
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
@@ -39,6 +44,25 @@ export default function ChatbotScreen() {
   // Options & History modals
   const [optionsModalVisible, setOptionsModalVisible] = useState(false);
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
+
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
+
+  useEffect(() => {
+    return () => {
+      const id = conversationIdRef.current;
+      if (id) {
+        void chatService.deleteConversation(id).catch(() => {
+          // The screen is already closing; cleanup should not block navigation.
+        });
+      }
+    };
+  }, []);
+
+  const redirectToLogin = () => {
+    router.replace('/(auth)/login');
+  };
 
   // 1. Khởi tạo và nạp lịch sử hội thoại khi vào màn hình
   useEffect(() => {
@@ -59,6 +83,10 @@ export default function ChatbotScreen() {
         }
       }
     } catch (error) {
+      if (error instanceof Error && error.name === 'AuthExpiredError') {
+        redirectToLogin();
+        return;
+      }
       console.log('Load conversation fallback to reset:', error);
       handleReset();
     } finally {
@@ -184,6 +212,10 @@ export default function ChatbotScreen() {
         }
       }
     } catch (error: any) {
+      if (error?.name === 'AuthExpiredError') {
+        redirectToLogin();
+        return;
+      }
       const errorMsg: ChatMessage = {
         id: `err_${Date.now()}`,
         role: 'assistant',
@@ -195,6 +227,20 @@ export default function ChatbotScreen() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (
+      !initialLoading &&
+      conversationId &&
+      params.autoSend === '1' &&
+      typeof params.prompt === 'string' &&
+      params.prompt.trim() &&
+      !autoSentPromptRef.current
+    ) {
+      autoSentPromptRef.current = true;
+      handleSend({ type: 'text', value: params.prompt.trim() });
+    }
+  }, [conversationId, initialLoading, params.autoSend, params.prompt]);
 
   // 3. Xử lý khi user chọn Choice từ Quick Picker
   const handleSelectChoice = (value: any, label: string) => {
@@ -223,6 +269,7 @@ export default function ChatbotScreen() {
           cook_time_minutes: raw.cook_time_minutes || 15,
           prep_time_minutes: raw.prep_time_minutes || 10,
           servings: raw.servings || 1,
+          meal_type: raw.meal_type || 'lunch',
           ingredients: raw.ingredients || [],
           steps: raw.steps || [],
         };
@@ -349,7 +396,10 @@ export default function ChatbotScreen() {
           recipe={selectedRecipeDetail}
           onClose={() => setDetailModalVisible(false)}
           onAddToMealPlan={(recId) =>
-            handleAction('add_to_meal_plan', { recipe_id: recId, meal_type: 'lunch' })
+            handleAction('add_to_meal_plan', {
+              recipe_id: recId,
+              meal_type: selectedRecipeDetail?.meal_type || 'lunch',
+            })
           }
         />
 
