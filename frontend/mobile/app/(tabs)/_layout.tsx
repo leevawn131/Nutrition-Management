@@ -121,6 +121,7 @@ export default function TabLayout() {
     carb_g: number;
     fat_g: number;
     meal_type: MealType;
+    logged_at?: string;
     recognition_id?: string;
   }) => {
     try {
@@ -140,6 +141,7 @@ export default function TabLayout() {
         carb_g: data.carb_g,
         fat_g: data.fat_g,
         meal_type: data.meal_type,
+        logged_at: data.logged_at,
         recognition_summary: {
           recognition_id: data.recognition_id,
           predicted_label: aiResult?.food_name,
