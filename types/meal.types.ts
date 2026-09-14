@@ -47,6 +47,19 @@ export interface AIRecognitionResult {
   }>;
 }
 
+export interface MicronutrientInfo {
+  fiber_g?: number;
+  sodium_mg?: number;
+  potassium_mg?: number;
+  calcium_mg?: number;
+  iron_mg?: number;
+  vitamin_a_mcg?: number;
+  vitamin_c_mg?: number;
+  vitamin_d_mcg?: number;
+  zinc_mg?: number;
+  magnesium_mg?: number;
+}
+
 export interface DishIngredient {
   food_item_id?: string;
   name: string;
@@ -57,6 +70,7 @@ export interface DishIngredient {
   protein_g?: number;
   carb_g?: number;
   fat_g?: number;
+  micronutrients?: MicronutrientInfo;
   source?: 'visible' | 'inferred' | 'user_added';
 }
 
@@ -68,6 +82,7 @@ export interface DishItem {
   protein_g?: number;
   carb_g?: number;
   fat_g?: number;
+  micronutrients?: MicronutrientInfo;
   ingredients: DishIngredient[];
 }
 
