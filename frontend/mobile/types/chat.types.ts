@@ -25,6 +25,7 @@ export interface ChatChoiceItem {
   label: string;
   value: any;
   icon?: string;
+  description?: string;
 }
 
 export interface ChatChoicePayload {

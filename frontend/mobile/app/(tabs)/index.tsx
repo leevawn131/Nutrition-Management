@@ -132,9 +132,9 @@ export default function HomeScreen() {
     }
 
     const prompts: Record<string, string> = {
-      'Bắt đầu': 'Xin chào, hãy giới thiệu các chức năng trợ lý có thể hỗ trợ tôi.',
-      'Thiết lập mục tiêu': 'Giúp tôi thiết lập mục tiêu dinh dưỡng phù hợp.',
-      'Lên kế hoạch': 'Giúp tôi lên kế hoạch bữa ăn phù hợp.',
+      'Bắt đầu': 'Xin chào Miu! Bạn có thể giúp mình những gì?',
+      'Thiết lập mục tiêu': 'Thiết lập mục tiêu dinh dưỡng',
+      'Lên kế hoạch': 'Lập kế hoạch bữa ăn',
       'Gợi ý món ăn': 'Tìm công thức nấu ăn',
       'Lên lịch tập': 'Luyện tập & vận động',
       'Hỏi về sức khỏe': 'Tôi muốn hỏi về sức khỏe và dinh dưỡng.',
@@ -144,7 +144,8 @@ export default function HomeScreen() {
       pathname: '/chatbot',
       params: {
         prompt: prompts[action] || action,
-        autoSend: action === 'Lên lịch tập' || action === 'Gợi ý món ăn' || action === 'Hỏi về sức khỏe' ? '1' : '0',
+        autoSend: '1',
+        newChat: '1',
       },
     });
   };
@@ -373,7 +374,10 @@ export default function HomeScreen() {
         })()}
 
         {/* 6. NUTRITION ASSISTANT CARD */}
-        <View style={styles.assistantCard}>
+        <TouchableOpacity
+          style={styles.assistantCard}
+          activeOpacity={0.92}
+          onPress={() => router.push('/assistant' as any)}>
           <View style={styles.assistantTopRow}>
             <View style={styles.assistantAvatar}>
               <MaterialCommunityIcons name="chef-hat" size={28} color="#10B981" />
@@ -381,6 +385,9 @@ export default function HomeScreen() {
             <View style={styles.assistantTextWrapper}>
               <Text style={styles.assistantTitle}>Mình là trợ lý dinh dưỡng</Text>
               <Text style={styles.assistantSubtitle}>Cần gì, cứ hỏi nha!</Text>
+            </View>
+            <View style={styles.assistantCardArrow}>
+              <Ionicons name="chevron-forward" size={16} color="#059669" />
             </View>
           </View>
 
@@ -436,7 +443,7 @@ export default function HomeScreen() {
               <Text style={styles.secondaryPillBtnText}>Hỏi về sức khỏe</Text>
             </TouchableOpacity>
           </ScrollView>
-        </View>
+        </TouchableOpacity>
 
         {/* 7. LOWER CONTENT CARDS */}
         <View style={styles.lowerCardsRow}>
@@ -855,6 +862,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#047857',
     marginTop: 2,
+  },
+  assistantCardArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   assistantBtnRow: {
     gap: 8,

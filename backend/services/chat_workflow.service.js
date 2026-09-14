@@ -126,22 +126,81 @@ class ChatWorkflowService {
     // Assistant shortcuts always begin a fresh flow, even if an older flow is completed.
     const shortcutFlows = {
       'luyện tập & vận động': 'exercise',
+      'luyện tập': 'exercise',
+      'lên lịch tập': 'exercise',
       'tìm công thức nấu ăn': 'recipe',
+      'tìm công thức': 'recipe',
+      'gợi ý món ăn': 'recipe',
       'lập kế hoạch bữa ăn': 'meal_plan',
+      'lên kế hoạch': 'meal_plan',
+      'lên thực đơn': 'meal_plan',
       'thiết lập mục tiêu dinh dưỡng': 'goal',
+      'thiết lập mục tiêu': 'goal',
+      'mục tiêu dinh dưỡng': 'goal',
       'tôi muốn hỏi về sức khỏe và dinh dưỡng.': 'health',
+      'hỏi về sức khỏe': 'health',
+      'tư vấn sức khỏe': 'health',
     };
-    if (shortcutFlows[normalizedText]) {
+
+    const isGreetingOrReset =
+      normalizedText.includes('xin chào') ||
+      normalizedText.includes('chào miu') ||
+      normalizedText.includes('giúp mình những gì') ||
+      normalizedText === 'bắt đầu' ||
+      normalizedText === 'menu chính' ||
+      normalizedText === 'bắt đầu lại' ||
+      normalizedText === 'reset' ||
+      normalizedText === 'trợ giúp';
+
+    if (isGreetingOrReset) {
+      conversation.current_flow = 'general';
+      conversation.current_step = 'entry';
+      conversation.status = 'collecting';
+      conversation.context_data = {};
+      await conversation.save();
+    } else if (shortcutFlows[normalizedText]) {
       conversation.current_flow = shortcutFlows[normalizedText];
       conversation.current_step = 'entry';
       conversation.status = 'collecting';
       conversation.context_data = {};
       await conversation.save();
-    }
-
-    // Reset command always works directly
-    if (normalizedText === 'menu chính' || normalizedText === 'bắt đầu lại' || normalizedText === 'reset' || normalizedText === 'trợ giúp') {
-      conversation.current_flow = 'general';
+    } else if (
+      normalizedText.includes('mục tiêu dinh dưỡng') ||
+      normalizedText.includes('thiết lập mục tiêu')
+    ) {
+      conversation.current_flow = 'goal';
+      conversation.current_step = 'entry';
+      conversation.status = 'collecting';
+      conversation.context_data = {};
+      await conversation.save();
+    } else if (
+      normalizedText.includes('công thức nấu ăn') ||
+      normalizedText.includes('tìm công thức') ||
+      normalizedText.includes('gợi ý món ăn')
+    ) {
+      conversation.current_flow = 'recipe';
+      conversation.current_step = 'entry';
+      conversation.status = 'collecting';
+      conversation.context_data = {};
+      await conversation.save();
+    } else if (
+      normalizedText.includes('kế hoạch bữa ăn') ||
+      normalizedText.includes('lập thực đơn') ||
+      normalizedText.includes('lên thực đơn')
+    ) {
+      conversation.current_flow = 'meal_plan';
+      conversation.current_step = 'entry';
+      conversation.status = 'collecting';
+      conversation.context_data = {};
+      await conversation.save();
+    } else if (normalizedText.includes('luyện tập') || normalizedText.includes('vận động')) {
+      conversation.current_flow = 'exercise';
+      conversation.current_step = 'entry';
+      conversation.status = 'collecting';
+      conversation.context_data = {};
+      await conversation.save();
+    } else if (normalizedText.includes('hỏi về sức khỏe') || normalizedText.includes('tư vấn sức khỏe')) {
+      conversation.current_flow = 'health';
       conversation.current_step = 'entry';
       conversation.status = 'collecting';
       conversation.context_data = {};
@@ -235,6 +294,12 @@ class ChatWorkflowService {
           conversation.status = 'collecting';
           conversation.context_data = {};
           await conversation.save();
+        } else if (normalizedText.includes('sức khỏe') || normalizedText.includes('health')) {
+          conversation.current_flow = 'health';
+          conversation.current_step = 'entry';
+          conversation.status = 'collecting';
+          conversation.context_data = {};
+          await conversation.save();
         }
       }
     }
@@ -250,10 +315,41 @@ class ChatWorkflowService {
   // WORKFLOW: GENERAL (Default Greeting & Routing)
   // =========================================================================
   async handleGeneralWorkflow(userId, conversation, input, normalizedText, aiResolution = null) {
-    const defaultGreeting =
-      'Xin chào! Mình là AI Assistant - Trợ lý dinh dưỡng và thể chất của bạn. Hôm nay bạn cần hỗ trợ gì nào?';
+    let nameDisplay = '';
+    if (userId) {
+      try {
+        const user = await User.findById(userId).select('full_name').lean();
+        if (user && user.full_name) {
+          nameDisplay = ` ${user.full_name}`;
+        }
+      } catch (err) {}
+    }
+
+    if (normalizedText.includes('trò chuyện chung') || normalizedText === 'trò chuyện') {
+      return {
+        message:
+          'Miu luôn sẵn sàng giải đáp và đồng hành cùng bạn! Bạn có thể hỏi bất cứ điều gì về dinh dưỡng, tính calo thực phẩm, thói quen ăn uống lành mạnh hay tập luyện. Dưới đây là một số chủ đề phổ biến bạn có thể thử hỏi:',
+        ui: {
+          type: 'choice',
+          payload: {
+            title: 'Gợi ý câu hỏi nhanh:',
+            choices: [
+              { label: '💧 Mỗi ngày nên uống bao nhiêu nước?', value: 'Mỗi ngày nên uống bao nhiêu nước?' },
+              { label: '🥗 Làm sao để giảm mỡ bụng an toàn?', value: 'Làm sao để giảm mỡ bụng an toàn?' },
+              { label: '🥩 Những thực phẩm nào giàu protein?', value: 'Những thực phẩm nào giàu protein?' },
+              { label: '📊 Chỉ số BMI và TDEE của mình?', value: 'Tôi muốn hỏi về sức khỏe và dinh dưỡng.' },
+              { label: '🏠 Quay lại danh sách tính năng', value: 'bắt đầu lại' },
+            ],
+          },
+        },
+        state: { flow: 'general', step: 'qa_prompt', status: 'collecting' },
+      };
+    }
+
+    const defaultGreeting = `Chào${nameDisplay}! Mình là Miu, trợ lý dinh dưỡng và sức khoẻ của The Meal. Mình có thể tính mục tiêu calo, lên thực đơn, gợi ý món ăn, theo dõi vận động, hoặc trả lời câu hỏi về dinh dưỡng và chỉ số của bạn. Bạn chọn một việc bên dưới, hoặc cứ hỏi mình bất cứ điều gì nhé.`;
+
     const message =
-      aiResolution && aiResolution.intent === 'general_qa' && aiResolution.natural_response
+      aiResolution && aiResolution.intent === 'general_qa' && aiResolution.natural_response && !normalizedText.includes('xin chào') && !normalizedText.includes('giúp mình những gì')
         ? aiResolution.natural_response
         : defaultGreeting;
 
@@ -262,12 +358,38 @@ class ChatWorkflowService {
       ui: {
         type: 'choice',
         payload: {
-          title: 'Chọn tính năng bạn cần:',
+          title: 'Chọn tác vụ bạn cần:',
           choices: [
-            { label: '🍲 Tìm công thức nấu ăn', value: 'Tìm công thức nấu ăn' },
-            { label: '📅 Lập kế hoạch bữa ăn', value: 'Lập kế hoạch bữa ăn' },
-            { label: '🎯 Thiết lập mục tiêu dinh dưỡng', value: 'Thiết lập mục tiêu dinh dưỡng' },
-            { label: '🏃 Luyện tập & vận động', value: 'Luyện tập & vận động' },
+            {
+              label: '💬 Trò chuyện chung',
+              value: 'Trò chuyện chung',
+              description: 'Trò chuyện, hỏi đáp về dinh dưỡng và sức khỏe',
+              icon: '💬',
+            },
+            {
+              label: '🍲 Tìm công thức',
+              value: 'Tìm công thức nấu ăn',
+              description: 'Tìm món ăn từ nguyên liệu hoặc khám phá món mới',
+              icon: '🍲',
+            },
+            {
+              label: '📅 Lập kế hoạch bữa ăn',
+              value: 'Lập kế hoạch bữa ăn',
+              description: 'Lên thực đơn 1-7 ngày cá nhân hóa theo mục tiêu',
+              icon: '📅',
+            },
+            {
+              label: '🎯 Thiết lập mục tiêu',
+              value: 'Thiết lập mục tiêu dinh dưỡng',
+              description: 'Tính BMR, TDEE, calo thâm hụt/thặng dư và tỷ lệ macro chuẩn',
+              icon: '🎯',
+            },
+            {
+              label: '🏃 Luyện tập & vận động',
+              value: 'Luyện tập & vận động',
+              description: 'Lên lịch bài tập và hướng dẫn vận động khoa học',
+              icon: '🏃',
+            },
           ],
         },
       },
@@ -1054,25 +1176,160 @@ class ChatWorkflowService {
   // WORKFLOW C: GOAL (Extension Point for Quoc)
   // =========================================================================
   async handleGoalWorkflow(userId, conversation, input, normalizedText, aiResolution = null) {
-    return {
-      message:
-        '🎯 [AI Assistant - Thiết lập mục tiêu dinh dưỡng]\n\nPhần giao diện và cấu trúc Goal Workflow đã sẵn sàng kết nối. Đồng đội Quoc sẽ sớm hoàn thiện tính năng tính toán calo thâm hụt (surplus/deficit) và vi chất chi tiết theo spec.',
-      ui: {
-        type: 'choice',
-        payload: {
-          title: 'Bạn có thể chọn quay lại:',
-          choices: [
-            { label: '🏠 Quay lại Menu chính', value: 'menu chính' },
-            { label: '🍲 Tìm công thức nấu ăn', value: 'Tìm công thức nấu ăn' },
-            { label: '📅 Lập kế hoạch bữa ăn', value: 'Lập kế hoạch bữa ăn' },
-          ],
+    const context = conversation.context_data || {};
+    const saveStep = async (step) => {
+      conversation.current_step = step;
+      conversation.status = 'collecting';
+      conversation.context_data = context;
+      conversation.markModified('context_data');
+      await conversation.save();
+    };
+
+    if (conversation.current_step === 'entry') {
+      await saveStep('ask_goal_type');
+      return {
+        message:
+          '🎯 Mình sẽ hỗ trợ bạn thiết lập mục tiêu calo và tỷ lệ dinh dưỡng phù hợp nhất cho cơ thể.\n\nMục tiêu chính hiện tại của bạn là gì?',
+        ui: {
+          type: 'choice',
+          payload: {
+            title: 'Chọn mục tiêu của bạn:',
+            choices: [
+              { label: '🔥 Giảm mỡ / Giảm cân', value: 'goal_lose' },
+              { label: '💪 Tăng cơ / Tăng cân', value: 'goal_gain' },
+              { label: '⚖️ Duy trì cân nặng', value: 'goal_maintain' },
+              { label: '🥗 Cải thiện sức khỏe tổng thể', value: 'goal_health' },
+            ],
+          },
         },
-      },
-      state: {
-        flow: 'goal',
-        step: 'entry',
-        status: 'collecting',
-      },
+        state: { flow: 'goal', step: 'ask_goal_type', status: 'collecting' },
+      };
+    }
+
+    if (conversation.current_step === 'ask_goal_type') {
+      let goalType = 'maintain';
+      let goalLabel = 'Duy trì cân nặng';
+      if (normalizedText.includes('giảm') || normalizedText.includes('lose')) {
+        goalType = 'lose';
+        goalLabel = 'Giảm mỡ / Giảm cân';
+      } else if (normalizedText.includes('tăng') || normalizedText.includes('gain')) {
+        goalType = 'gain';
+        goalLabel = 'Tăng cơ / Tăng cân';
+      } else if (normalizedText.includes('sức khỏe') || normalizedText.includes('health')) {
+        goalType = 'improve';
+        goalLabel = 'Cải thiện sức khỏe';
+      }
+
+      context.goalType = goalType;
+
+      // Tính toán dựa trên hồ sơ người dùng
+      let user = null;
+      try {
+        user = await User.findById(userId).lean();
+      } catch (e) {}
+
+      const height_cm = user?.height_cm || 170;
+      const weight_kg = user?.weight_kg || 65;
+      const gender = user?.gender || 'male';
+      const activity_level = user?.activity_level || 'moderate';
+
+      let bmr = 1600;
+      let tdee = 2200;
+      try {
+        let age = 25;
+        if (user?.date_of_birth) {
+          age = healthService.calculateAge(user.date_of_birth);
+        }
+        bmr = healthService.calculateBMR({ gender, height_cm, weight_kg, age });
+        tdee = healthService.calculateTDEE(bmr, activity_level);
+      } catch (e) {
+        tdee = user?.target_calories || 2000;
+      }
+
+      let targetCal = Math.round(tdee);
+      if (goalType === 'lose') {
+        targetCal = Math.max(1200, Math.round(tdee - 400));
+      } else if (goalType === 'gain') {
+        targetCal = Math.round(tdee + 350);
+      }
+
+      // Macro calculation: 25% Protein, 50% Carbs, 25% Fat
+      const protein_g = Math.round((targetCal * 0.25) / 4);
+      const carbs_g = Math.round((targetCal * 0.5) / 4);
+      const fat_g = Math.round((targetCal * 0.25) / 9);
+
+      context.target_calories = targetCal;
+      context.target_protein_g = protein_g;
+      context.target_carb_g = carbs_g;
+      context.target_fat_g = fat_g;
+
+      await saveStep('confirm_goal');
+
+      return {
+        message:
+          `Mục tiêu bạn chọn: **${goalLabel}**\n\n` +
+          `Dựa trên chỉ số cơ thể của bạn (TDEE ước tính ~${Math.round(tdee)} kcal/ngày), Miu gợi ý mức dinh dưỡng tối ưu:\n` +
+          `• 🎯 **Calo mục tiêu**: ${targetCal} kcal/ngày\n` +
+          `• 🥩 **Chất đạm (Protein)**: ${protein_g}g (~25% calo)\n` +
+          `• 🍚 **Đường bột (Carb)**: ${carbs_g}g (~50% calo)\n` +
+          `• 🥑 **Chất béo (Fat)**: ${fat_g}g (~25% calo)\n\n` +
+          `Bạn có muốn lưu chỉ số mục tiêu này vào hồ sơ cá nhân không?`,
+        ui: {
+          type: 'choice',
+          payload: {
+            title: 'Lựa chọn thao tác:',
+            choices: [
+              { label: '💾 Lưu mục tiêu vào hồ sơ', value: 'save_goal_confirm' },
+              { label: '🔄 Chọn lại mục tiêu khác', value: 'thiết lập mục tiêu dinh dưỡng' },
+              { label: '🏠 Quay lại menu chính', value: 'menu chính' },
+            ],
+          },
+        },
+        state: { flow: 'goal', step: 'confirm_goal', status: 'collecting' },
+      };
+    }
+
+    if (conversation.current_step === 'confirm_goal') {
+      if (normalizedText.includes('lưu') || normalizedText.includes('save') || normalizedText.includes('đồng ý') || normalizedText === 'save_goal_confirm') {
+        try {
+          await User.findByIdAndUpdate(userId, {
+            target_calories: context.target_calories,
+            target_protein_g: context.target_protein_g,
+            target_carb_g: context.target_carb_g,
+            target_fat_g: context.target_fat_g,
+            goal: context.goalType,
+          });
+        } catch (e) {}
+
+        conversation.current_step = 'completed';
+        conversation.status = 'completed';
+        await conversation.save();
+
+        return {
+          message:
+            `Đã lưu thành công mục tiêu **${context.target_calories} kcal/ngày** vào hồ sơ cá nhân của bạn! 🎉\n\n` +
+            `Trang chủ và nhật ký dinh dưỡng đã được đồng bộ với mục tiêu mới này. Bây giờ bạn muốn làm gì tiếp theo?`,
+          ui: {
+            type: 'choice',
+            payload: {
+              title: 'Hành động tiếp theo:',
+              choices: [
+                { label: '📅 Lên thực đơn theo mục tiêu mới', value: 'Lập kế hoạch bữa ăn' },
+                { label: '🍲 Tìm món ăn phù hợp', value: 'Tìm công thức nấu ăn' },
+                { label: '🏃 Xem lịch tập vận động', value: 'Luyện tập & vận động' },
+                { label: '🏠 Quay lại menu chính', value: 'menu chính' },
+              ],
+            },
+          },
+          state: { flow: 'goal', step: 'completed', status: 'completed' },
+        };
+      }
+    }
+
+    return {
+      message: 'Bạn có thể bắt đầu thiết lập mục tiêu mới bất cứ lúc nào.',
+      ui: null,
+      state: { flow: 'goal', step: 'completed', status: 'completed' },
     };
   }
 

@@ -24,7 +24,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ChatbotScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ prompt?: string; autoSend?: string }>();
+  const params = useLocalSearchParams<{ prompt?: string; autoSend?: string; newChat?: string }>();
   const flatListRef = useRef<FlatList>(null);
   const autoSentPromptRef = useRef(false);
   const conversationIdRef = useRef<string | null>(null);
@@ -66,7 +66,20 @@ export default function ChatbotScreen() {
 
   // 1. Khởi tạo và nạp lịch sử hội thoại khi vào màn hình
   useEffect(() => {
-    loadConversation();
+    if (params.newChat === '1') {
+      if (params.autoSend === '1' && typeof params.prompt === 'string' && params.prompt.trim()) {
+        // Cuộc trò chuyện mới tinh: không load lịch sử cũ, gửi thẳng tin nhắn đầu tiên
+        setMessages([]);
+        setConversationId(null);
+        setInitialLoading(false);
+        autoSentPromptRef.current = true;
+        void handleSend({ type: 'text', value: params.prompt.trim() }, null);
+      } else {
+        void handleReset();
+      }
+    } else {
+      loadConversation();
+    }
   }, []);
 
   const loadConversation = async () => {
@@ -99,16 +112,42 @@ export default function ChatbotScreen() {
       id: 'greeting_0',
       role: 'assistant',
       content:
-        'Xin chào! Mình là AI Assistant - Trợ lý dinh dưỡng và thể chất của bạn. Hôm nay bạn cần hỗ trợ gì nào?',
+        'Chào bạn! Mình là Miu, trợ lý dinh dưỡng và sức khoẻ của The Meal. Mình có thể tính mục tiêu calo, lên thực đơn, gợi ý món ăn, theo dõi vận động, hoặc trả lời câu hỏi về dinh dưỡng và chỉ số của bạn. Bạn chọn một việc bên dưới, hoặc cứ hỏi mình bất cứ điều gì nhé.',
       ui: {
         type: 'choice',
         payload: {
-          title: 'Chọn tính năng bạn cần:',
+          title: 'Chọn tác vụ bạn cần:',
           choices: [
-            { label: '🍲 Tìm công thức nấu ăn', value: 'Tìm công thức nấu ăn' },
-            { label: '📅 Lập kế hoạch bữa ăn', value: 'Lập kế hoạch bữa ăn' },
-            { label: '🎯 Thiết lập mục tiêu dinh dưỡng', value: 'Thiết lập mục tiêu dinh dưỡng' },
-            { label: '🏃 Luyện tập & vận động', value: 'Luyện tập & vận động' },
+            {
+              label: '💬 Trò chuyện chung',
+              value: 'Trò chuyện chung',
+              description: 'Trò chuyện, hỏi đáp về dinh dưỡng và sức khỏe',
+              icon: '💬',
+            },
+            {
+              label: '🍲 Tìm công thức',
+              value: 'Tìm công thức nấu ăn',
+              description: 'Tìm món ăn từ nguyên liệu hoặc khám phá món mới',
+              icon: '🍲',
+            },
+            {
+              label: '📅 Lập kế hoạch bữa ăn',
+              value: 'Lập kế hoạch bữa ăn',
+              description: 'Lên thực đơn 1-7 ngày cá nhân hóa theo mục tiêu',
+              icon: '📅',
+            },
+            {
+              label: '🎯 Thiết lập mục tiêu',
+              value: 'Thiết lập mục tiêu dinh dưỡng',
+              description: 'Tính BMR, TDEE, calo thâm hụt/thặng dư và tỷ lệ macro chuẩn',
+              icon: '🎯',
+            },
+            {
+              label: '🏃 Luyện tập & vận động',
+              value: 'Luyện tập & vận động',
+              description: 'Lên lịch bài tập và hướng dẫn vận động khoa học',
+              icon: '🏃',
+            },
           ],
         },
       },
@@ -150,7 +189,7 @@ export default function ChatbotScreen() {
   };
 
   // 2. Gửi tin nhắn
-  const handleSend = async (customInput?: ChatInput) => {
+  const handleSend = async (customInput?: ChatInput, explicitConvId?: string | null) => {
     const inputToSend: ChatInput = customInput || {
       type: 'text',
       value: inputText.trim(),
@@ -189,8 +228,9 @@ export default function ChatbotScreen() {
     setLoading(true);
 
     try {
+      const targetConvId = explicitConvId !== undefined ? explicitConvId : conversationId;
       const res = await chatService.sendMessage({
-        conversation_id: conversationId,
+        conversation_id: targetConvId,
         input: inputToSend,
       });
 
@@ -233,6 +273,7 @@ export default function ChatbotScreen() {
       !initialLoading &&
       conversationId &&
       params.autoSend === '1' &&
+      params.newChat !== '1' &&
       typeof params.prompt === 'string' &&
       params.prompt.trim() &&
       !autoSentPromptRef.current
@@ -240,7 +281,7 @@ export default function ChatbotScreen() {
       autoSentPromptRef.current = true;
       handleSend({ type: 'text', value: params.prompt.trim() });
     }
-  }, [conversationId, initialLoading, params.autoSend, params.prompt]);
+  }, [conversationId, initialLoading, params.autoSend, params.newChat, params.prompt]);
 
   // 3. Xử lý khi user chọn Choice từ Quick Picker
   const handleSelectChoice = (value: any, label: string) => {

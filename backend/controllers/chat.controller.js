@@ -119,20 +119,55 @@ const resetConversation = async (req, res) => {
       context_data: {},
     });
 
+    // Lấy thông tin người dùng để chào hỏi cá nhân hóa
+    let nameDisplay = '';
+    try {
+      const user = await User.findById(userId).select('full_name').lean();
+      if (user && user.full_name) {
+        nameDisplay = ` ${user.full_name}`;
+      }
+    } catch (e) {}
+
     // Tạo tin nhắn chào mừng ban đầu
     const initialAiMsg = await ChatMessage.create({
       conversation_id: newConversation._id,
       sender: 'ai',
       role: 'assistant',
-      content: 'Xin chào! Mình là AI Assistant - Trợ lý dinh dưỡng và thể chất của bạn. Hôm nay bạn cần hỗ trợ gì nào?',
+      content: `Chào${nameDisplay}! Mình là Miu, trợ lý dinh dưỡng và sức khoẻ của The Meal. Mình có thể tính mục tiêu calo, lên thực đơn, gợi ý món ăn, theo dõi vận động, hoặc trả lời câu hỏi về dinh dưỡng và chỉ số của bạn. Bạn chọn một việc bên dưới, hoặc cứ hỏi mình bất cứ điều gì nhé.`,
       ui_type: 'choice',
       ui_payload: {
-        title: 'Chọn tính năng bạn cần:',
+        title: 'Chọn tác vụ bạn cần:',
         choices: [
-          { label: '🍲 Tìm công thức nấu ăn', value: 'Tìm công thức nấu ăn' },
-          { label: '📅 Lập kế hoạch bữa ăn', value: 'Lập kế hoạch bữa ăn' },
-          { label: '🎯 Thiết lập mục tiêu dinh dưỡng', value: 'Thiết lập mục tiêu dinh dưỡng' },
-          { label: '🏃 Luyện tập & vận động', value: 'Luyện tập & vận động' },
+          {
+            label: '💬 Trò chuyện chung',
+            value: 'Trò chuyện chung',
+            description: 'Trò chuyện, hỏi đáp về dinh dưỡng và sức khỏe',
+            icon: '💬',
+          },
+          {
+            label: '🍲 Tìm công thức',
+            value: 'Tìm công thức nấu ăn',
+            description: 'Tìm món ăn từ nguyên liệu hoặc khám phá món mới',
+            icon: '🍲',
+          },
+          {
+            label: '📅 Lập kế hoạch bữa ăn',
+            value: 'Lập kế hoạch bữa ăn',
+            description: 'Lên thực đơn 1-7 ngày cá nhân hóa theo mục tiêu',
+            icon: '📅',
+          },
+          {
+            label: '🎯 Thiết lập mục tiêu',
+            value: 'Thiết lập mục tiêu dinh dưỡng',
+            description: 'Tính BMR, TDEE, calo thâm hụt/thặng dư và tỷ lệ macro chuẩn',
+            icon: '🎯',
+          },
+          {
+            label: '🏃 Luyện tập & vận động',
+            value: 'Luyện tập & vận động',
+            description: 'Lên lịch bài tập và hướng dẫn vận động khoa học',
+            icon: '🏃',
+          },
         ],
       },
       created_at: new Date(),

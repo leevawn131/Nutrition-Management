@@ -37,6 +37,8 @@ export default function RootLayout() {
         <Stack.Screen name="habit-analysis" options={{ headerShown: false }} />
         <Stack.Screen name="sample-plans" options={{ headerShown: false }} />
         <Stack.Screen name="sample-plan-detail" options={{ headerShown: false }} />
+        <Stack.Screen name="assistant" options={{ headerShown: false }} />
+        <Stack.Screen name="chatbot" options={{ headerShown: false }} />
         <Stack.Screen name="plan" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
       </Stack>
