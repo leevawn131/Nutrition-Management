@@ -92,7 +92,7 @@ export const AIConfirmationModal: React.FC<AIConfirmationModalProps> = ({
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#059669" />
-              <Text style={styles.loadingTitle}>Miu miu đang phân tích bữa ăn...</Text>
+              <Text style={styles.loadingTitle}>AI Assistant đang phân tích bữa ăn...</Text>
               <Text style={styles.loadingSubtitle}>Đang nhận diện hình ảnh & tính toán dinh dưỡng ✨</Text>
             </View>
           ) : (

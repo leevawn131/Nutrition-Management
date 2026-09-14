@@ -112,6 +112,12 @@ export function QuickActionsModal({ visible, onClose, onOpenMealScan }: QuickAct
       return;
     }
 
+    if (item.id === 'assistant') {
+      onClose();
+      router.push('/chatbot');
+      return;
+    }
+
     Alert.alert(item.title, 'Tính năng đang được hoàn thiện và sẽ sớm ra mắt trong các bản cập nhật tới!');
   };
 
