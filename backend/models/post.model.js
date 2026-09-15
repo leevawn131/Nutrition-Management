@@ -1,20 +1,30 @@
 const mongoose = require('mongoose');
 
+const postImageSchema = new mongoose.Schema(
+  {
+    image_url: {
+      type: String,
+      required: [true, 'image_url là bắt buộc'],
+    },
+    display_order: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { _id: false }
+);
+
 const postSchema = new mongoose.Schema(
   {
-    author: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      required: [true, 'user_id là bắt buộc'],
     },
     content: {
       type: String,
-      required: [true, 'Content is required'],
-      maxlength: 5000,
+      default: '',
+      trim: true,
     },
     recipe_id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -26,28 +36,24 @@ const postSchema = new mongoose.Schema(
       enum: ['visible', 'hidden', 'pending'],
       default: 'visible',
     },
-    images: [{ type: String }],
-    tags: [{ type: String }],
-    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],
+    images: {
+      type: [postImageSchema],
+      default: [],
+    },
+    created_at: {
+      type: Date,
+      default: Date.now,
+    },
   },
   {
-    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
+    timestamps: false,
     collection: 'posts',
   }
 );
 
-// Tự động đồng bộ author và user_id
-postSchema.pre('save', function (next) {
-  if (this.author && !this.user_id) {
-    this.user_id = this.author;
-  } else if (this.user_id && !this.author) {
-    this.author = this.user_id;
-  }
-  next();
-});
-
-postSchema.index({ author: 1, created_at: -1 });
+postSchema.index({ user_id: 1, created_at: -1 });
 postSchema.index({ status: 1 });
 
-module.exports = mongoose.model('Post', postSchema);
+const Post = mongoose.model('Post', postSchema);
+
+module.exports = Post;

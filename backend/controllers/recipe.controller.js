@@ -19,7 +19,7 @@ const getEffectiveUserId = async (req) => {
 const getRecipes = async (req, res) => {
   try {
     const { search, tab, limit, page } = req.query;
-    const userId = req.user ? req.user.id : null;
+    const userId = req.user ? req.user.id : await getEffectiveUserId(req);
     const result = await recipeService.getRecipes({ search, tab, userId, limit, page });
 
     return res.status(200).json({

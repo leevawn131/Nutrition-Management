@@ -104,6 +104,11 @@ class RecipeService {
 
     const query = { status: 'approved' };
 
+    if ((tab === 'my_recipes' || tab === 'mine') && userId) {
+      query.created_by_user_id = userId;
+      delete query.status;
+    }
+
     if (tab === 'collections' && userId) {
       const collections = await UserCollection.find({ user_id: userId }).lean();
       const recipeIds = [];
@@ -130,6 +135,7 @@ class RecipeService {
 
     const skip = (Math.max(1, parseInt(page, 10)) - 1) * Math.max(1, parseInt(limit, 10));
     const items = await Recipe.find(query)
+      .populate('created_by_user_id', 'full_name email avatar_url')
       .sort({ created_at: -1 })
       .skip(skip)
       .limit(parseInt(limit, 10) || 50)
@@ -152,7 +158,14 @@ class RecipeService {
   }
 
   async getRecipeById(id) {
-    const recipe = await Recipe.findById(id).lean();
+    let recipe;
+    try {
+      recipe = await Recipe.findById(id)
+        .populate('created_by_user_id', 'full_name email avatar_url')
+        .lean();
+    } catch (e) {
+      recipe = await Recipe.findById(id).lean();
+    }
     if (!recipe) return null;
 
     try {

@@ -20,34 +20,62 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { recipeService } from '@/services/recipe.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { userService } from '@/services/user.service';
+import { postService } from '@/services/post.service';
 import { User } from '@/types/auth.types';
 import { Recipe } from '@/types/plan.types';
+import { PostItem } from '@/types/post.types';
+import { CreatePostModal } from '@/components/community/CreatePostModal';
+import { PostCard } from '@/components/community/PostCard';
+import { PostDetailModal } from '@/components/community/PostDetailModal';
+import { ReportPostModal } from '@/components/community/ReportPostModal';
 
 export default function ProfileScreen() {
   const router = useRouter();
 
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'posts' | 'recipes' | 'collections' | 'activities'>('collections');
+  const [activeTab, setActiveTab] = useState<'posts' | 'recipes' | 'collections' | 'activities'>('posts');
   const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
+  const [myRecipes, setMyRecipes] = useState<Recipe[]>([]);
+  const [myPosts, setMyPosts] = useState<PostItem[]>([]);
   const [loadingCollections, setLoadingCollections] = useState(false);
+  const [loadingMyRecipes, setLoadingMyRecipes] = useState(false);
+  const [loadingPosts, setLoadingPosts] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showCreatePostModal, setShowCreatePostModal] = useState(false);
+  const [selectedDetailPost, setSelectedDetailPost] = useState<PostItem | null>(null);
+  const [selectedReportPost, setSelectedReportPost] = useState<PostItem | null>(null);
+
+  const loadMyPosts = useCallback(async (userId?: string) => {
+    setLoadingPosts(true);
+    try {
+      const posts = await postService.getMyPosts(userId);
+      setMyPosts(posts || []);
+    } catch (error) {
+      console.warn('Error loading my posts in profile:', error);
+    } finally {
+      setLoadingPosts(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     async function loadProfile() {
       const cached = await getCachedUser();
       if (cached) {
         setUser(cached);
+        loadMyPosts(cached._id);
       }
       const token = await getAuthToken();
       if (token) {
         const freshUser = await userService.getProfile(token);
         if (freshUser) {
           setUser(freshUser);
+          loadMyPosts(freshUser._id);
         }
       }
     }
     loadProfile();
-  }, []);
+  }, [loadMyPosts]);
 
   const loadSavedRecipes = useCallback(async () => {
     setLoadingCollections(true);
@@ -62,15 +90,62 @@ export default function ProfileScreen() {
     }
   }, []);
 
+  const loadMyRecipes = useCallback(async () => {
+    setLoadingMyRecipes(true);
+    try {
+      const list = await recipeService.getMyRecipes();
+      setMyRecipes(list || []);
+    } catch (error) {
+      console.warn('Error loading my recipes in profile:', error);
+    } finally {
+      setLoadingMyRecipes(false);
+      setRefreshing(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadSavedRecipes();
-    }, [loadSavedRecipes])
+      loadMyRecipes();
+      loadMyPosts(user?._id);
+    }, [loadSavedRecipes, loadMyRecipes, loadMyPosts, user?._id])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
     loadSavedRecipes();
+    loadMyRecipes();
+    loadMyPosts(user?._id);
+  };
+
+  const handleToggleLike = async (postId: string) => {
+    try {
+      const result = await postService.toggleLike(postId);
+      setMyPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, is_liked: result.is_liked, like_count: result.like_count }
+            : p
+        )
+      );
+      if (selectedDetailPost && selectedDetailPost.id === postId) {
+        setSelectedDetailPost((prev) =>
+          prev ? { ...prev, is_liked: result.is_liked, like_count: result.like_count } : null
+        );
+      }
+    } catch (err) {
+      console.log('Lỗi thích bài viết:', err);
+    }
+  };
+
+  const handleConfirmReport = async (post: PostItem) => {
+    try {
+      await postService.reportPost(post.id);
+      Alert.alert('Thành công', 'Đã báo cáo bài viết. Bài viết sẽ được tạm ẩn để duyệt.');
+      setMyPosts((prev) => prev.filter((p) => p.id !== post.id));
+    } catch (err: any) {
+      Alert.alert('Lỗi', err.message || 'Không thể báo cáo bài viết');
+    }
   };
 
   const handleBack = () => {
@@ -103,18 +178,7 @@ export default function ProfileScreen() {
   };
 
   const handleOpenRecipeDetail = (item: Recipe) => {
-    router.push({
-      pathname: '/recipe-detail' as any,
-      params: {
-        id: item._id,
-        title: item.title,
-        imageUrl: item.image_url || undefined,
-        calories: item.calories_per_serving ? String(item.calories_per_serving) : undefined,
-        protein: item.protein_g ? String(item.protein_g) : undefined,
-        carb: item.carb_g ? String(item.carb_g) : undefined,
-        fat: item.fat_g ? String(item.fat_g) : undefined,
-      },
-    });
+    router.push(`/recipe/${item._id || (item as any).id}` as any);
   };
 
   const handleRemoveSaved = async (recipe: Recipe) => {
@@ -248,8 +312,18 @@ export default function ProfileScreen() {
         <View style={styles.tabsRow}>
           <TouchableOpacity
             style={[styles.tabItem, activeTab === 'posts' && styles.tabItemActive]}
-            onPress={() => setActiveTab('posts')}>
-            <Text style={[styles.tabText, activeTab === 'posts' && styles.tabTextActive]}>Bài viết</Text>
+            onPress={() => {
+              setActiveTab('posts');
+              loadMyPosts(user?._id);
+            }}>
+            <View style={styles.tabWithBadge}>
+              <Text style={[styles.tabText, activeTab === 'posts' && styles.tabTextActive]}>Bài viết</Text>
+              {myPosts.length > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>{myPosts.length}</Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -378,40 +452,160 @@ export default function ProfileScreen() {
         {/* TAB B: CÔNG THỨC (RECIPES) */}
         {activeTab === 'recipes' && (
           <View style={styles.tabContentContainer}>
-            <View style={styles.emptyStateContainer}>
-              <View style={styles.cookingPotWrapper}>
-                <MaterialCommunityIcons name="chef-hat" size={64} color="#94A3B8" />
+            {loadingMyRecipes ? (
+              <View style={styles.centerLoading}>
+                <ActivityIndicator size="large" color="#10B981" />
+                <Text style={styles.loadingSubText}>Đang tải công thức của bạn...</Text>
               </View>
-              <Text style={styles.emptyStateHeading}>Công thức của bạn</Text>
-              <Text style={styles.emptyStateText}>
-                Bạn chưa chia sẻ công thức nấu ăn nào. Hãy tạo công thức đầu tiên để chia sẻ với cộng đồng!
-              </Text>
-              <TouchableOpacity
-                style={styles.actionGreenBtn}
-                onPress={() => router.push('/recipes')}
-                activeOpacity={0.88}>
-                <Text style={styles.actionGreenBtnText}>Khám phá công thức mẫu</Text>
-              </TouchableOpacity>
-            </View>
+            ) : myRecipes.length > 0 ? (
+              <View>
+                <View style={styles.collectionHeaderRow}>
+                  <View style={styles.collectionTitleWrap}>
+                    <Text style={styles.collectionTitle}>
+                      Công thức của bạn ({myRecipes.length})
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.exploreMoreBtn}
+                    onPress={() => router.push('/recipe/create' as any)}>
+                    <Ionicons name="add" size={16} color="#10B981" />
+                    <Text style={styles.exploreMoreBtnText}>Tạo mới</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.savedGrid}>
+                  {myRecipes.map((item) => {
+                    const cookTime =
+                      (item.prep_time_minutes || 0) + (item.cook_time_minutes || 0) || 25;
+                    const calories = item.calories_per_serving || 350;
+
+                    return (
+                      <TouchableOpacity
+                        key={item._id}
+                        style={styles.savedCard}
+                        onPress={() => handleOpenRecipeDetail(item)}
+                        activeOpacity={0.88}>
+                        <View style={styles.savedImageWrapper}>
+                          <Image
+                            source={{
+                              uri:
+                                item.image_url ||
+                                'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80',
+                            }}
+                            style={styles.savedImage}
+                            resizeMode="cover"
+                          />
+                          <View style={[styles.savedBookmarkBtn, { backgroundColor: '#10B981' }]}>
+                            <MaterialCommunityIcons name="chef-hat" size={16} color="#FFFFFF" />
+                          </View>
+                        </View>
+
+                        <View style={styles.savedCardBody}>
+                          <Text style={styles.savedCardTitle} numberOfLines={2}>
+                            {item.title}
+                          </Text>
+
+                          <View style={styles.savedMetaRow}>
+                            <View style={styles.savedMetaItem}>
+                              <Ionicons name="time-outline" size={13} color="#64748B" />
+                              <Text style={styles.savedMetaText}>{cookTime}p</Text>
+                            </View>
+                            <Text style={styles.savedMetaDot}>•</Text>
+                            <View style={styles.savedMetaItem}>
+                              <MaterialCommunityIcons name="fire" size={14} color="#EF4444" />
+                              <Text style={styles.savedMetaText}>{Math.round(calories)} kcal</Text>
+                            </View>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <View style={styles.cookingPotWrapper}>
+                  <MaterialCommunityIcons name="chef-hat" size={64} color="#10B981" />
+                </View>
+                <Text style={styles.emptyStateHeading}>Công thức của bạn</Text>
+                <Text style={styles.emptyStateText}>
+                  Bạn chưa chia sẻ công thức nấu ăn nào. Hãy tạo công thức đầu tiên để chia sẻ với cộng đồng!
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                  <TouchableOpacity
+                    style={styles.actionGreenBtn}
+                    onPress={() => router.push('/recipe/create' as any)}
+                    activeOpacity={0.88}>
+                    <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.actionGreenBtnText}>Tạo công thức mới</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.actionGreenBtn, { backgroundColor: '#F1F5F9' }]}
+                    onPress={() => router.push('/recipes')}
+                    activeOpacity={0.88}>
+                    <Text style={[styles.actionGreenBtnText, { color: '#334155' }]}>Khám phá món mẫu</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
         )}
 
         {/* TAB C: BÀI VIẾT (POSTS) */}
         {activeTab === 'posts' && (
           <View style={styles.tabContentContainer}>
-            <View style={styles.emptyStateContainer}>
-              <View style={styles.cookingPotWrapper}>
-                <MaterialCommunityIcons name="pot-steam-outline" size={72} color="#94A3B8" />
+            {loadingPosts ? (
+              <View style={styles.centerLoading}>
+                <ActivityIndicator size="large" color="#10B981" />
+                <Text style={styles.loadingSubText}>Đang tải bài viết của bạn...</Text>
               </View>
-              <Text style={styles.emptyStateHeading}>Chưa có bài viết nào</Text>
-              <Text style={styles.emptyStateText}>Bạn chưa có hoạt động nào trên trang cá nhân</Text>
-              <TouchableOpacity
-                style={styles.actionGreenBtn}
-                onPress={() => handlePlaceholderAction('Tạo bài viết đầu tiên')}
-                activeOpacity={0.88}>
-                <Text style={styles.actionGreenBtnText}>Tạo bài viết đầu tiên</Text>
-              </TouchableOpacity>
-            </View>
+            ) : myPosts.length > 0 ? (
+              <View>
+                <View style={styles.collectionHeaderRow}>
+                  <View style={styles.collectionTitleWrap}>
+                    <Text style={styles.collectionTitle}>
+                      Bài viết của bạn ({myPosts.length})
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.exploreMoreBtn}
+                    onPress={() => setShowCreatePostModal(true)}>
+                    <Ionicons name="add" size={16} color="#10B981" />
+                    <Text style={styles.exploreMoreBtnText}>Đăng bài</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ gap: 12 }}>
+                  {myPosts.map((item) => (
+                    <PostCard
+                      key={item.id || item._id}
+                      post={item}
+                      onLikeToggle={handleToggleLike}
+                      onOpenComment={(p) => setSelectedDetailPost(p)}
+                      onOpenReport={(p) => setSelectedReportPost(p)}
+                      onPressPost={(p) => setSelectedDetailPost(p)}
+                      onPressRecipe={(recId) => router.push(`/recipe/${recId}` as any)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <View style={styles.cookingPotWrapper}>
+                  <MaterialCommunityIcons name="pot-steam-outline" size={72} color="#94A3B8" />
+                </View>
+                <Text style={styles.emptyStateHeading}>Chưa có bài viết nào</Text>
+                <Text style={styles.emptyStateText}>Bạn chưa có hoạt động nào trên trang cá nhân</Text>
+                <TouchableOpacity
+                  style={styles.actionGreenBtn}
+                  onPress={() => setShowCreatePostModal(true)}
+                  activeOpacity={0.88}>
+                  <Ionicons name="create-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.actionGreenBtnText}>Tạo bài viết đầu tiên</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
 
@@ -439,14 +633,14 @@ export default function ProfileScreen() {
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.cameraBtn}
-          onPress={() => handlePlaceholderAction('Chụp ảnh')}
+          onPress={() => setShowCreatePostModal(true)}
           activeOpacity={0.8}>
           <Ionicons name="camera" size={20} color="#FFFFFF" />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.inputPill}
-          onPress={() => handlePlaceholderAction('Đăng bài viết')}
+          onPress={() => setShowCreatePostModal(true)}
           activeOpacity={0.9}>
           <TextInput
             placeholder="Bạn đang nghĩ gì?"
@@ -457,6 +651,38 @@ export default function ProfileScreen() {
           />
         </TouchableOpacity>
       </View>
+
+      {/* MODAL TẠO BÀI VIẾT */}
+      <CreatePostModal
+        visible={showCreatePostModal}
+        onClose={() => setShowCreatePostModal(false)}
+        onPostCreated={() => {
+          loadMyPosts(user?._id);
+        }}
+        userName={user?.full_name || 'Người dùng'}
+        userAvatar={user?.avatar_url || undefined}
+      />
+
+      {/* MODAL CHI TIẾT BÀI VIẾT */}
+      <PostDetailModal
+        visible={Boolean(selectedDetailPost)}
+        post={selectedDetailPost}
+        onClose={() => setSelectedDetailPost(null)}
+        onLikeToggle={handleToggleLike}
+        onPressRecipe={(recId) => router.push(`/recipe/${recId}` as any)}
+        onReportPost={(p) => {
+          setSelectedDetailPost(null);
+          setSelectedReportPost(p);
+        }}
+      />
+
+      {/* MODAL BÁO CÁO BÀI VIẾT */}
+      <ReportPostModal
+        visible={Boolean(selectedReportPost)}
+        post={selectedReportPost}
+        onClose={() => setSelectedReportPost(null)}
+        onConfirmReport={handleConfirmReport}
+      />
     </SafeAreaView>
   );
 }

@@ -95,6 +95,7 @@ export default function RecipeDetailScreen() {
   useEffect(() => {
     fetchRecipeData();
     getAuthToken().then(setUserAuthToken);
+    recipeService.isRecipeSaved(recipeId).then(setIsSaved);
     if ((params as any).mode === 'cooking') {
       setCookingModeVisible(true);
     }
@@ -104,9 +105,18 @@ export default function RecipeDetailScreen() {
     setIsLoading(true);
     try {
       const response = await recipeService.getRecipeById(recipeId);
-      if (response && response.data) {
-        setRecipe(response.data);
-        setServings(response.data.servings || 1);
+      const recipeData = response?.data || response?.recipe || response;
+      if (recipeData && (recipeData._id || recipeData.id || recipeData.title)) {
+        const normalized: Recipe = {
+          ...recipeData,
+          _id: recipeData._id || recipeData.id || recipeId,
+          title: recipeData.title || 'Công thức món ăn',
+          ingredients: Array.isArray(recipeData.ingredients) ? recipeData.ingredients : [],
+          steps: Array.isArray(recipeData.steps) ? recipeData.steps : [],
+          servings: recipeData.servings || 1,
+        };
+        setRecipe(normalized);
+        setServings(normalized.servings || 1);
         if ((params as any).mode === 'cooking') {
           setCookingModeVisible(true);
         }
@@ -195,19 +205,27 @@ export default function RecipeDetailScreen() {
     }
   };
 
-  const toggleBookmark = () => {
-    setIsSaved(!isSaved);
-    if (Platform.OS !== 'web') {
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
+  const toggleBookmark = async () => {
+    if (!recipe) return;
+    try {
+      const res = await recipeService.toggleSaveRecipe(recipe);
+      setIsSaved(res.isSaved);
+      if (Platform.OS !== 'web') {
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {}
+      }
+      const msg = res.isSaved
+        ? 'Món ăn đã được lưu vào bộ sưu tập cá nhân! 🔖'
+        : 'Món ăn đã được xóa khỏi bộ sưu tập của bạn.';
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert(res.isSaved ? 'Đã lưu món ăn' : 'Đã bỏ lưu', msg);
+      }
+    } catch (err: any) {
+      console.error('Error toggling bookmark:', err);
     }
-    Alert.alert(
-      isSaved ? 'Đã bỏ lưu' : 'Đã lưu món ăn 🔖',
-      isSaved
-        ? 'Món ăn đã được xóa khỏi bộ sưu tập của bạn.'
-        : 'Món ăn đã được lưu vào bộ sưu tập cá nhân!'
-    );
   };
 
   if (isLoading) {
@@ -360,10 +378,15 @@ export default function RecipeDetailScreen() {
               <Text style={styles.starText}>
                 ⭐ {recipe.avg_rating || recipe.rating || 5.0} ({recipe.comment_count || recipe.reviews?.length || recipe.rating_count || 0})
               </Text>
-              <View style={styles.savedBadge}>
-                <Ionicons name="bookmark-outline" size={14} color="#2563EB" />
-                <Text style={styles.savedCountText}>({recipe.saved_count || 0})</Text>
-              </View>
+              <TouchableOpacity
+                style={styles.savedBadge}
+                onPress={toggleBookmark}
+                activeOpacity={0.8}>
+                <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={14} color={isSaved ? '#10B981' : '#2563EB'} />
+                <Text style={[styles.savedCountText, isSaved && { color: '#10B981', fontWeight: '700' }]}>
+                  {isSaved ? 'Đã lưu' : `(${recipe.saved_count || 0})`}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
