@@ -43,6 +43,7 @@ export default function ExploreScreen() {
   const [recipeFilter, setRecipeFilter] = useState<'all' | 'mine' | 'saved'>('all');
   const [myRecipesList, setMyRecipesList] = useState<any[]>([]);
   const [savedRecipesList, setSavedRecipesList] = useState<any[]>([]);
+  const [storyRecipes, setStoryRecipes] = useState<any[]>([]);
 
   // Loading & Refreshing states
   const [isLoading, setIsLoading] = useState(false);
@@ -54,6 +55,17 @@ export default function ExploreScreen() {
   const [selectedReportPost, setSelectedReportPost] = useState<PostItem | null>(null);
 
   const searchTimeoutRef = useRef<any>(null);
+
+  const loadStoryRecipes = useCallback(async () => {
+    try {
+      const recipes = await recipeService.getRecipes({ limit: 12 });
+      if (Array.isArray(recipes) && recipes.length > 0) {
+        setStoryRecipes(recipes);
+      }
+    } catch (e) {
+      console.warn('Lỗi tải danh sách story recipes:', e);
+    }
+  }, []);
 
   const loadSavedRecipes = useCallback(async () => {
     try {
@@ -82,7 +94,8 @@ export default function ExploreScreen() {
   useEffect(() => {
     loadSavedRecipes();
     loadMyRecipes();
-  }, [loadSavedRecipes, loadMyRecipes]);
+    loadStoryRecipes();
+  }, [loadSavedRecipes, loadMyRecipes, loadStoryRecipes]);
 
   const handleToggleBookmark = async (recipe: any) => {
     try {
@@ -188,6 +201,7 @@ export default function ExploreScreen() {
     executeSearch(searchQuery, activeTab);
     loadSavedRecipes();
     loadMyRecipes();
+    loadStoryRecipes();
   };
 
   const handleToggleLike = async (postId: string) => {
@@ -453,50 +467,34 @@ export default function ExploreScreen() {
                 <Text style={styles.addStoryText}>Chia sẻ công thức của bạn</Text>
               </TouchableOpacity>
 
-              {/* Sample Story Cards */}
-              {[
-                {
-                  id: '6aa80a61f502627b5985d963',
-                  name: 'anni',
-                  title: 'Gà sốt mật ...',
-                  img: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=400',
-                },
-                {
-                  id: '6aa80a61f502627b5985d965',
-                  name: 'hoa ly',
-                  title: 'Sữa dừa thạ...',
-                  img: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400',
-                },
-                {
-                  id: '6aa80a61f502627b5985d95b',
-                  name: 'Minh Đỗ',
-                  title: 'Thịt rim...',
-                  img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400',
-                },
-                {
-                  id: '6aa810bfa86661d83b07082b',
-                  name: 'Sáng Hoàng',
-                  title: 'Bò xào ớt chuông',
-                  img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400',
-                },
-                {
-                  id: '6aa811d1a86661d83b07082e',
-                  name: 'sanghoang2005',
-                  title: 'sang',
-                  img: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400',
-                },
-              ].map((story, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={styles.storyCard}
-                  activeOpacity={0.88}
-                  onPress={() => router.push(`/recipe/${story.id}` as any)}
-                >
-                  <Image source={{ uri: story.img }} style={styles.storyImage} />
-                  <Text style={styles.storyAuthorName}>{story.name}</Text>
-                  <Text style={styles.storyTitle} numberOfLines={1}>{story.title}</Text>
-                </TouchableOpacity>
-              ))}
+              {/* Dynamic Story Cards */}
+              {storyRecipes.map((story, i) => {
+                const authorName =
+                  typeof story.created_by_user_id === 'object' && story.created_by_user_id?.full_name
+                    ? story.created_by_user_id.full_name
+                    : (typeof story.created_by_user_id === 'object' && story.created_by_user_id?.email
+                        ? story.created_by_user_id.email.split('@')[0]
+                        : 'Cộng đồng');
+
+                const recipeImg =
+                  story.image_url ||
+                  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400';
+
+                const recipeId = String(story._id || story.id);
+
+                return (
+                  <TouchableOpacity
+                    key={recipeId || i}
+                    style={styles.storyCard}
+                    activeOpacity={0.88}
+                    onPress={() => router.push(`/recipe/${recipeId}` as any)}
+                  >
+                    <Image source={{ uri: recipeImg }} style={styles.storyImage} />
+                    <Text style={styles.storyAuthorName} numberOfLines={1}>{authorName}</Text>
+                    <Text style={styles.storyTitle} numberOfLines={1}>{story.title}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
 
             {/* Create Post Input Trigger Box */}
@@ -560,7 +558,10 @@ export default function ExploreScreen() {
       <CreatePostModal
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onPostCreated={() => executeSearch(searchQuery, activeTab)}
+        onPostCreated={() => {
+          executeSearch(searchQuery, activeTab);
+          loadStoryRecipes();
+        }}
       />
 
       <PostDetailModal

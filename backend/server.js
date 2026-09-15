@@ -54,6 +54,7 @@ const leaderboardRoutes = require('./routes/leaderboard.routes');
 const achievementRoutes = require('./routes/achievement.routes');
 const socialUserRoutes = require('./routes/social_user.routes');
 const chatRoutes = require('./routes/chat.routes');
+const searchRoutes = require('./routes/search.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -75,6 +76,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/social-users', socialUserRoutes);
+app.use('/api/search', searchRoutes);
 
 // Routes quản trị viên (Admin)
 const adminUserRoutes = require('./routes/admin/user.admin.routes');
