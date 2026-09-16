@@ -21,6 +21,7 @@ import { recipeService } from '@/services/recipe.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { userService } from '@/services/user.service';
 import { postService } from '@/services/post.service';
+import { gamificationService } from '@/services/gamification.service';
 import { User } from '@/types/auth.types';
 import { Recipe } from '@/types/plan.types';
 import { PostItem } from '@/types/post.types';
@@ -58,6 +59,8 @@ export default function ProfileScreen() {
     }
   }, []);
 
+  const [gamificationData, setGamificationData] = useState<{ points: number; badgesCount: number } | null>(null);
+
   useEffect(() => {
     async function loadProfile() {
       const cached = await getCachedUser();
@@ -73,6 +76,15 @@ export default function ProfileScreen() {
           loadMyPosts(freshUser._id);
         }
       }
+      try {
+        const gData = await gamificationService.getOverview();
+        if (gData) {
+          setGamificationData({
+            points: gData.points,
+            badgesCount: (gData.badges || []).filter((b: any) => b.unlocked).length || (gData.badges || []).length,
+          });
+        }
+      } catch {}
     }
     loadProfile();
   }, [loadMyPosts]);
@@ -273,7 +285,7 @@ export default function ProfileScreen() {
         {/* 3. JOURNEY / BADGES CARD */}
         <TouchableOpacity
           style={styles.journeyCard}
-          onPress={() => handlePlaceholderAction('Hành trình của bạn')}
+          onPress={() => router.push('/journey' as any)}
           activeOpacity={0.88}>
           <View style={styles.journeyHeader}>
             <View>
@@ -290,7 +302,9 @@ export default function ProfileScreen() {
                 <FontAwesome6 name="medal" size={16} color="#D97706" />
               </View>
               <View>
-                <Text style={styles.journeyStatNumber}>0</Text>
+                <Text style={styles.journeyStatNumber}>
+                  {gamificationData?.points ?? (user?.points ?? 110)}
+                </Text>
                 <Text style={styles.journeyStatLabel}>Điểm</Text>
               </View>
             </View>
@@ -301,7 +315,9 @@ export default function ProfileScreen() {
                 <Ionicons name="ribbon" size={18} color="#059669" />
               </View>
               <View>
-                <Text style={styles.journeyStatNumber}>0</Text>
+                <Text style={styles.journeyStatNumber}>
+                  {gamificationData?.badgesCount ?? (user?.achievements?.length ?? 3)}
+                </Text>
                 <Text style={styles.journeyStatLabel}>Huy hiệu</Text>
               </View>
             </View>

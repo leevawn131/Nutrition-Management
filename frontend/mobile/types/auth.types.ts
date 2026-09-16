@@ -18,6 +18,15 @@ export interface User {
     preference_type: 'diet_type' | 'allergy' | 'favorite' | 'dislike';
     value: string;
   }[];
+  points?: number;
+  rank?: string;
+  achievements?: string[];
+  friends?: string[];
+  streak?: {
+    current_streak?: number;
+    longest_streak?: number;
+    last_success_date?: string | null;
+  };
   created_at?: string;
   updated_at?: string;
 }

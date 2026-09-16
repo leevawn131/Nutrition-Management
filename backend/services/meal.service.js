@@ -185,6 +185,15 @@ class MealService {
 
     await mealLog.save();
 
+    // Trigger Gamification: Tự động cập nhật chuỗi và cộng 10 điểm thưởng
+    try {
+      const gamificationService = require('./gamification.service');
+      await gamificationService.updateStreak(userId);
+      await gamificationService.awardPoints(userId, 10, 'Ghi nhận bữa ăn');
+    } catch (e) {
+      console.warn('Gamification meal log trigger error:', e.message);
+    }
+
     // If recognition_id is linked, update recognition_history record
     if (recognition_summary && recognition_summary.recognition_id) {
       await RecognitionHistory.findByIdAndUpdate(recognition_summary.recognition_id, {

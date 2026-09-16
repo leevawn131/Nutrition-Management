@@ -149,7 +149,7 @@ export default function TabLayout() {
       });
 
       setNutritionResultVisible(false);
-      Alert.alert('Thành công 🎉', `Đã lưu bữa ăn "${data.food_name}" (${data.calories} kcal) vào nhật ký!`);
+      Alert.alert('Thành công 🎉', `Đã lưu bữa ăn "${data.food_name}" (${data.calories} kcal) vào nhật ký! Bạn nhận được +10 điểm thưởng ⭐`);
     } catch (error: any) {
       Alert.alert('Lỗi lưu bữa ăn', error.message || 'Không thể lưu bữa ăn vào nhật ký.');
     }
@@ -188,7 +188,7 @@ export default function TabLayout() {
       });
 
       setManualLogVisible(false);
-      const successMsg = `Đã lưu bữa ăn tự nấu (${data.totalCalories} kcal) vào nhật ký thành công!`;
+      const successMsg = `Đã lưu bữa ăn tự nấu (${data.totalCalories} kcal) vào nhật ký thành công! Bạn nhận được +10 điểm thưởng ⭐`;
       if (Platform.OS === 'web') {
         window.alert(`Thành công 🎉\n${successMsg}`);
       } else {

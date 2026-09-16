@@ -182,6 +182,15 @@ class MealPlanService {
         logged_at: plan.plan_date,
         created_at: new Date(),
       });
+
+      // Trigger Gamification: Tự động cập nhật chuỗi và cộng 10 điểm thưởng
+      try {
+        const gamificationService = require('./gamification.service');
+        await gamificationService.updateStreak(userId);
+        await gamificationService.awardPoints(userId, 10, 'Ghi nhận bữa ăn theo kế hoạch');
+      } catch (e) {
+        console.warn('Gamification meal plan trigger error:', e.message);
+      }
     }
 
     const populated = await MealPlan.findById(plan._id)

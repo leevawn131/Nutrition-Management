@@ -55,6 +55,7 @@ const achievementRoutes = require('./routes/achievement.routes');
 const socialUserRoutes = require('./routes/social_user.routes');
 const chatRoutes = require('./routes/chat.routes');
 const searchRoutes = require('./routes/search.routes');
+const gamificationRoutes = require('./routes/gamification.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -77,6 +78,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/social-users', socialUserRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/gamification', gamificationRoutes);
 
 // Routes quản trị viên (Admin)
 const adminUserRoutes = require('./routes/admin/user.admin.routes');
@@ -92,6 +94,15 @@ app.use('/api/admin/recipes', adminRecipeRoutes);
 app.use('/api/admin/meal-plan-templates', adminMealPlanTemplateRoutes);
 app.use('/api/admin/reports', adminReportRoutes);
 app.use('/api/admin/unidentified-foods', adminUnidentifiedFoodRoutes);
+
+// Middleware xử lý lỗi tập trung trả về JSON
+app.use((err, req, res, next) => {
+  console.error('[Error Handler]', err.message);
+  res.status(err.status || 400).json({
+    success: false,
+    message: err.message || 'Đã có lỗi xảy ra trên hệ thống',
+  });
+});
 
 // Lắng nghe cổng (cho phép cả điện thoại kết nối qua IP Wi-Fi)
 app.listen(PORT, '0.0.0.0', () => {

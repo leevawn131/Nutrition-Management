@@ -155,6 +155,15 @@ class PostService {
     });
 
     await newPost.save();
+
+    // Trigger Gamification: Tự động cộng 15 điểm cho bài viết cộng đồng
+    try {
+      const gamificationService = require('./gamification.service');
+      gamificationService.awardPoints(userId, 15, 'Chia sẻ bài viết cộng đồng').catch((e) => console.warn('Gamification post award error:', e.message));
+    } catch (e) {
+      console.warn('Gamification trigger error:', e.message);
+    }
+
     return this.getPostById({ postId: newPost._id, userId });
   }
 

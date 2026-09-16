@@ -109,6 +109,16 @@ class MealLogService {
     });
 
     const populated = await MealLog.findById(newLog._id).populate('food_item_id').lean();
+
+    // Trigger Gamification: Tự động cập nhật chuỗi và cộng 10 điểm thưởng
+    try {
+      const gamificationService = require('./gamification.service');
+      await gamificationService.updateStreak(userId);
+      await gamificationService.awardPoints(userId, 10, 'Ghi nhận bữa ăn');
+    } catch (e) {
+      console.warn('Gamification trigger error:', e.message);
+    }
+
     return populated;
   }
 

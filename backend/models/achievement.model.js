@@ -15,10 +15,35 @@ const achievementSchema = new mongoose.Schema(
       type: String,
       default: '🏆',
     },
+    tier: {
+      type: String,
+      enum: ['Đồng', 'Bạc', 'Vàng', 'Bạch Kim', 'Kim Cương'],
+      default: 'Đồng',
+    },
+    category: {
+      type: String,
+      enum: ['Khám phá', 'Ghi chép', 'Thói quen', 'Nấu nướng', 'Cộng đồng', 'Sức khoẻ'],
+      default: 'Khám phá',
+    },
+    reward_points: {
+      type: Number,
+      default: 50,
+    },
     condition: {
       type: {
         type: String,
-        enum: ['points', 'posts', 'comments', 'likes_received', 'streak', 'friends'],
+        enum: [
+          'points',
+          'posts',
+          'comments',
+          'likes_received',
+          'streak',
+          'friends',
+          'meal_logs',
+          'distinct_meal_days',
+          'recipes',
+          'unlocked_badges',
+        ],
         required: true,
       },
       threshold: {
@@ -34,3 +59,4 @@ const achievementSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model('Achievement', achievementSchema);
+
