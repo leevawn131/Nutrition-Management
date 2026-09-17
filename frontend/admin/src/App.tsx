@@ -8,6 +8,8 @@ import { Dashboard } from './pages/Dashboard';
 import { Users } from './pages/Users';
 import { Foods } from './pages/Foods';
 import { MealPlans } from './pages/MealPlans';
+import { Activities } from './pages/Activities';
+import { Achievements } from './pages/Achievements';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 
@@ -27,6 +29,8 @@ export const App: React.FC = () => {
               <Route path="/users" element={<Users />} />
               <Route path="/foods" element={<Foods />} />
               <Route path="/meal-plans" element={<MealPlans />} />
+              <Route path="/activities" element={<Activities />} />
+              <Route path="/achievements" element={<Achievements />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />
             </Route>

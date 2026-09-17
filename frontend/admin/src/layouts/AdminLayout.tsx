@@ -11,6 +11,8 @@ import {
   LogOut,
   ShieldCheck,
   Activity,
+  Dumbbell,
+  Trophy,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -18,6 +20,8 @@ const NAV_ITEMS = [
   { path: '/users', label: 'Người dùng', icon: Users },
   { path: '/foods', label: 'Món ăn & Dinh dưỡng', icon: UtensilsCrossed },
   { path: '/meal-plans', label: 'Kế hoạch mẫu', icon: CalendarCheck },
+  { path: '/activities', label: 'Hoạt động thể chất', icon: Dumbbell },
+  { path: '/achievements', label: 'Danh hiệu & Huy hiệu', icon: Trophy },
   { path: '/reports', label: 'Báo cáo & Thống kê', icon: BarChart3 },
   { path: '/settings', label: 'Cài đặt hệ thống', icon: Settings },
 ];
