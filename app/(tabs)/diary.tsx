@@ -7,16 +7,23 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import { mealService } from '@/services/meal.service';
 import { getAuthToken } from '@/services/storage.service';
+import { EditMealLogModal } from '@/components/meal/EditMealLogModal';
+import { ShareMealModal } from '@/components/meal/ShareMealModal';
 
 export default function DiaryScreen() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const [selectedMealForEdit, setSelectedMealForEdit] = useState<any | null>(null);
+  const [selectedMealForShare, setSelectedMealForShare] = useState<any | null>(null);
 
   const fetchMealLogs = useCallback(async () => {
     try {
@@ -62,6 +69,30 @@ export default function DiaryScreen() {
   const totalCarb = logs.reduce((sum, item) => sum + (item.carb_g || 0), 0);
   const totalFat = logs.reduce((sum, item) => sum + (item.fat_g || 0), 0);
 
+  const handleDeleteMeal = (mealId: string) => {
+    const confirmAction = async () => {
+      try {
+        const token = await getAuthToken();
+        if (!token) return;
+        await mealService.deleteMealLog(token, mealId);
+        fetchMealLogs();
+      } catch (err) {
+        console.error('Lỗi khi xóa bữa ăn:', err);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Bạn có chắc chắn muốn xóa bữa ăn này không?')) {
+        confirmAction();
+      }
+    } else {
+      Alert.alert('Xác nhận xóa', 'Bạn có chắc chắn muốn xóa bữa ăn này khỏi nhật ký?', [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Xóa', style: 'destructive', onPress: confirmAction },
+      ]);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
@@ -102,32 +133,91 @@ export default function DiaryScreen() {
             </Text>
           </View>
         ) : (
-          logs.map((log) => (
-            <View key={log._id} style={styles.mealCard}>
-              <View style={styles.mealCardHeader}>
-                <Text style={styles.mealTypeTitle}>{getMealTypeLabel(log.meal_type)}</Text>
-                <Text style={styles.mealCalories}>{Math.round(log.calories)} kcal</Text>
+          logs.map((log) => {
+            const foodDisplayName =
+              log.food_item_id?.name ||
+              log.description_text ||
+              log.recognition_summary?.corrected_label ||
+              'Bữa ăn đã ghi';
+
+            return (
+              <View key={log._id} style={styles.mealCard}>
+                <View style={styles.mealCardHeader}>
+                  <Text style={styles.mealTypeTitle}>{getMealTypeLabel(log.meal_type)}</Text>
+                  <Text style={styles.mealCalories}>{Math.round(log.calories)} kcal</Text>
+                </View>
+
+                <Text style={styles.foodName}>{foodDisplayName}</Text>
+
+                {log.portion_grams ? (
+                  <Text style={styles.portionText}>Khẩu phần: {log.portion_grams}g</Text>
+                ) : null}
+
+                <View style={styles.mealMacroRow}>
+                  <Text style={styles.mealMacroText}>Đạm: {log.protein_g || 0}g</Text>
+                  <Text style={styles.mealMacroText}>•</Text>
+                  <Text style={styles.mealMacroText}>Đường: {log.carb_g || 0}g</Text>
+                  <Text style={styles.mealMacroText}>•</Text>
+                  <Text style={styles.mealMacroText}>Chất béo: {log.fat_g || 0}g</Text>
+                </View>
+
+                {/* Meal Action Buttons */}
+                <View style={styles.cardActionRow}>
+                  <TouchableOpacity
+                    style={styles.actionBtnSecondary}
+                    onPress={() =>
+                      setSelectedMealForEdit({
+                        ...log,
+                        foodName: foodDisplayName,
+                      })
+                    }
+                  >
+                    <Ionicons name="create-outline" size={15} color="#059669" style={{ marginRight: 4 }} />
+                    <Text style={styles.actionBtnSecondaryText}>Sửa định lượng</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.actionBtnShare}
+                    onPress={() =>
+                      setSelectedMealForShare({
+                        ...log,
+                        foodName: foodDisplayName,
+                      })
+                    }
+                  >
+                    <Ionicons name="share-social-outline" size={15} color="#2563EB" style={{ marginRight: 4 }} />
+                    <Text style={styles.actionBtnShareText}>Chia sẻ MXH</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.actionBtnDelete}
+                    onPress={() => handleDeleteMeal(log._id)}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
               </View>
-
-              <Text style={styles.foodName}>
-                {log.food_item_id?.name || log.description_text || log.recognition_summary?.corrected_label || 'Bữa ăn đã ghi'}
-              </Text>
-
-              {log.portion_grams ? (
-                <Text style={styles.portionText}>Khấu phần: {log.portion_grams}g</Text>
-              ) : null}
-
-              <View style={styles.mealMacroRow}>
-                <Text style={styles.mealMacroText}>Đạm: {log.protein_g || 0}g</Text>
-                <Text style={styles.mealMacroText}>•</Text>
-                <Text style={styles.mealMacroText}>Đường: {log.carb_g || 0}g</Text>
-                <Text style={styles.mealMacroText}>•</Text>
-                <Text style={styles.mealMacroText}>Chất béo: {log.fat_g || 0}g</Text>
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
+
+      {/* Edit Meal Log Modal */}
+      <EditMealLogModal
+        visible={!!selectedMealForEdit}
+        meal={selectedMealForEdit}
+        onClose={() => setSelectedMealForEdit(null)}
+        onSaveSuccess={() => {
+          fetchMealLogs();
+        }}
+      />
+
+      {/* Share Meal to Social Feed Modal */}
+      <ShareMealModal
+        visible={!!selectedMealForShare}
+        meal={selectedMealForShare}
+        onClose={() => setSelectedMealForShare(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -272,5 +362,56 @@ const styles = StyleSheet.create({
   mealMacroText: {
     fontSize: 12,
     color: '#64748B',
+  },
+  cardActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    gap: 8,
+  },
+  actionBtnSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  actionBtnSecondaryText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  actionBtnShare: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 8,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  actionBtnShareText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  actionBtnDelete: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
 });

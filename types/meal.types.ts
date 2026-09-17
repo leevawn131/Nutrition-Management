@@ -1,9 +1,10 @@
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
-export type InputMethod = 'photo' | 'gallery' | 'text' | 'manual';
+export type InputMethod = 'photo' | 'gallery' | 'text' | 'manual' | 'voice';
 
 export interface AIRecognitionResult {
   recognition_id?: string;
+  transcription?: string;
   food_name: string;
   estimated_weight_g: number;
   estimated_eaten_weight_g?: number;

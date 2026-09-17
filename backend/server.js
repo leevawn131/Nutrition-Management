@@ -31,6 +31,7 @@ const foodRoutes = require('./routes/food.routes');
 const mealRoutes = require('./routes/meal.routes');
 const recipeRoutes = require('./routes/recipe.routes');
 const groceryRoutes = require('./routes/grocery.routes');
+const postRoutes = require('./routes/post.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -40,6 +41,7 @@ app.use('/api/foods', foodRoutes);
 app.use('/api/meals', mealRoutes);
 app.use('/api/recipes', recipeRoutes);
 app.use('/api/grocery', groceryRoutes);
+app.use('/api/posts', postRoutes);
 
 
 // Lắng nghe cổng (cho phép cả điện thoại kết nối qua IP Wi-Fi)

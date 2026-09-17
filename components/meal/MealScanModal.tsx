@@ -17,8 +17,10 @@ interface MealScanModalProps {
   visible: boolean;
   onClose: () => void;
   onImageSelected: (imageUri: string, mimeType: string) => void;
+  onImagesSelected?: (images: Array<{ uri: string; mimeType: string }>) => void;
   onTextDescriptionSelected: (description: string) => void;
   onManualCookingSelected: () => void;
+  onVoiceSelected?: () => void;
   onViewGuide?: () => void;
 }
 
@@ -26,8 +28,10 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
   visible,
   onClose,
   onImageSelected,
+  onImagesSelected,
   onTextDescriptionSelected,
   onManualCookingSelected,
+  onVoiceSelected,
   onViewGuide,
 }) => {
   const [showTextInput, setShowTextInput] = useState(false);
@@ -50,11 +54,15 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const asset = result.assets[0];
       onClose();
-      onImageSelected(asset.uri, asset.mimeType || 'image/jpeg');
+      if (onImagesSelected) {
+        onImagesSelected([{ uri: asset.uri, mimeType: asset.mimeType || 'image/jpeg' }]);
+      } else {
+        onImageSelected(asset.uri, asset.mimeType || 'image/jpeg');
+      }
     }
   };
 
-  // Handle Gallery picker
+  // Handle Gallery picker (supports multiple image selection up to 5)
   const handleChooseFromLibrary = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -64,14 +72,23 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
+      allowsMultipleSelection: true,
+      selectionLimit: 5,
       quality: 0.8,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      const asset = result.assets[0];
       onClose();
-      onImageSelected(asset.uri, asset.mimeType || 'image/jpeg');
+      const selectedPhotos = result.assets.map((a) => ({
+        uri: a.uri,
+        mimeType: a.mimeType || 'image/jpeg',
+      }));
+
+      if (onImagesSelected) {
+        onImagesSelected(selectedPhotos);
+      } else {
+        onImageSelected(selectedPhotos[0].uri, selectedPhotos[0].mimeType);
+      }
     }
   };
 
@@ -132,6 +149,19 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
                   <Text style={[styles.optionText, { color: '#D97706', fontWeight: '600' }]}>Chọn từ thư viện</Text>
                 </TouchableOpacity>
 
+                <TouchableOpacity
+                  style={styles.optionRow}
+                  onPress={() => {
+                    onClose();
+                    if (onVoiceSelected) onVoiceSelected();
+                  }}
+                >
+                  <Ionicons name="mic-outline" size={22} color="#10B981" style={styles.optionIcon} />
+                  <Text style={[styles.optionText, { color: '#10B981', fontWeight: '700' }]}>
+                    Ghi âm giọng nói (AI Voice 🎙️)
+                  </Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity style={styles.optionRow} onPress={() => setShowTextInput(true)}>
                   <Ionicons name="sparkles-outline" size={22} color="#2563EB" style={styles.optionIcon} />
                   <Text style={[styles.optionText, { color: '#2563EB', fontWeight: '600' }]}>Mô tả bữa ăn</Text>
@@ -171,6 +201,18 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
                 onChangeText={setTextInput}
                 autoFocus
               />
+
+              <TouchableOpacity
+                style={styles.voiceSwitchBtn}
+                onPress={() => {
+                  setShowTextInput(false);
+                  onClose();
+                  if (onVoiceSelected) onVoiceSelected();
+                }}
+              >
+                <Ionicons name="mic" size={16} color="#059669" />
+                <Text style={styles.voiceSwitchText}>Hoặc nói bằng giọng nói</Text>
+              </TouchableOpacity>
 
               <View style={styles.textInputActions}>
                 <TouchableOpacity
@@ -309,5 +351,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  voiceSwitchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    alignSelf: 'center',
+    marginBottom: 16,
+    gap: 6,
+  },
+  voiceSwitchText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#059669',
   },
 });

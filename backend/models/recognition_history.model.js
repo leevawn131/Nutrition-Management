@@ -14,7 +14,7 @@ const recognitionHistorySchema = new mongoose.Schema(
     },
     source_type: {
       type: String,
-      enum: ['image', 'text', 'manual', 'recipe'],
+      enum: ['image', 'text', 'manual', 'recipe', 'voice'],
       default: 'image',
     },
     raw_input: {

@@ -12,9 +12,9 @@ class MealService {
    * @param {string} params.mimeType
    * @param {string} [params.descriptionText]
    */
-  async analyzeMealImage({ userId, imageBuffer, mimeType, descriptionText }) {
+  async analyzeMealImage({ userId, imageBuffer, mimeType = 'image/jpeg', descriptionText }) {
     // 1. Call Gemini AI Service
-    const aiResult = await geminiService.analyzeFoodImage(imageBuffer, mimeType);
+    const aiResult = await geminiService.analyzeFoodImage(imageBuffer, mimeType, descriptionText);
 
     // 2. Save entry to recognition_history
     const historyDoc = new RecognitionHistory({
@@ -102,6 +102,63 @@ class MealService {
       has_bones: aiResult.has_bones,
       sugar_level: aiResult.sugar_level,
       default_ice_pct: aiResult.default_ice_pct,
+      ingredients: aiResult.ingredients || [],
+      toppings: aiResult.toppings || [],
+      alternatives: aiResult.alternatives || [],
+    };
+  }
+
+  /**
+   * Transcribe voice recording audio to Vietnamese text
+   */
+  async transcribeVoice({ audioBuffer, mimeType }) {
+    return await geminiService.transcribeAudio(audioBuffer, mimeType);
+  }
+
+  /**
+   * Analyze food voice recording or transcript
+   */
+  async analyzeMealVoice({ userId, audioBuffer, mimeType, transcriptText }) {
+    const aiResult = await geminiService.analyzeFoodVoice(audioBuffer, mimeType, transcriptText);
+
+    const historyDoc = new RecognitionHistory({
+      user_id: userId,
+      source_type: 'voice',
+      raw_input: aiResult.transcription || transcriptText || 'Ghi âm bữa ăn',
+      predicted_label: aiResult.food_name,
+      confidence: aiResult.confidence,
+      ai_model: 'gemini-1.5-flash',
+      raw_response: aiResult.raw_response,
+      created_at: new Date(),
+    });
+
+    await historyDoc.save();
+
+    return {
+      recognition_id: historyDoc._id,
+      transcription: aiResult.transcription || transcriptText || '',
+      food_name: aiResult.food_name,
+      estimated_weight_g: aiResult.estimated_weight_g,
+      estimated_eaten_weight_g: aiResult.estimated_eaten_weight_g,
+      consumption_pct: aiResult.consumption_pct,
+      container_size: aiResult.container_size,
+      calories: aiResult.calories,
+      protein_g: aiResult.protein_g,
+      carb_g: aiResult.carb_g,
+      fat_g: aiResult.fat_g,
+      glycemic_load: aiResult.glycemic_load,
+      confidence: aiResult.confidence,
+      image_quality: aiResult.image_quality,
+      quality_warning: aiResult.quality_warning,
+      nutrition_source: 'voice_ai',
+      quantity_uncertain: aiResult.quantity_uncertain,
+      hidden_base_food: aiResult.hidden_base_food,
+      fried_food: aiResult.fried_food,
+      is_beverage: aiResult.is_beverage,
+      has_bones: aiResult.has_bones,
+      sugar_level: aiResult.sugar_level,
+      default_ice_pct: aiResult.default_ice_pct,
+      dishes: aiResult.dishes || [],
       ingredients: aiResult.ingredients || [],
       toppings: aiResult.toppings || [],
       alternatives: aiResult.alternatives || [],
@@ -257,6 +314,50 @@ class MealService {
       .lean();
 
     return logs;
+  }
+
+  /**
+   * Cập nhật thông tin định lượng và dinh dưỡng bữa ăn sau khi đã ghi nhận
+   */
+  async updateMealLog(userId, mealId, updateData) {
+    const meal = await MealLog.findOne({ _id: mealId, user_id: userId });
+    if (!meal) {
+      throw new Error('Không tìm thấy bữa ăn hoặc bạn không có quyền chỉnh sửa');
+    }
+
+    const {
+      portion_grams,
+      calories,
+      protein_g,
+      carb_g,
+      fat_g,
+      meal_type,
+      logged_at,
+      description_text,
+    } = updateData;
+
+    if (portion_grams !== undefined) meal.portion_grams = Number(portion_grams);
+    if (calories !== undefined) meal.calories = Number(calories);
+    if (protein_g !== undefined) meal.protein_g = Number(protein_g);
+    if (carb_g !== undefined) meal.carb_g = Number(carb_g);
+    if (fat_g !== undefined) meal.fat_g = Number(fat_g);
+    if (meal_type) meal.meal_type = meal_type;
+    if (logged_at) meal.logged_at = new Date(logged_at);
+    if (description_text !== undefined) meal.description_text = description_text;
+
+    await meal.save();
+    return await MealLog.findById(meal._id).populate('food_item_id').lean();
+  }
+
+  /**
+   * Xóa bữa ăn
+   */
+  async deleteMealLog(userId, mealId) {
+    const result = await MealLog.findOneAndDelete({ _id: mealId, user_id: userId });
+    if (!result) {
+      throw new Error('Không tìm thấy bữa ăn hoặc bạn không có quyền xóa');
+    }
+    return result;
   }
 }
 

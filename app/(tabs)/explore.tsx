@@ -1,112 +1,339 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { postService } from '@/services/post.service';
+import { getAuthToken } from '@/services/storage.service';
+import { Post } from '@/types/post.types';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+export default function ExploreScreen() {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [likedPostIds, setLikedPostIds] = useState<string[]>([]);
 
-export default function TabTwoScreen() {
+  const fetchPosts = useCallback(async () => {
+    try {
+      const token = await getAuthToken();
+      const res = await postService.getPosts(token || undefined, 1, 30);
+      setPosts(res.data || []);
+    } catch (error) {
+      console.error('Lỗi tải bảng tin cộng đồng:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchPosts();
+  };
+
+  const toggleLike = (postId: string) => {
+    setLikedPostIds((prev) =>
+      prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId]
+    );
+  };
+
+  const formatPostTime = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffMins < 1) return 'Vừa xong';
+      if (diffMins < 60) return `${diffMins} phút trước`;
+      if (diffHours < 24) return `${diffHours} giờ trước`;
+      if (diffDays < 7) return `${diffDays} ngày trước`;
+      return date.toLocaleDateString('vi-VN');
+    } catch {
+      return 'Vừa xong';
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.safeArea}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTitleRow}>
+          <Ionicons name="people" size={24} color="#059669" style={{ marginRight: 8 }} />
+          <Text style={styles.headerTitle}>Cộng đồng Dinh dưỡng</Text>
+        </View>
+        <TouchableOpacity style={styles.headerIconBtn} onPress={onRefresh}>
+          <Ionicons name="reload" size={20} color="#64748B" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#059669" />}
+      >
+        {loading ? (
+          <ActivityIndicator size="large" color="#059669" style={{ marginTop: 40 }} />
+        ) : posts.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="chatbubbles-outline" size={44} color="#059669" />
+            </View>
+            <Text style={styles.emptyTitle}>Chưa có bài viết nào</Text>
+            <Text style={styles.emptySubtitle}>
+              Hãy là người đầu tiên chia sẻ bữa ăn dinh dưỡng của bạn lên cộng đồng!
+            </Text>
+          </View>
+        ) : (
+          posts.map((post) => {
+            const author = typeof post.user_id === 'object' ? post.user_id : null;
+            const authorName = author?.full_name || 'Thành viên dinh dưỡng';
+            const avatarUrl = author?.avatar_url;
+            const isLiked = likedPostIds.includes(post._id);
+
+            return (
+              <View key={post._id} style={styles.postCard}>
+                {/* Author Info */}
+                <View style={styles.authorRow}>
+                  {avatarUrl ? (
+                    <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Text style={styles.avatarInitial}>
+                        {authorName.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.authorInfo}>
+                    <Text style={styles.authorName}>{authorName}</Text>
+                    <Text style={styles.postTime}>{formatPostTime(post.created_at)}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.postMenuBtn}>
+                    <Ionicons name="ellipsis-horizontal" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Content */}
+                {post.content ? (
+                  <Text style={styles.postContent}>{post.content}</Text>
+                ) : null}
+
+                {/* Attached Image (if meal photo shared) */}
+                {post.images && post.images.length > 0 && post.images[0].image_url ? (
+                  <View style={styles.postImageContainer}>
+                    <Image
+                      source={{ uri: post.images[0].image_url }}
+                      style={styles.postImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                ) : null}
+
+                {/* Post Footer / Actions */}
+                <View style={styles.actionRow}>
+                  <TouchableOpacity
+                    style={styles.actionBtn}
+                    onPress={() => toggleLike(post._id)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={isLiked ? 'heart' : 'heart-outline'}
+                      size={20}
+                      color={isLiked ? '#EF4444' : '#64748B'}
+                    />
+                    <Text style={[styles.actionBtnText, isLiked && { color: '#EF4444', fontWeight: '700' }]}>
+                      {isLiked ? 'Đã thích' : 'Thích'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
+                    <Ionicons name="chatbubble-outline" size={18} color="#64748B" />
+                    <Text style={styles.actionBtnText}>Bình luận</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
+                    <Ionicons name="share-social-outline" size={18} color="#64748B" />
+                    <Text style={styles.actionBtnText}>Chia sẻ</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  titleContainer: {
+  header: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  headerIconBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 40,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    marginTop: 80,
+  },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  postCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+  },
+  authorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    marginRight: 10,
+  },
+  avatarPlaceholder: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  avatarInitial: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  authorInfo: {
+    flex: 1,
+  },
+  authorName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  postTime: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  postMenuBtn: {
+    padding: 4,
+  },
+  postContent: {
+    fontSize: 14,
+    color: '#334155',
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  postImageContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  postImage: {
+    width: '100%',
+    height: 220,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 10,
+    marginTop: 4,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    gap: 6,
+  },
+  actionBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
   },
 });
