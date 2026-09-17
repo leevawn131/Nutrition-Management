@@ -2,17 +2,17 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Modal,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -902,8 +902,8 @@ function MealPlan({
           style={styles.exploreButton}
           onPress={() => router.push('/sample-plans' as any)}
           activeOpacity={0.8}>
-          <MaterialCommunityIcons name="auto-fix" size={18} color="#FFFFFF" />
-          <Text style={styles.exploreText}>Khám phá thực đơn mẫu</Text>
+          <MaterialCommunityIcons name="compass-outline" size={18} color="#ffffffff" />
+          <Text style={styles.exploreText}>Thực đơn mẫu</Text>
         </TouchableOpacity>
       </View>
 
@@ -1474,8 +1474,8 @@ const styles = StyleSheet.create({
   scoreSegment: { flex: 1, height: 8, backgroundColor: '#E0E4E8', borderRadius: 3 },
   scoreFilled: { backgroundColor: '#EF5555' },
   planHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
-  exploreButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#49C99B', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 10 },
-  exploreText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  exploreButton: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#39ce97ff', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9 },
+  exploreText: { color: '#ffffffff', fontSize: 13, fontWeight: '700' },
   weekDaysStrip: {
     flexDirection: 'row',
     backgroundColor: '#F8FAFC',

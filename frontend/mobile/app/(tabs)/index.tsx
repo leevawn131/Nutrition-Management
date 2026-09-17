@@ -1,9 +1,10 @@
 import { FontAwesome6, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   Platform,
   RefreshControl,
   ScrollView,
@@ -11,7 +12,6 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -19,10 +19,10 @@ import { GroceryBagModal } from '@/components/home/grocery-bag-modal';
 import { QuickActionsModal } from '@/components/home/quick-actions-modal';
 import { AppLogo } from '@/components/ui/app-logo';
 import { groceryService } from '@/services/grocery.service';
+import { mealService } from '@/services/meal.service';
 import { mealLogService } from '@/services/meal_log.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { HealthMetrics, userService } from '@/services/user.service';
-import { mealService } from '@/services/meal.service';
 import { User } from '@/types/auth.types';
 import { DailySummary } from '@/types/meal_log.types';
 
@@ -406,7 +406,7 @@ export default function HomeScreen() {
           {/* Card 1: Glycemic Load (GL) */}
           <View style={styles.infoCard}>
             <View style={styles.infoCardHeader}>
-              <Text style={styles.infoCardTitle}>Tải đường huyết</Text>
+              <Text style={styles.infoCardTitle}>Đường huyết</Text>
               <Ionicons name="information-circle-outline" size={16} color="#94A3B8" />
               <View style={styles.badgePill}>
                 <Text style={styles.badgePillText}>Thấp</Text>
