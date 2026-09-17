@@ -15,9 +15,175 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { AIRecognitionResult, MealType, DishItem } from '@/types/meal.types';
+import { AIRecognitionResult, MealType, DishItem, DishIngredient, MicronutrientInfo } from '@/types/meal.types';
 import { foodService } from '@/services/food.service';
 import { FoodItem } from '@/types/food.types';
+
+export const calculateIngredientMicronutrients = (ingName: string, portionG: number): MicronutrientInfo => {
+  const nameLower = (ingName || '').toLowerCase();
+  const ratio = portionG / 100;
+
+  let baseFiber = 1.2;
+  let baseSodium = 350;
+  let basePotassium = 220;
+  let baseCalcium = 25;
+  let baseIron = 1.2;
+  let baseVitA = 40;
+  let baseVitC = 8;
+  let baseVitD = 0.2;
+  let baseZinc = 0.8;
+
+  if (
+    nameLower.includes('rau') ||
+    nameLower.includes('củ') ||
+    nameLower.includes('canh') ||
+    nameLower.includes('xào') ||
+    nameLower.includes('salad') ||
+    nameLower.includes('nộm') ||
+    nameLower.includes('cải') ||
+    nameLower.includes('cà rốt') ||
+    nameLower.includes('cà chua')
+  ) {
+    baseFiber = 2.8;
+    baseVitC = 25;
+    baseVitA = 180;
+    basePotassium = 320;
+    baseCalcium = 45;
+  }
+
+  if (
+    nameLower.includes('thịt') ||
+    nameLower.includes('bò') ||
+    nameLower.includes('lợn') ||
+    nameLower.includes('gà') ||
+    nameLower.includes('sườn') ||
+    nameLower.includes('heo')
+  ) {
+    baseIron = 2.5;
+    baseZinc = 3.2;
+    basePotassium = 280;
+    baseSodium = 420;
+    baseVitD = 0.4;
+  }
+
+  if (
+    nameLower.includes('cá') ||
+    nameLower.includes('tôm') ||
+    nameLower.includes('hải sản') ||
+    nameLower.includes('mực') ||
+    nameLower.includes('cua') ||
+    nameLower.includes('ngao') ||
+    nameLower.includes('sò')
+  ) {
+    baseVitD = 2.5;
+    baseCalcium = 65;
+    baseZinc = 2.1;
+    baseSodium = 480;
+    baseVitA = 60;
+  }
+
+  if (nameLower.includes('trứng') || nameLower.includes('opla')) {
+    baseVitA = 140;
+    baseVitD = 1.8;
+    baseCalcium = 50;
+    baseIron = 1.8;
+  }
+
+  if (nameLower.includes('nấm')) {
+    baseVitD = 3.5;
+    basePotassium = 350;
+    baseFiber = 2.2;
+  }
+
+  return {
+    fiber_g: Number((baseFiber * ratio).toFixed(1)),
+    sodium_mg: Math.round(baseSodium * ratio),
+    potassium_mg: Math.round(basePotassium * ratio),
+    calcium_mg: Math.round(baseCalcium * ratio),
+    iron_mg: Number((baseIron * ratio).toFixed(1)),
+    vitamin_a_mcg: Math.round(baseVitA * ratio),
+    vitamin_c_mg: Math.round(baseVitC * ratio),
+    vitamin_d_mcg: Number((baseVitD * ratio).toFixed(1)),
+    zinc_mg: Number((baseZinc * ratio).toFixed(1)),
+  };
+};
+
+export const calculateDishMicronutrients = (
+  dish: DishItem,
+  scale: number = 1.0,
+  dIdx?: number,
+  excludedIngKeys: string[] = []
+) => {
+  let fiberG = 0;
+  let sodiumMg = 0;
+  let potassiumMg = 0;
+  let calciumMg = 0;
+  let ironMg = 0;
+  let vitAMcg = 0;
+  let vitCMg = 0;
+  let vitDMcg = 0;
+  let zincMg = 0;
+
+  const activeIngs = (dish.ingredients || []).filter((_, iIdx) => {
+    if (dIdx !== undefined) {
+      return !excludedIngKeys.includes(`${dIdx}_${iIdx}`);
+    }
+    return true;
+  });
+
+  if (activeIngs.length > 0) {
+    activeIngs.forEach(ing => {
+      const ingPortion = (ing.portion_g || ing.estimated_weight_g || 50) * scale;
+      if (ing.micronutrients) {
+        const ratio = ingPortion / (ing.portion_g || 50);
+        fiberG += (ing.micronutrients.fiber_g || 0) * ratio;
+        sodiumMg += (ing.micronutrients.sodium_mg || 0) * ratio;
+        potassiumMg += (ing.micronutrients.potassium_mg || 0) * ratio;
+        calciumMg += (ing.micronutrients.calcium_mg || 0) * ratio;
+        ironMg += (ing.micronutrients.iron_mg || 0) * ratio;
+        vitAMcg += (ing.micronutrients.vitamin_a_mcg || 0) * ratio;
+        vitCMg += (ing.micronutrients.vitamin_c_mg || 0) * ratio;
+        vitDMcg += (ing.micronutrients.vitamin_d_mcg || 0) * ratio;
+        zincMg += (ing.micronutrients.zinc_mg || 0) * ratio;
+      } else {
+        const ingMicro = calculateIngredientMicronutrients(ing.name, ingPortion);
+        fiberG += ingMicro.fiber_g || 0;
+        sodiumMg += ingMicro.sodium_mg || 0;
+        potassiumMg += ingMicro.potassium_mg || 0;
+        calciumMg += ingMicro.calcium_mg || 0;
+        ironMg += ingMicro.iron_mg || 0;
+        vitAMcg += ingMicro.vitamin_a_mcg || 0;
+        vitCMg += ingMicro.vitamin_c_mg || 0;
+        vitDMcg += ingMicro.vitamin_d_mcg || 0;
+        zincMg += ingMicro.zinc_mg || 0;
+      }
+    });
+  } else {
+    const dishPortion = (dish.estimated_weight_g || 150) * scale;
+    const dishMicro = calculateIngredientMicronutrients(dish.name, dishPortion);
+    fiberG = dishMicro.fiber_g || 0;
+    sodiumMg = dishMicro.sodium_mg || 0;
+    potassiumMg = dishMicro.potassium_mg || 0;
+    calciumMg = dishMicro.calcium_mg || 0;
+    ironMg = dishMicro.iron_mg || 0;
+    vitAMcg = dishMicro.vitamin_a_mcg || 0;
+    vitCMg = dishMicro.vitamin_c_mg || 0;
+    vitDMcg = dishMicro.vitamin_d_mcg || 0;
+    zincMg = dishMicro.zinc_mg || 0;
+  }
+
+  return {
+    fiberG: Number(fiberG.toFixed(1)),
+    sodiumMg: Math.round(sodiumMg),
+    potassiumMg: Math.round(potassiumMg),
+    calciumMg: Math.round(calciumMg),
+    ironMg: Number(ironMg.toFixed(1)),
+    vitAMcg: Math.round(vitAMcg),
+    vitCMg: Math.round(vitCMg),
+    vitDMcg: Number(vitDMcg.toFixed(1)),
+    zincMg: Number(zincMg.toFixed(1)),
+  };
+};
 
 interface NutritionAnalysisResultModalProps {
   visible: boolean;
@@ -62,11 +228,18 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
   // Full ingredients list modal & inline expansion state
   const [showFullIngredientsModal, setShowFullIngredientsModal] = useState<boolean>(false);
   const [expandedIngKeys, setExpandedIngKeys] = useState<string[]>([]);
+  const [expandedDishMicroIndexes, setExpandedDishMicroIndexes] = useState<number[]>([]);
 
   const toggleExpandIngName = (dIdx: number, iIdx: number) => {
     const key = `${dIdx}_${iIdx}`;
     setExpandedIngKeys(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  const toggleExpandDishMicro = (dIdx: number) => {
+    setExpandedDishMicroIndexes(prev =>
+      prev.includes(dIdx) ? prev.filter(i => i !== dIdx) : [...prev, dIdx]
     );
   };
 
@@ -119,23 +292,11 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
       let initialDishes: DishItem[] = [];
       if (result.dishes && result.dishes.length > 0) {
         initialDishes = result.dishes;
-      } else if (result.ingredients && result.ingredients.length > 1) {
-        // Auto-split distinct recognized food items into separate dish cards (Món 1, Món 2, Món 3)
-        initialDishes = result.ingredients.map((ing, idx) => ({
-          id: `dish_${idx}_${Date.now()}`,
-          name: ing.name || `Món ${idx + 1}`,
-          estimated_weight_g: ing.portion_g || ing.estimated_weight_g || 150,
-          calories: ing.calories || 0,
-          protein_g: ing.protein_g || 0,
-          carb_g: ing.carb_g || 0,
-          fat_g: ing.fat_g || 0,
-          ingredients: [ing],
-        }));
       } else {
         initialDishes = [
           {
             id: 'dish_0',
-            name: result.food_name || 'Món 1',
+            name: result.food_name || 'Món ăn',
             estimated_weight_g: result.estimated_weight_g || 200,
             calories: result.calories || 0,
             protein_g: result.protein_g || 0,
@@ -405,6 +566,206 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
     setNewIngCal('');
     setSelectedDbFood(null);
     setShowAddIngModal(false);
+  };
+
+  const generatePresetIngredientsForDish = (foodName: string, portionG: number): DishIngredient[] => {
+    const nameLower = foodName.toLowerCase();
+
+    if (
+      nameLower.includes('cacao') ||
+      nameLower.includes('cocoa') ||
+      nameLower.includes('chocolate') ||
+      nameLower.includes('socola')
+    ) {
+      return [
+        {
+          name: 'Bột cacao nguyên chất',
+          portion_g: Math.max(10, Math.round(portionG * 0.15)),
+          calories: 90,
+          protein_g: 4.5,
+          carb_g: 12,
+          fat_g: 3.0,
+          micronutrients: calculateIngredientMicronutrients('Bột cacao nguyên chất', Math.max(10, Math.round(portionG * 0.15))),
+          source: 'inferred',
+        },
+        {
+          name: 'Sữa tươi đánh nóng',
+          portion_g: Math.max(50, Math.round(portionG * 0.65)),
+          calories: 85,
+          protein_g: 4.2,
+          carb_g: 6.5,
+          fat_g: 4.5,
+          micronutrients: calculateIngredientMicronutrients('Sữa tươi đánh nóng', Math.max(50, Math.round(portionG * 0.65))),
+          source: 'inferred',
+        },
+        {
+          name: 'Sữa đặc / Đường',
+          portion_g: Math.max(15, Math.round(portionG * 0.2)),
+          calories: 65,
+          protein_g: 1.0,
+          carb_g: 15,
+          fat_g: 0.5,
+          micronutrients: calculateIngredientMicronutrients('Sữa đặc / Đường', Math.max(15, Math.round(portionG * 0.2))),
+          source: 'inferred',
+        },
+      ];
+    }
+
+    if (nameLower.includes('bạc xỉu') || nameLower.includes('bac xiu')) {
+      return [
+        {
+          name: 'Sữa đặc có đường',
+          portion_g: Math.max(20, Math.round(portionG * 0.25)),
+          calories: 120,
+          protein_g: 2.5,
+          carb_g: 20,
+          fat_g: 3.2,
+          micronutrients: calculateIngredientMicronutrients('Sữa đặc có đường', Math.max(20, Math.round(portionG * 0.25))),
+          source: 'inferred',
+        },
+        {
+          name: 'Sữa tươi thanh trùng',
+          portion_g: Math.max(50, Math.round(portionG * 0.55)),
+          calories: 70,
+          protein_g: 3.5,
+          carb_g: 5.5,
+          fat_g: 3.8,
+          micronutrients: calculateIngredientMicronutrients('Sữa tươi thanh trùng', Math.max(50, Math.round(portionG * 0.55))),
+          source: 'inferred',
+        },
+        {
+          name: 'Cà phê nguyên chất',
+          portion_g: Math.max(20, Math.round(portionG * 0.2)),
+          calories: 10,
+          protein_g: 0.5,
+          carb_g: 1.2,
+          fat_g: 0.1,
+          micronutrients: calculateIngredientMicronutrients('Cà phê nguyên chất', Math.max(20, Math.round(portionG * 0.2))),
+          source: 'inferred',
+        },
+      ];
+    }
+
+    if (nameLower.includes('cappuccino') || nameLower.includes('latte') || nameLower.includes('espresso')) {
+      return [
+        {
+          name: 'Cà phê Espresso',
+          portion_g: Math.max(20, Math.round(portionG * 0.25)),
+          calories: 10,
+          protein_g: 0.6,
+          carb_g: 1.5,
+          fat_g: 0.1,
+          micronutrients: calculateIngredientMicronutrients('Cà phê Espresso', Math.max(20, Math.round(portionG * 0.25))),
+          source: 'inferred',
+        },
+        {
+          name: 'Sữa tươi đánh bọt',
+          portion_g: Math.max(60, Math.round(portionG * 0.6)),
+          calories: 75,
+          protein_g: 4.0,
+          carb_g: 6.0,
+          fat_g: 3.8,
+          micronutrients: calculateIngredientMicronutrients('Sữa tươi đánh bọt', Math.max(60, Math.round(portionG * 0.6))),
+          source: 'inferred',
+        },
+        {
+          name: 'Bọt sữa & Đường nhẹ',
+          portion_g: Math.max(10, Math.round(portionG * 0.15)),
+          calories: 35,
+          protein_g: 0.5,
+          carb_g: 8.0,
+          fat_g: 0.2,
+          micronutrients: calculateIngredientMicronutrients('Bọt sữa & Đường nhẹ', Math.max(10, Math.round(portionG * 0.15))),
+          source: 'inferred',
+        },
+      ];
+    }
+
+    if (nameLower.includes('trà sữa') || nameLower.includes('milk tea')) {
+      return [
+        {
+          name: 'Cốt trà đen / Oolong',
+          portion_g: Math.max(50, Math.round(portionG * 0.5)),
+          calories: 15,
+          protein_g: 0.5,
+          carb_g: 3.0,
+          fat_g: 0.1,
+          micronutrients: calculateIngredientMicronutrients('Cốt trà đen / Oolong', Math.max(50, Math.round(portionG * 0.5))),
+          source: 'inferred',
+        },
+        {
+          name: 'Bột béo / Sữa tươi',
+          portion_g: Math.max(30, Math.round(portionG * 0.3)),
+          calories: 140,
+          protein_g: 2.0,
+          carb_g: 12.0,
+          fat_g: 9.5,
+          micronutrients: calculateIngredientMicronutrients('Bột béo / Sữa tươi', Math.max(30, Math.round(portionG * 0.3))),
+          source: 'inferred',
+        },
+        {
+          name: 'Trân châu / Topping',
+          portion_g: Math.max(20, Math.round(portionG * 0.2)),
+          calories: 90,
+          protein_g: 0.3,
+          carb_g: 22.0,
+          fat_g: 0.1,
+          micronutrients: calculateIngredientMicronutrients('Trân châu / Topping', Math.max(20, Math.round(portionG * 0.2))),
+          source: 'inferred',
+        },
+      ];
+    }
+
+    return [
+      {
+        name: `${foodName} (Thành phần chính)`,
+        portion_g: Math.max(50, Math.round(portionG * 0.8)),
+        calories: 160,
+        protein_g: 5.0,
+        carb_g: 20.0,
+        fat_g: 6.0,
+        micronutrients: calculateIngredientMicronutrients(foodName, Math.max(50, Math.round(portionG * 0.8))),
+        source: 'inferred',
+      },
+      {
+        name: 'Gia vị & Phụ gia kèm theo',
+        portion_g: Math.max(10, Math.round(portionG * 0.2)),
+        calories: 40,
+        protein_g: 1.0,
+        carb_g: 5.0,
+        fat_g: 2.0,
+        micronutrients: calculateIngredientMicronutrients('Gia vị', Math.max(10, Math.round(portionG * 0.2))),
+        source: 'inferred',
+      },
+    ];
+  };
+
+  const handleSelectAlternativeDish = (altName: string) => {
+    setEditedFoodName(altName);
+
+    setDishesList(prev => {
+      if (!prev || prev.length === 0) {
+        return [
+          {
+            id: 'dish_0',
+            name: altName,
+            estimated_weight_g: editedPortionGrams || 200,
+            ingredients: generatePresetIngredientsForDish(altName, editedPortionGrams || 200),
+          },
+        ];
+      }
+
+      const updated = [...prev];
+      const targetWeight = updated[0].estimated_weight_g || editedPortionGrams || 200;
+      const newIngredients = generatePresetIngredientsForDish(altName, targetWeight);
+
+      updated[0] = {
+        ...updated[0],
+        name: altName,
+        ingredients: newIngredients,
+      };
+      return updated;
+    });
   };
 
   const handleAddNewDish = () => {
@@ -756,17 +1117,20 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
             <View style={styles.alternativesSection}>
               <Text style={styles.alternativesTitle}>Món ăn có thể là (Bấm để chọn món đúng):</Text>
               <View style={styles.alternativesRow}>
-                {result.alternatives.map((alt, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={styles.altBadge}
-                    onPress={() => setEditedFoodName(alt.name)}
-                  >
-                    <Text style={styles.altBadgeText}>
-                      {alt.name} ({Math.round(alt.confidence * 100)}%)
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {result.alternatives.map((alt, i) => {
+                  const isSelected = editedFoodName.toLowerCase() === alt.name.toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.altBadge, isSelected && styles.altBadgeActive]}
+                      onPress={() => handleSelectAlternativeDish(alt.name)}
+                    >
+                      <Text style={[styles.altBadgeText, isSelected && styles.altBadgeTextActive]}>
+                        {alt.name} ({Math.round(alt.confidence * 100)}%)
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           ) : null}
@@ -881,6 +1245,76 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
                     </View>
                   </View>
                 )}
+
+                {/* Vitamin & Mineral Micronutrient Breakdown for this Dish */}
+                {!isDishExcluded && (() => {
+                  const dishMicro = calculateDishMicronutrients(dish, totalScale, dIdx, excludedIngKeys);
+                  const isMicroExpanded = expandedDishMicroIndexes.includes(dIdx);
+                  return (
+                    <View style={styles.dishMicroContainer}>
+                      <TouchableOpacity
+                        style={styles.microHeaderToggle}
+                        onPress={() => toggleExpandDishMicro(dIdx)}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons name="sparkles" size={15} color="#8B5CF6" />
+                          <Text style={styles.dishMicroHeaderTitle}>
+                            Chi tiết Vitamin & Khoáng chất theo dõi:
+                          </Text>
+                        </View>
+                        <Ionicons
+                          name={isMicroExpanded ? 'chevron-up' : 'chevron-down'}
+                          size={16}
+                          color="#64748B"
+                        />
+                      </TouchableOpacity>
+
+                      <View style={styles.microGridRow}>
+                        <View style={styles.microBadgePill}>
+                          <Text style={styles.microBadgeLabel}>🥬 Chất xơ:</Text>
+                          <Text style={styles.microBadgeValue}>{dishMicro.fiberG}g</Text>
+                        </View>
+                        <View style={styles.microBadgePill}>
+                          <Text style={styles.microBadgeLabel}>🧂 Natri:</Text>
+                          <Text style={styles.microBadgeValue}>{dishMicro.sodiumMg}mg</Text>
+                        </View>
+                        <View style={styles.microBadgePill}>
+                          <Text style={styles.microBadgeLabel}>🍌 Kali:</Text>
+                          <Text style={styles.microBadgeValue}>{dishMicro.potassiumMg}mg</Text>
+                        </View>
+                        <View style={styles.microBadgePill}>
+                          <Text style={styles.microBadgeLabel}>🥛 Canxi:</Text>
+                          <Text style={styles.microBadgeValue}>{dishMicro.calciumMg}mg</Text>
+                        </View>
+                        <View style={styles.microBadgePill}>
+                          <Text style={styles.microBadgeLabel}>🥩 Sắt:</Text>
+                          <Text style={styles.microBadgeValue}>{dishMicro.ironMg}mg</Text>
+                        </View>
+
+                        {isMicroExpanded && (
+                          <>
+                            <View style={styles.microBadgePill}>
+                              <Text style={styles.microBadgeLabel}>🥕 Vit A:</Text>
+                              <Text style={styles.microBadgeValue}>{dishMicro.vitAMcg}µg</Text>
+                            </View>
+                            <View style={styles.microBadgePill}>
+                              <Text style={styles.microBadgeLabel}>🍊 Vit C:</Text>
+                              <Text style={styles.microBadgeValue}>{dishMicro.vitCMg}mg</Text>
+                            </View>
+                            <View style={styles.microBadgePill}>
+                              <Text style={styles.microBadgeLabel}>☀️ Vit D:</Text>
+                              <Text style={styles.microBadgeValue}>{dishMicro.vitDMcg}µg</Text>
+                            </View>
+                            <View style={styles.microBadgePill}>
+                              <Text style={styles.microBadgeLabel}>🛡️ Kẽm:</Text>
+                              <Text style={styles.microBadgeValue}>{dishMicro.zincMg}mg</Text>
+                            </View>
+                          </>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })()}
 
                 {/* Header for Ingredients of this specific Dish Frame */}
                 {!isDishExcluded && (
@@ -1774,10 +2208,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F59E0B',
   },
+  altBadgeActive: {
+    backgroundColor: '#F59E0B',
+    borderColor: '#D97706',
+  },
   altBadgeText: {
     fontSize: 12,
     fontWeight: '700',
     color: '#B45309',
+  },
+  altBadgeTextActive: {
+    color: '#FFFFFF',
   },
   sourceBadge: {
     marginTop: 4,
@@ -2209,5 +2650,50 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
     color: '#94A3B8',
+  },
+  dishMicroContainer: {
+    backgroundColor: '#F3E8FF',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  microHeaderToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  dishMicroHeaderTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#6B21A8',
+  },
+  microGridRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  microBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    gap: 4,
+  },
+  microBadgeLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#581C87',
+  },
+  microBadgeValue: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#7E22CE',
   },
 });
