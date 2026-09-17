@@ -19,17 +19,27 @@ import { useSetup } from '@/context/setup-context';
 
 type BodyType = 'low' | 'fit' | 'full' | 'high';
 
-const BODY_TYPE_CARDS: { id: BodyType; title: string; desc: string; fatPct: number }[] = [
+const MALE_BODY_TYPE_CARDS: { id: BodyType; title: string; desc: string; fatPct: number }[] = [
   { id: 'low', title: 'Mỡ thấp', desc: '(nhỏ hơn 15%)', fatPct: 13 },
   { id: 'fit', title: 'Cân đối', desc: '(15%-18%)', fatPct: 16 },
   { id: 'full', title: 'Đầy đặn', desc: '(19%-22%)', fatPct: 20 },
   { id: 'high', title: 'Mỡ cao', desc: '(lớn hơn 22%)', fatPct: 25 },
 ];
 
+const FEMALE_BODY_TYPE_CARDS: { id: BodyType; title: string; desc: string; fatPct: number }[] = [
+  { id: 'low', title: 'Mỡ thấp', desc: '(dưới 20%)', fatPct: 18 },
+  { id: 'fit', title: 'Cân đối', desc: '(20%-24%)', fatPct: 22 },
+  { id: 'full', title: 'Đầy đặn', desc: '(25%-29%)', fatPct: 27 },
+  { id: 'high', title: 'Mỡ cao', desc: '(trên 30%)', fatPct: 33 },
+];
+
 export default function SetupStep5Screen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { wizardData, updateWizardData } = useSetup();
+
+  const isFemale = wizardData.gender === 'female';
+  const bodyCards = isFemale ? FEMALE_BODY_TYPE_CARDS : MALE_BODY_TYPE_CARDS;
 
   const [hasMeasurements, setHasMeasurements] = useState<boolean>(
     wizardData.hasBodyMeasurements !== undefined ? wizardData.hasBodyMeasurements : false
@@ -65,7 +75,7 @@ export default function SetupStep5Screen() {
       } catch {}
     }
 
-    const estimatedFat = BODY_TYPE_CARDS.find((c) => c.id === selectedBodyType)?.fatPct || 18;
+    const estimatedFat = bodyCards.find((c) => c.id === selectedBodyType)?.fatPct || (isFemale ? 22 : 16);
 
     // Temporary calculation values (discarded after setup, not stored in MongoDB)
     updateWizardData({
@@ -175,7 +185,7 @@ export default function SetupStep5Screen() {
             </Text>
 
             <View style={styles.bodyGrid}>
-              {BODY_TYPE_CARDS.map((card) => {
+              {bodyCards.map((card) => {
                 const isSelected = selectedBodyType === card.id;
                 return (
                   <TouchableOpacity
@@ -183,7 +193,7 @@ export default function SetupStep5Screen() {
                     style={[styles.bodyCard, isSelected && styles.bodyCardSelected]}
                     onPress={() => handleSelectBodyType(card.id)}
                     activeOpacity={0.88}>
-                    <BodyIllustration type={card.id} />
+                    <BodyIllustration type={card.id} gender={wizardData.gender} />
 
                     <View style={styles.bodyCardFooter}>
                       <View
