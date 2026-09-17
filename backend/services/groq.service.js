@@ -24,6 +24,77 @@ class GroqService {
     return process.env.GROQ_API_KEY || null;
   }
 
+  async generateChatResponse(userMessage, history = [], context = {}) {
+    const apiKey = this.getApiKey();
+    if (!apiKey) return null;
+
+    const messages = [
+      {
+        role: 'system',
+        content: `Bạn là Tri, AI Assistant của The Nutri. Hãy trò chuyện tự nhiên bằng tiếng Việt như một trợ lý thật sự.
+- Trả lời đúng câu hỏi hiện tại và dựa trên lịch sử, không lặp lại lời chào hoặc ép người dùng vào một workflow.
+- Với câu hỏi dinh dưỡng/sức khỏe, giải thích ngắn gọn, thực tế, có lưu ý an toàn khi cần.
+- Nếu câu hỏi có các lựa chọn rõ ràng, trả về choices tối đa 4 mục để giao diện tạo nút bấm.
+- Nếu không cần lựa chọn, trả choices là [].
+- Chỉ trả JSON hợp lệ theo dạng: {"reply":"...","choices":[{"label":"...","value":"..."}]}.
+Ngữ cảnh hiện tại: ${JSON.stringify(context)}`,
+      },
+      ...history.slice(-12).map((item) => ({
+        role: item.role === 'assistant' || item.sender === 'ai' ? 'assistant' : 'user',
+        content: String(item.content || item.text || ''),
+      })),
+      { role: 'user', content: userMessage },
+    ];
+
+    try {
+      const response = await fetch(this.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.getModel(),
+          messages,
+          temperature: 0.7,
+          max_tokens: 700,
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn(`[GroqService] conversational call failed (${response.status})`);
+        return null;
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (!content) return null;
+
+      const normalized = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+      let parsed;
+      try {
+        parsed = JSON.parse(normalized);
+      } catch {
+        const start = normalized.indexOf('{');
+        const end = normalized.lastIndexOf('}');
+        parsed = start >= 0 && end > start ? JSON.parse(normalized.slice(start, end + 1)) : null;
+      }
+
+      const reply = parsed?.reply || content;
+      const choices = Array.isArray(parsed?.choices)
+        ? parsed.choices
+            .filter((choice) => choice?.label && choice?.value)
+            .slice(0, 4)
+            .map((choice) => ({ label: String(choice.label), value: String(choice.value) }))
+        : [];
+
+      return { reply: String(reply).trim(), choices };
+    } catch (error) {
+      console.warn('[GroqService] conversational response failed:', error.message);
+      return null;
+    }
+  }
+
   /**
    * Resolve user natural language input into structured intent and parameters.
    * Uses Groq GPT-OSS 20B with JSON Object output.

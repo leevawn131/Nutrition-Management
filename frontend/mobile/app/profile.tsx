@@ -451,7 +451,7 @@ export default function ProfileScreen() {
                 </View>
                 <Text style={styles.emptyStateHeading}>Chưa có món ăn nào trong bộ sưu tập</Text>
                 <Text style={styles.emptyStateText}>
-                  Hãy khám phá các công thức nấu ăn ngon và nhấn "Lưu lại" để xem lại bất cứ lúc nào!
+                  Hãy khám phá các công thức nấu ăn ngon và nhấn &quot;Lưu lại&quot; để xem lại bất cứ lúc nào!
                 </Text>
                 <TouchableOpacity
                   style={styles.actionGreenBtn}
@@ -661,9 +661,8 @@ export default function ProfileScreen() {
           <TextInput
             placeholder="Bạn đang nghĩ gì?"
             placeholderTextColor="#94A3B8"
-            style={styles.fakeInput}
+            style={[styles.fakeInput, { pointerEvents: 'none' }]}
             editable={false}
-            pointerEvents="none"
           />
         </TouchableOpacity>
       </View>

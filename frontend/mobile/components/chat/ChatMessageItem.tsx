@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import Markdown from 'react-native-markdown-display';
 import { ChatMessage } from '@/types/chat.types';
 import { ChatChoicePicker } from './ChatChoicePicker';
 import { ChatRecipeCard } from './ChatRecipeCard';
@@ -40,9 +41,11 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
 
       <View style={[styles.bubbleWrapper, isUser && styles.userBubbleWrapper]}>
         <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
-          <Text style={[styles.messageText, isUser ? styles.userText : styles.assistantText]}>
-            {message.content}
-          </Text>
+          {isUser ? (
+            <Text style={[styles.messageText, styles.userText]}>{message.content}</Text>
+          ) : (
+            <Markdown style={markdownStyles}>{message.content}</Markdown>
+          )}
 
           {/* Timestamp */}
           <Text style={[styles.timeText, isUser ? styles.userTimeText : styles.assistantTimeText]}>
@@ -197,3 +200,37 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 });
+
+const markdownStyles = {
+  body: {
+    color: '#1F2937',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  paragraph: {
+    marginTop: 0,
+    marginBottom: 8,
+  },
+  strong: {
+    fontWeight: '700' as const,
+  },
+  bullet_list: {
+    marginTop: 0,
+    marginBottom: 8,
+  },
+  ordered_list: {
+    marginTop: 0,
+    marginBottom: 8,
+  },
+  code_inline: {
+    color: '#047857',
+    backgroundColor: '#ECFDF5',
+    borderRadius: 4,
+  },
+  code_block: {
+    color: '#E5E7EB',
+    backgroundColor: '#111827',
+    borderRadius: 8,
+    padding: 10,
+  },
+};

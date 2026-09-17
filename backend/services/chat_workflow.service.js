@@ -145,6 +145,7 @@ class ChatWorkflowService {
     const isGreetingOrReset =
       normalizedText.includes('xin chào') ||
       normalizedText.includes('chào miu') ||
+      normalizedText.includes('chào tri') ||
       normalizedText.includes('giúp mình những gì') ||
       normalizedText === 'bắt đầu' ||
       normalizedText === 'menu chính' ||
@@ -328,7 +329,7 @@ class ChatWorkflowService {
     if (normalizedText.includes('trò chuyện chung') || normalizedText === 'trò chuyện') {
       return {
         message:
-          'Miu luôn sẵn sàng giải đáp và đồng hành cùng bạn! Bạn có thể hỏi bất cứ điều gì về dinh dưỡng, tính calo thực phẩm, thói quen ăn uống lành mạnh hay tập luyện. Dưới đây là một số chủ đề phổ biến bạn có thể thử hỏi:',
+          'Tri luôn sẵn sàng giải đáp và đồng hành cùng bạn! Bạn có thể hỏi bất cứ điều gì về dinh dưỡng, tính calo thực phẩm, thói quen ăn uống lành mạnh hay tập luyện. Dưới đây là một số chủ đề phổ biến bạn có thể thử hỏi:',
         ui: {
           type: 'choice',
           payload: {
@@ -346,7 +347,34 @@ class ChatWorkflowService {
       };
     }
 
-    const defaultGreeting = `Chào${nameDisplay}! Mình là Miu, trợ lý dinh dưỡng và sức khoẻ của The Meal. Mình có thể tính mục tiêu calo, lên thực đơn, gợi ý món ăn, theo dõi vận động, hoặc trả lời câu hỏi về dinh dưỡng và chỉ số của bạn. Bạn chọn một việc bên dưới, hoặc cứ hỏi mình bất cứ điều gì nhé.`;
+    const defaultGreeting = `Chào${nameDisplay}! Mình là Tri, trợ lý dinh dưỡng và sức khoẻ của The Nutri. Mình có thể tính mục tiêu calo, lên thực đơn, gợi ý món ăn, theo dõi vận động, hoặc trả lời câu hỏi về dinh dưỡng và chỉ số của bạn. Bạn chọn một việc bên dưới, hoặc cứ hỏi mình bất cứ điều gì nhé.`;
+
+    if (
+      input.type === 'text' &&
+      normalizedText.length > 0 &&
+      !normalizedText.includes('xin chào') &&
+      !normalizedText.includes('giúp mình những gì')
+    ) {
+      const history = await ChatMessage.find({ conversation_id: conversation._id })
+        .sort({ created_at: -1 })
+        .limit(12)
+        .lean();
+      const conversationalResponse = await groqService.generateChatResponse(
+        String(input.value),
+        history.reverse().slice(0, -1),
+        { flow: conversation.current_flow, step: conversation.current_step }
+      );
+
+      if (conversationalResponse) {
+        return {
+          message: conversationalResponse.reply,
+          ui: conversationalResponse.choices.length > 0
+            ? { type: 'choice', payload: { title: 'Gợi ý lựa chọn:', choices: conversationalResponse.choices } }
+            : null,
+          state: { flow: 'general', step: 'chatting', status: 'collecting' },
+        };
+      }
+    }
 
     const message =
       aiResolution && aiResolution.intent === 'general_qa' && aiResolution.natural_response && !normalizedText.includes('xin chào') && !normalizedText.includes('giúp mình những gì')
@@ -1267,13 +1295,7 @@ class ChatWorkflowService {
 
       return {
         message:
-          `Mục tiêu bạn chọn: **${goalLabel}**\n\n` +
-          `Dựa trên chỉ số cơ thể của bạn (TDEE ước tính ~${Math.round(tdee)} kcal/ngày), Miu gợi ý mức dinh dưỡng tối ưu:\n` +
-          `• 🎯 **Calo mục tiêu**: ${targetCal} kcal/ngày\n` +
-          `• 🥩 **Chất đạm (Protein)**: ${protein_g}g (~25% calo)\n` +
-          `• 🍚 **Đường bột (Carb)**: ${carbs_g}g (~50% calo)\n` +
-          `• 🥑 **Chất béo (Fat)**: ${fat_g}g (~25% calo)\n\n` +
-          `Bạn có muốn lưu chỉ số mục tiêu này vào hồ sơ cá nhân không?`,
+          `Mình đã ghi nhận mục tiêu **${goalLabel}**. Để tư vấn chính xác theo hồ sơ và thói quen của bạn, hãy tiếp tục trò chuyện với Tri hoặc chọn một thao tác bên dưới.`,
         ui: {
           type: 'choice',
           payload: {

@@ -66,7 +66,15 @@ export const foodService = {
         },
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data: any;
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        throw new Error(
+          `API món ăn trả về dữ liệu không hợp lệ (${response.status}). Kiểm tra backend tại ${API_BASE_URL}`
+        );
+      }
 
       if (!response.ok) {
         throw new Error(data.message || 'Lỗi tìm kiếm món ăn');

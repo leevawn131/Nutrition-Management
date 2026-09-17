@@ -8,11 +8,11 @@ import {
   ActivityIndicator,
   Alert,
   StyleSheet,
-  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { chatService } from '@/services/chat.service';
 import { ChatConversationSummary } from '@/types/chat.types';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface ChatHistoryModalProps {
   visible: boolean;
@@ -33,12 +33,6 @@ export const ChatHistoryModal: React.FC<ChatHistoryModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (visible) {
-      loadHistory();
-    }
-  }, [visible]);
-
   const loadHistory = async () => {
     try {
       setLoading(true);
@@ -50,6 +44,14 @@ export const ChatHistoryModal: React.FC<ChatHistoryModalProps> = ({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!visible) return;
+    const timer = setTimeout(() => {
+      void loadHistory();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [visible]);
 
   const handleDelete = (item: ChatConversationSummary) => {
     Alert.alert(

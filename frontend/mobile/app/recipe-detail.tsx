@@ -57,7 +57,7 @@ export default function RecipeDetailScreen() {
   const carbPercent = 11;
   const fatPercent = 26;
 
-  const authorName = 'the Meal Chef';
+  const authorName = 'The Nutri Chef';
   const authorInitials = 'TC';
 
   const prepTime = 20;
@@ -112,7 +112,7 @@ export default function RecipeDetailScreen() {
   const handleToggleSave = async () => {
     try {
       const result = await recipeService.toggleSaveRecipe({
-        _id: params.id,
+        _id: params.id || `recipe-${Date.now()}`,
         title: itemName,
         image_url: itemImage,
         prep_time_minutes: prepTime,

@@ -5,23 +5,149 @@ import { ChatRecipeDetailModal } from '@/components/chat/ChatRecipeDetailModal';
 import { chatService } from '@/services/chat.service';
 import { recipeService } from '@/services/recipe.service';
 import { ChatInput, ChatMessage } from '@/types/chat.types';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+// --- COMPONENT THẺ ĐỀ XUẤT MỤC TIÊU (THE.MEAL STYLE) ---
+interface GoalProposal {
+  readyToApply?: boolean;
+  goalType?: string;
+  targetWeightKg?: number;
+  currentWeight?: number;
+  tdee?: number;
+  targetCalories: number;
+  macros: {
+    protein: number;
+    carb: number;
+    fat: number;
+  };
+  waterIntakeMl?: number;
+  recommendationSummary?: string;
+}
+
+const goalStyles = StyleSheet.create({
+  card: { marginHorizontal: 12, marginVertical: 8, padding: 16, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#D1FAE5' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  iconBadge: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D1FAE5' },
+  title: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  subTitle: { marginTop: 2, fontSize: 11, color: '#6B7280' },
+  summary: { marginTop: 12, fontSize: 13, lineHeight: 19, color: '#374151' },
+  caloRow: { flexDirection: 'row', marginTop: 14, gap: 12 },
+  caloItem: { flex: 1, padding: 10, borderRadius: 8, backgroundColor: '#ECFDF5' },
+  tdeeItem: { flex: 1, padding: 10, borderRadius: 8, backgroundColor: '#F3F4F6' },
+  caloLabel: { fontSize: 11, color: '#6B7280' },
+  caloValue: { marginTop: 4, fontSize: 18, fontWeight: '700', color: '#047857' },
+  tdeeValue: { marginTop: 4, fontSize: 16, fontWeight: '700', color: '#374151' },
+  macroTitle: { marginTop: 14, fontSize: 12, fontWeight: '600', color: '#374151' },
+  macroContainer: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  macroBadge: { flex: 1, padding: 8, borderRadius: 8 },
+  macroLabel: { fontSize: 10, fontWeight: '600' },
+  macroVal: { marginTop: 3, fontSize: 15, fontWeight: '700' },
+  waterRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
+  waterText: { fontSize: 12, color: '#2563EB' },
+  applyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, borderRadius: 8, backgroundColor: '#10B981' },
+  appliedBtn: { backgroundColor: '#6B7280' },
+  applyBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+});
+
+const InlineGoalProposalCard = ({
+  goal,
+  onApply,
+  isApplied,
+}: {
+  goal: GoalProposal;
+  onApply: (g: GoalProposal) => void;
+  isApplied?: boolean;
+}) => {
+  return (
+    <View style={goalStyles.card}>
+      <View style={goalStyles.header}>
+        <View style={goalStyles.iconBadge}>
+          <MaterialCommunityIcons name="bullseye-arrow" size={20} color="#10B981" />
+        </View>
+        <View>
+          <Text style={goalStyles.title}>Kế hoạch mục tiêu từ AI Tri</Text>
+          <Text style={goalStyles.subTitle}>Chuẩn Viện Dinh Dưỡng VDD & USDA</Text>
+        </View>
+      </View>
+
+      {goal.recommendationSummary ? (
+        <Text style={goalStyles.summary}>{goal.recommendationSummary}</Text>
+      ) : null}
+
+      <View style={goalStyles.caloRow}>
+        <View style={goalStyles.caloItem}>
+          <Text style={goalStyles.caloLabel}>Mục tiêu mỗi ngày</Text>
+          <Text style={goalStyles.caloValue}>
+            {goal.targetCalories} <Text style={{ fontSize: 13 }}>kcal</Text>
+          </Text>
+        </View>
+        {goal.tdee ? (
+          <View style={goalStyles.tdeeItem}>
+            <Text style={goalStyles.caloLabel}>Tiêu hao TDEE</Text>
+            <Text style={goalStyles.tdeeValue}>{goal.tdee} kcal</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <Text style={goalStyles.macroTitle}>Tỷ lệ đa lượng dinh dưỡng (Macro):</Text>
+      <View style={goalStyles.macroContainer}>
+        <View style={[goalStyles.macroBadge, { backgroundColor: '#FEE2E2' }]}>
+          <Text style={[goalStyles.macroLabel, { color: '#DC2626' }]}>Đạm (Protein)</Text>
+          <Text style={[goalStyles.macroVal, { color: '#991B1B' }]}>{goal.macros?.protein || 0}g</Text>
+        </View>
+        <View style={[goalStyles.macroBadge, { backgroundColor: '#FEF3C7' }]}>
+          <Text style={[goalStyles.macroLabel, { color: '#D97706' }]}>Tinh bột (Carb)</Text>
+          <Text style={[goalStyles.macroVal, { color: '#92400E' }]}>{goal.macros?.carb || 0}g</Text>
+        </View>
+        <View style={[goalStyles.macroBadge, { backgroundColor: '#DBEAFE' }]}>
+          <Text style={[goalStyles.macroLabel, { color: '#2563EB' }]}>Chất béo (Fat)</Text>
+          <Text style={[goalStyles.macroVal, { color: '#1E40AF' }]}>{goal.macros?.fat || 0}g</Text>
+        </View>
+      </View>
+
+      {goal.waterIntakeMl ? (
+        <View style={goalStyles.waterRow}>
+          <MaterialCommunityIcons name="water" size={16} color="#3B82F6" />
+          <Text style={goalStyles.waterText}>Nước khuyến nghị: {goal.waterIntakeMl} ml/ngày</Text>
+        </View>
+      ) : null}
+
+      <TouchableOpacity
+        style={[goalStyles.applyBtn, isApplied && goalStyles.appliedBtn]}
+        onPress={() => !isApplied && onApply(goal)}
+        disabled={isApplied}
+        activeOpacity={0.8}
+      >
+        <MaterialCommunityIcons
+          name={isApplied ? 'check-circle' : 'lightning-bolt'}
+          size={18}
+          color="#FFFFFF"
+          style={{ marginRight: 6 }}
+        />
+        <Text style={goalStyles.applyBtnText}>
+          {isApplied ? '✓ Đã kích hoạt mục tiêu này' : 'Áp dụng mục tiêu vào App'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+// --- MÀN HÌNH CHÍNH CHATBOT ---
 export default function ChatbotScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ prompt?: string; autoSend?: string; newChat?: string }>();
@@ -36,6 +162,9 @@ export default function ChatbotScreen() {
   );
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+
+  // Lưu trữ trạng thái mục tiêu đã áp dụng theo message ID
+  const [appliedGoalMap, setAppliedGoalMap] = useState<{ [key: string]: boolean }>({});
 
   // Recipe detail modal state
   const [selectedRecipeDetail, setSelectedRecipeDetail] = useState<any>(null);
@@ -54,7 +183,7 @@ export default function ChatbotScreen() {
       const id = conversationIdRef.current;
       if (id) {
         void chatService.deleteConversation(id).catch(() => {
-          // The screen is already closing; cleanup should not block navigation.
+          // Cleanup an toàn khi rời khỏi màn hình
         });
       }
     };
@@ -68,7 +197,6 @@ export default function ChatbotScreen() {
   useEffect(() => {
     if (params.newChat === '1') {
       if (params.autoSend === '1' && typeof params.prompt === 'string' && params.prompt.trim()) {
-        // Cuộc trò chuyện mới tinh: không load lịch sử cũ, gửi thẳng tin nhắn đầu tiên
         setMessages([]);
         setConversationId(null);
         setInitialLoading(false);
@@ -91,7 +219,6 @@ export default function ChatbotScreen() {
         if (res.messages && res.messages.length > 0) {
           setMessages(res.messages);
         } else {
-          // Tạo tin nhắn chào mừng ban đầu
           startInitialGreeting(res.conversation._id);
         }
       }
@@ -112,7 +239,7 @@ export default function ChatbotScreen() {
       id: 'greeting_0',
       role: 'assistant',
       content:
-        'Chào bạn! Mình là Miu, trợ lý dinh dưỡng và sức khoẻ của The Meal. Mình có thể tính mục tiêu calo, lên thực đơn, gợi ý món ăn, theo dõi vận động, hoặc trả lời câu hỏi về dinh dưỡng và chỉ số của bạn. Bạn chọn một việc bên dưới, hoặc cứ hỏi mình bất cứ điều gì nhé.',
+        'Chào bạn! Mình là Tri, trợ lý dinh dưỡng và sức khoẻ của The Nutri. Mình có thể tính mục tiêu calo, lên thực đơn, gợi ý món ăn, theo dõi vận động, hoặc trả lời câu hỏi về dinh dưỡng và chỉ số của bạn. Bạn chọn một việc bên dưới, hoặc cứ hỏi mình bất cứ điều gì nhé.',
       ui: {
         type: 'choice',
         payload: {
@@ -125,6 +252,12 @@ export default function ChatbotScreen() {
               icon: '💬',
             },
             {
+              label: '🎯 Thiết lập mục tiêu',
+              value: 'Thiết lập mục tiêu dinh dưỡng',
+              description: 'Tính BMR, TDEE, calo thâm hụt/thặng dư và tỷ lệ macro chuẩn',
+              icon: '🎯',
+            },
+            {
               label: '🍲 Tìm công thức',
               value: 'Tìm công thức nấu ăn',
               description: 'Tìm món ăn từ nguyên liệu hoặc khám phá món mới',
@@ -135,12 +268,6 @@ export default function ChatbotScreen() {
               value: 'Lập kế hoạch bữa ăn',
               description: 'Lên thực đơn 1-7 ngày cá nhân hóa theo mục tiêu',
               icon: '📅',
-            },
-            {
-              label: '🎯 Thiết lập mục tiêu',
-              value: 'Thiết lập mục tiêu dinh dưỡng',
-              description: 'Tính BMR, TDEE, calo thâm hụt/thặng dư và tỷ lệ macro chuẩn',
-              icon: '🎯',
             },
             {
               label: '🏃 Luyện tập & vận động',
@@ -188,64 +315,31 @@ export default function ChatbotScreen() {
     }
   };
 
-  // 2. Gửi tin nhắn
   const handleSend = async (customInput?: ChatInput, explicitConvId?: string | null) => {
-    const inputToSend: ChatInput = customInput || {
-      type: 'text',
-      value: inputText.trim(),
-    };
-
+    const inputToSend: ChatInput = customInput || { type: 'text', value: inputText.trim() };
     if (inputToSend.type === 'text' && !inputToSend.value) return;
+    if (!customInput) setInputText('');
 
-    if (!customInput) {
-      setInputText('');
-    }
-
-    // Tin nhắn tạm trên UI (dùng text thân thiện thay vì raw JSON kỹ thuật)
-    let displayContent = '';
-    if (inputToSend.type === 'action') {
-      const act = inputToSend.value?.action;
-      const title = inputToSend.value?.data?.title;
-      if (act === 'save_recipe') {
-        displayContent = title ? `⭐ Lưu món: "${title}"` : '⭐ Lưu món vào bộ sưu tập';
-      } else if (act === 'add_to_meal_plan') {
-        displayContent = title ? `📅 Thêm vào kế hoạch: "${title}"` : '📅 Thêm vào kế hoạch';
-      } else {
-        displayContent = `Thao tác: ${act || ''}`;
-      }
-    } else {
-      displayContent = typeof inputToSend.value === 'string' ? inputToSend.value : JSON.stringify(inputToSend.value);
-    }
-
+    const displayContent = inputToSend.type === 'action'
+      ? `Thao tác: ${inputToSend.value?.action || ''}`
+      : typeof inputToSend.value === 'string' ? inputToSend.value : JSON.stringify(inputToSend.value);
     const tempUserMsg: ChatMessage = {
       id: `temp_${Date.now()}`,
       role: 'user',
       content: displayContent,
       created_at: new Date().toISOString(),
     };
-
     setMessages((prev) => [...prev, tempUserMsg]);
     setLoading(true);
 
     try {
       const targetConvId = explicitConvId !== undefined ? explicitConvId : conversationId;
-      const res = await chatService.sendMessage({
-        conversation_id: targetConvId,
-        input: inputToSend,
-      });
-
+      const res = await chatService.sendMessage({ conversation_id: targetConvId, input: inputToSend });
       if (res.success && res.data) {
         setConversationId(res.data.conversation_id);
         const aiMsg: ChatMessage = res.data.message;
-
-        // Nếu có UI từ response thì gán vào message
-        if (res.data.ui) {
-          aiMsg.ui = res.data.ui;
-        }
-
+        if (res.data.ui) aiMsg.ui = res.data.ui;
         setMessages((prev) => [...prev, aiMsg]);
-
-        // Nếu response là recipe detail modal
         if (res.data.ui?.type === 'recipe_detail' && res.data.ui.payload?.recipe) {
           setSelectedRecipeDetail(res.data.ui.payload.recipe);
           setDetailModalVisible(true);
@@ -256,93 +350,53 @@ export default function ChatbotScreen() {
         redirectToLogin();
         return;
       }
-      const errorMsg: ChatMessage = {
+      setMessages((prev) => [...prev, {
         id: `err_${Date.now()}`,
         role: 'assistant',
         content: `Đã có lỗi xảy ra: ${error.message || 'Không thể kết nối máy chủ'}`,
         created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
+      }]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (
-      !initialLoading &&
-      conversationId &&
-      params.autoSend === '1' &&
-      params.newChat !== '1' &&
-      typeof params.prompt === 'string' &&
-      params.prompt.trim() &&
-      !autoSentPromptRef.current
-    ) {
-      autoSentPromptRef.current = true;
-      handleSend({ type: 'text', value: params.prompt.trim() });
-    }
-  }, [conversationId, initialLoading, params.autoSend, params.newChat, params.prompt]);
-
-  // 3. Xử lý khi user chọn Choice từ Quick Picker
   const handleSelectChoice = (value: any, label: string) => {
-    handleSend({
-      type: 'choice',
-      value: label || value,
-    });
+    const selectedValue = String(label || value || '');
+    const isGoalChoice = /giảm mỡ|giảm cân|tăng cơ|tăng cân|duy trì cân nặng|cải thiện sức khỏe/i.test(
+      selectedValue
+    );
+    if (isGoalChoice) {
+      router.push({
+        pathname: '/goal-setup-chat',
+        params: { prompt: selectedValue, autoSend: '1' },
+      });
+      return;
+    }
+
+    void handleSend({ type: 'choice', value: label || value });
   };
 
-  // 4. Xử lý Structured Action (view_recipe, save_recipe, add_to_meal_plan, confirm_meal_plan)
   const handleAction = async (action: string, data: any) => {
     if (action === 'view_recipe') {
-      // Khi xem chi tiết: KHÔNG gửi tin nhắn chat, mở trực tiếp Modal chi tiết món ăn!
-      const recipeData = data.recipe;
-      const normalizeData = (raw: any) => {
-        if (!raw) return null;
-        return {
-          id: raw.id || raw._id?.toString?.() || String(raw._id || data.recipe_id || ''),
-          title: raw.title || data.title || 'Công thức món ăn',
-          description: raw.description || '',
-          image_url: raw.image_url,
-          calories: Math.round(Number(raw.calories ?? raw.calories_per_serving ?? raw.nutrition_facts?.energy_kcal ?? 0) || 0),
-          protein: Number(raw.protein ?? raw.protein_g ?? raw.nutrition_facts?.protein_g ?? 0) || 0,
-          carbs: Number(raw.carbs ?? raw.carb_g ?? raw.carbs_g ?? raw.nutrition_facts?.carbohydrate_g ?? 0) || 0,
-          fat: Number(raw.fat ?? raw.fat_g ?? raw.nutrition_facts?.fat_g ?? 0) || 0,
-          cook_time_minutes: raw.cook_time_minutes || 15,
-          prep_time_minutes: raw.prep_time_minutes || 10,
-          servings: raw.servings || 1,
-          meal_type: raw.meal_type || 'lunch',
-          ingredients: raw.ingredients || [],
-          steps: raw.steps || [],
-        };
-      };
-
-      if (recipeData && recipeData.ingredients && recipeData.ingredients.length > 0) {
-        setSelectedRecipeDetail(normalizeData(recipeData));
+      const recipe = data.recipe;
+      if (recipe) {
+        setSelectedRecipeDetail(recipe);
         setDetailModalVisible(true);
       } else {
         try {
           const detail = await recipeService.getRecipeById(data.recipe_id || data.id);
           if (detail) {
-            setSelectedRecipeDetail(normalizeData(detail));
-            setDetailModalVisible(true);
-          } else if (recipeData) {
-            setSelectedRecipeDetail(normalizeData(recipeData));
+            setSelectedRecipeDetail(detail);
             setDetailModalVisible(true);
           }
         } catch {
-          if (recipeData) {
-            setSelectedRecipeDetail(normalizeData(recipeData));
-            setDetailModalVisible(true);
-          }
+          Alert.alert('Thông báo', 'Không thể tải chi tiết công thức');
         }
       }
       return;
     }
-
-    handleSend({
-      type: 'action',
-      value: { action, data },
-    });
+    void handleSend({ type: 'action', value: { action, data } });
   };
 
   return (
@@ -352,32 +406,22 @@ export default function ChatbotScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Text style={styles.backBtnText}>←</Text>
           </TouchableOpacity>
-
           <View style={styles.headerInfo}>
             <View style={styles.titleRow}>
-              <Text style={styles.avatarEmoji}>🤖</Text>
+              <Text style={styles.avatarEmoji}>🧑‍⚕️</Text>
               <Text style={styles.headerTitle}>AI Assistant</Text>
             </View>
-            <Text style={styles.headerStatus}>
-              {loading ? 'Đang xử lý...' : 'Sẵn sàng hỗ trợ'}
-            </Text>
+            <Text style={styles.headerStatus}>{loading ? 'Đang xử lý...' : 'Sẵn sàng hỗ trợ'}</Text>
           </View>
-
-          <TouchableOpacity
-            onPress={() => setOptionsModalVisible(true)}
-            style={styles.moreBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
+          <TouchableOpacity onPress={() => setOptionsModalVisible(true)} style={styles.moreBtn}>
             <Ionicons name="ellipsis-vertical" size={20} color="#374151" />
           </TouchableOpacity>
         </View>
 
-        {/* Message List */}
         {initialLoading ? (
           <View style={styles.loadingCenter}>
             <ActivityIndicator size="large" color="#10B981" />
@@ -402,7 +446,6 @@ export default function ChatbotScreen() {
           />
         )}
 
-        {/* Typing indicator */}
         {loading && (
           <View style={styles.typingRow}>
             <ActivityIndicator size="small" color="#10B981" />
@@ -410,7 +453,6 @@ export default function ChatbotScreen() {
           </View>
         )}
 
-        {/* Input Bar */}
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
@@ -418,53 +460,36 @@ export default function ChatbotScreen() {
             onChangeText={setInputText}
             placeholder="Hỏi về món ăn, thực đơn, mục tiêu..."
             placeholderTextColor="#9CA3AF"
-            multiline={false}
             returnKeyType="send"
-            onSubmitEditing={() => handleSend()}
+            onSubmitEditing={() => void handleSend()}
           />
           <TouchableOpacity
             style={[styles.sendBtn, (!inputText.trim() || loading) && styles.sendBtnDisabled]}
             disabled={!inputText.trim() || loading}
-            onPress={() => handleSend()}
+            onPress={() => void handleSend()}
           >
-            <Text style={styles.sendBtnText}>➤</Text>
+            <Ionicons name="send" size={18} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
-        {/* Recipe Detail Modal */}
         <ChatRecipeDetailModal
           visible={detailModalVisible}
           recipe={selectedRecipeDetail}
           onClose={() => setDetailModalVisible(false)}
-          onAddToMealPlan={(recId) =>
-            handleAction('add_to_meal_plan', {
-              recipe_id: recId,
-              meal_type: selectedRecipeDetail?.meal_type || 'lunch',
-            })
-          }
+          onAddToMealPlan={(recipeId) => void handleAction('add_to_meal_plan', { recipe_id: recipeId })}
         />
-
-        {/* Options Modal (Tùy chọn popup) */}
         <ChatOptionsModal
           visible={optionsModalVisible}
           onClose={() => setOptionsModalVisible(false)}
-          onNewConversation={() => {
-            handleReset();
-          }}
-          onOpenHistory={() => {
-            setHistoryModalVisible(true);
-          }}
+          onNewConversation={() => void handleReset()}
+          onOpenHistory={() => setHistoryModalVisible(true)}
         />
-
-        {/* Conversation History Modal (Lịch sử trò chuyện) */}
         <ChatHistoryModal
           visible={historyModalVisible}
           currentConversationId={conversationId}
           onClose={() => setHistoryModalVisible(false)}
           onSelectConversation={handleSelectConversation}
-          onNewConversation={() => {
-            handleReset();
-          }}
+          onNewConversation={() => void handleReset()}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -472,126 +497,24 @@ export default function ChatbotScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  backBtn: {
-    padding: 6,
-  },
-  backBtnText: {
-    fontSize: 22,
-    color: '#374151',
-    fontWeight: '700',
-  },
-  headerInfo: {
-    alignItems: 'center',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  avatarEmoji: {
-    fontSize: 18,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  headerStatus: {
-    fontSize: 11,
-    color: '#10B981',
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  moreBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listContent: {
-    paddingVertical: 12,
-  },
-  loadingCenter: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  typingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    gap: 8,
-  },
-  typingText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontStyle: 'italic',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    gap: 8,
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#1F2937',
-    maxHeight: 100,
-  },
-  sendBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#10B981',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendBtnDisabled: {
-    backgroundColor: '#D1D5DB',
-  },
-  sendBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  safeArea: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  backBtn: { padding: 6 },
+  backBtnText: { fontSize: 22, color: '#374151', fontWeight: '700' },
+  headerInfo: { alignItems: 'center' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  avatarEmoji: { fontSize: 18 },
+  headerTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  headerStatus: { fontSize: 11, color: '#10B981', fontWeight: '600', marginTop: 1 },
+  moreBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  listContent: { paddingVertical: 12 },
+  loadingCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 10, fontSize: 13, color: '#6B7280' },
+  typingRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, gap: 8 },
+  typingText: { fontSize: 12, color: '#6B7280', fontStyle: 'italic' },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E5E7EB', gap: 8 },
+  textInput: { flex: 1, backgroundColor: '#F3F4F6', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: '#1F2937', maxHeight: 100 },
+  sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center' },
+  sendBtnDisabled: { backgroundColor: '#D1D5DB' },
 });

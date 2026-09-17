@@ -70,7 +70,7 @@ function formatReasonTitle(reason: string): string {
   if (/post|bài viết/i.test(r)) {
     return 'Đăng bài viết';
   }
-  if (/chatbot|chat|miu/i.test(r)) {
+  if (/chatbot|chat|miu|tri/i.test(r)) {
     return 'Trò chuyện với trợ lý dinh dưỡng';
   }
 

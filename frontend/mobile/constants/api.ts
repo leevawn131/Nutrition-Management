@@ -11,11 +11,11 @@ const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL || process.env.API_BASE_URL;
 
 const getWebFallbackApiUrl = () => {
   if (typeof window === 'undefined') {
-    return 'http://localhost:5000/api';
+    return 'http://localhost:5001/api';
   }
 
   const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-  return `${protocol}//${window.location.hostname}:5000/api`;
+  return `${protocol}//${window.location.hostname}:5001/api`;
 };
 
 export const API_BASE_URL =
@@ -23,5 +23,5 @@ export const API_BASE_URL =
     ? getWebFallbackApiUrl()
     : ENV_API_URL ||
       (Platform.OS === 'android'
-        ? 'http://10.0.2.2:5000/api'
-        : 'http://localhost:5000/api');
+        ? 'http://10.0.2.2:5001/api'
+        : 'http://localhost:5001/api');

@@ -4,12 +4,12 @@ import { useRouter } from 'expo-router';
 import {
     Alert,
     Modal,
+    Pressable,
     Platform,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    TouchableWithoutFeedback,
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -164,10 +164,8 @@ export function QuickActionsModal({ visible, onClose, onOpenMealScan }: QuickAct
       visible={visible}
       animationType="slide"
       onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <View style={[styles.sheetContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <Pressable style={[styles.sheetContainer, { paddingBottom: Math.max(insets.bottom, 20) }]} onPress={(event) => event.stopPropagation()}>
               {/* Drag Handle */}
               <View style={styles.handleContainer}>
                 <View style={styles.dragHandle} />
@@ -239,10 +237,8 @@ export function QuickActionsModal({ visible, onClose, onOpenMealScan }: QuickAct
                   <Text style={styles.recordCardTitle}>Cân nặng</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }

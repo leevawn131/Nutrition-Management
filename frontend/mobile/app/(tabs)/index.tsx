@@ -133,7 +133,7 @@ export default function HomeScreen() {
     }
 
     const prompts: Record<string, string> = {
-      'Bắt đầu': 'Xin chào Miu! Bạn có thể giúp mình những gì?',
+      'Bắt đầu': 'Xin chào Tri! Bạn có thể giúp mình những gì?',
       'Thiết lập mục tiêu': 'Thiết lập mục tiêu dinh dưỡng',
       'Lên kế hoạch': 'Lập kế hoạch bữa ăn',
       'Gợi ý món ăn': 'Tìm công thức nấu ăn',

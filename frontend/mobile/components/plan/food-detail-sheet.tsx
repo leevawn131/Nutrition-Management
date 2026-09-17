@@ -356,7 +356,7 @@ export function FullFoodDetailModal({
   const handleToggleSave = async () => {
     try {
       const result = await recipeService.toggleSaveRecipe({
-        _id: recipe?._id || food?._id,
+        _id: recipe?._id || food?._id || `recipe-${Date.now()}`,
         title: itemName,
         image_url: itemImage,
         prep_time_minutes: prepTime,

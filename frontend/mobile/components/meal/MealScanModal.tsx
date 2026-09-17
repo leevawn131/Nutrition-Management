@@ -10,7 +10,6 @@ import {
   TextInput,
   Platform,
   KeyboardAvoidingView,
-  TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -125,7 +124,7 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
         }
       }}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <Pressable onPress={Keyboard.dismiss}>
         <View style={styles.modalBackdrop}>
           {/* Dismiss backdrop on press outside */}
           <Pressable
@@ -144,8 +143,8 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
             style={[
               styles.keyboardAvoidingContainer,
               showTextInput ? styles.centeredOverlay : styles.bottomOverlay,
+              { pointerEvents: 'box-none' },
             ]}
-            pointerEvents="box-none"
           >
             <Pressable
               style={[
@@ -231,7 +230,7 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
 
                   <Text style={styles.popupTitle}>Mô tả bữa ăn</Text>
                   <Text style={styles.popupSubtitle}>
-                    Ví dụ: "1 bát phở bò tái chín ít bánh, 1 quả trứng chần, 1 cốc trà đá"
+                    Ví dụ: &quot;1 bát phở bò tái chín ít bánh, 1 quả trứng chần, 1 cốc trà đá&quot;
                   </Text>
 
                   <TextInput
@@ -263,7 +262,7 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
             </Pressable>
           </KeyboardAvoidingView>
         </View>
-      </TouchableWithoutFeedback>
+      </Pressable>
     </Modal>
   );
 };
@@ -300,10 +299,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
+    boxShadow: '0px 12px 24px rgba(0, 0, 0, 0.18)',
     elevation: 12,
   },
   header: {
@@ -330,10 +326,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 16,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.05)',
   },
   optionRow: {
     flexDirection: 'row',
@@ -355,10 +348,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.05)',
   },
   cancelBtnText: {
     fontSize: 16,

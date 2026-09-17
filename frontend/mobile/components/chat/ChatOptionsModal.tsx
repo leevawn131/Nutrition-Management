@@ -3,8 +3,8 @@ import {
   View,
   Text,
   Modal,
+  Pressable,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,10 +29,8 @@ export const ChatOptionsModal: React.FC<ChatOptionsModalProps> = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <View style={styles.sheetContainer}>
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <Pressable style={styles.sheetContainer} onPress={(event) => event.stopPropagation()}>
               {/* Handle indicator */}
               <View style={styles.handleContainer}>
                 <View style={styles.handle} />
@@ -89,10 +87,8 @@ export const ChatOptionsModal: React.FC<ChatOptionsModalProps> = ({
               >
                 <Text style={styles.cancelText}>Hủy</Text>
               </TouchableOpacity>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 };
@@ -110,10 +106,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    boxShadow: '0px -4px 12px rgba(0, 0, 0, 0.1)',
     elevation: 10,
   },
   handleContainer: {

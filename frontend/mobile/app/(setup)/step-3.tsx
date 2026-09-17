@@ -22,8 +22,11 @@ export default function SetupStep3Screen() {
   const insets = useSafeAreaInsets();
   const { wizardData, updateWizardData } = useSetup();
 
-  const [birthYear, setBirthYear] = useState<string>(
-    wizardData.date_of_birth ? wizardData.date_of_birth.substring(0, 4) : '1998'
+  const currentYear = new Date().getFullYear();
+  const [age, setAge] = useState<number>(
+    wizardData.date_of_birth
+      ? Math.max(13, currentYear - Number(wizardData.date_of_birth.substring(0, 4)))
+      : 28
   );
   const [gender, setGender] = useState<'male' | 'female'>(
     (wizardData.gender as 'male' | 'female') || 'female'
@@ -44,12 +47,15 @@ export default function SetupStep3Screen() {
     setGender(val);
   };
 
+  const adjustAge = (delta: number) => {
+    setAge((value) => Math.min(100, Math.max(13, value + delta)));
+  };
+
   const handleNext = () => {
-    const yearNum = parseInt(birthYear, 10);
+    const yearNum = currentYear - age;
     const heightNum = parseFloat(heightCm);
     const weightNum = parseFloat(weightKg);
 
-    const currentYear = new Date().getFullYear();
     if (isNaN(yearNum) || yearNum < 1920 || yearNum > currentYear - 5) {
       Alert.alert('Năm sinh không hợp lệ', 'Vui lòng nhập năm sinh hợp lệ (ví dụ: 1998).');
       return;
@@ -59,7 +65,6 @@ export default function SetupStep3Screen() {
       Alert.alert('Chiều cao không hợp lệ', 'Vui lòng nhập chiều cao từ 80 đến 250 cm.');
       return;
     }
-
     if (isNaN(weightNum) || weightNum < 25 || weightNum > 300) {
       Alert.alert('Cân nặng không hợp lệ', 'Vui lòng nhập cân nặng từ 25 đến 300 kg.');
       return;
@@ -96,20 +101,20 @@ export default function SetupStep3Screen() {
           <Text style={styles.subtitle}>Hãy để chúng tôi hiểu thêm về bạn</Text>
         </View>
 
-        {/* 1. NĂM SINH */}
+        {/* 1. TUỔI */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>Năm sinh:</Text>
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.textInput}
-              value={birthYear}
-              onChangeText={setBirthYear}
-              placeholder="Nhập năm sinh (ví dụ: 1998)"
-              placeholderTextColor="#94A3B8"
-              keyboardType="number-pad"
-              maxLength={4}
-            />
-            <Ionicons name="calendar-outline" size={20} color="#94A3B8" />
+          <Text style={styles.fieldLabel}>Tuổi:</Text>
+          <View style={styles.ageStepper}>
+            <TouchableOpacity style={styles.ageButton} onPress={() => adjustAge(-1)} accessibilityLabel="Giảm tuổi">
+              <Text style={styles.ageButtonText}>−</Text>
+            </TouchableOpacity>
+            <View style={styles.ageValue}>
+              <Text style={styles.ageNumber}>{age}</Text>
+              <Text style={styles.ageUnit}>tuổi</Text>
+            </View>
+            <TouchableOpacity style={styles.ageButton} onPress={() => adjustAge(1)} accessibilityLabel="Tăng tuổi">
+              <Text style={styles.ageButtonText}>+</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -235,6 +240,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 52,
   },
+  ageStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 8,
+    backgroundColor: '#F8FAFC',
+  },
+  ageButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E2E8F0',
+  },
+  ageButtonText: {
+    fontSize: 28,
+    lineHeight: 30,
+    color: '#0F2644',
+  },
+  ageValue: {
+    alignItems: 'center',
+  },
+  ageNumber: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#0F2644',
+  },
+  ageUnit: {
+    fontSize: 13,
+    color: '#64748B',
+  },
   textInput: {
     flex: 1,
     fontSize: 15,
@@ -323,10 +363,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 22,
     gap: 6,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 4px rgba(16, 185, 129, 0.2)',
     elevation: 2,
   },
   nextButtonText: {

@@ -1,0 +1,17 @@
+$kind: http-request
+name: goal-chat
+method: POST
+url: 'http://localhost:5000/api/chatbot/goal-chat'
+order: 1000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{token}}'
+body:
+  type: json
+  content: |-
+    {
+      "message": "Hello, I want to set a nutrition goal",
+      "history": []
+    }

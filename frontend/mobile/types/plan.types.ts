@@ -1,14 +1,14 @@
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 export interface RecipeIngredient {
-  ingredient_name: string;
+  ingredient_name?: string | null;
   quantity?: number | null;
   unit?: string | null;
 }
 
 export interface RecipeStep {
   step_number: number;
-  instruction: string;
+  instruction?: string | null;
   image_url?: string | null;
 }
 
@@ -54,8 +54,8 @@ export interface Recipe {
   fat_g?: number | null;
   avg_rating?: number | null;
   comment_count?: number | null;
-  source_type: 'system' | 'community';
-  status?: 'pending' | 'approved' | 'rejected';
+  source_type?: 'system' | 'community';
+  status?: string | null;
   ingredients: RecipeIngredient[];
   steps?: RecipeStep[];
   nutrition_facts?: RecipeNutritionFacts | null;

@@ -92,7 +92,7 @@ export default function SamplePlanDetailScreen() {
         if (recipe && Array.isArray(recipe.ingredients)) {
           recipe.ingredients.forEach((ing: RecipeIngredient) => {
             list.push({
-              name: ing.ingredient_name,
+              name: ing.ingredient_name || 'Nguyên liệu',
               quantity: ing.quantity ? `${ing.quantity} ${ing.unit || ''}`.trim() : 'Định lượng vừa đủ',
               recipeName: recipe.title,
             });

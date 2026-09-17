@@ -133,7 +133,7 @@ const resetConversation = async (req, res) => {
       conversation_id: newConversation._id,
       sender: 'ai',
       role: 'assistant',
-      content: `Chào${nameDisplay}! Mình là Miu, trợ lý dinh dưỡng và sức khoẻ của The Meal. Mình có thể tính mục tiêu calo, lên thực đơn, gợi ý món ăn, theo dõi vận động, hoặc trả lời câu hỏi về dinh dưỡng và chỉ số của bạn. Bạn chọn một việc bên dưới, hoặc cứ hỏi mình bất cứ điều gì nhé.`,
+      content: `Chào${nameDisplay}! Mình là Tri, trợ lý dinh dưỡng và sức khoẻ của The Nutri. Mình có thể tính mục tiêu calo, lên thực đơn, gợi ý món ăn, theo dõi vận động, hoặc trả lời câu hỏi về dinh dưỡng và chỉ số của bạn. Bạn chọn một việc bên dưới, hoặc cứ hỏi mình bất cứ điều gì nhé.`,
       ui_type: 'choice',
       ui_payload: {
         title: 'Chọn tác vụ bạn cần:',
