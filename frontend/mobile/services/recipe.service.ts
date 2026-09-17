@@ -96,6 +96,33 @@ export const recipeService = {
   },
 
   /**
+   * Fetch current user's created recipes
+   */
+  async getMyRecipes(): Promise<Recipe[]> {
+    try {
+      const token = await getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/recipes?tab=mine`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const resData = await response.json();
+      if (response.ok && resData.success) {
+        if (Array.isArray(resData.data)) return resData.data;
+        if (resData.data && Array.isArray(resData.data.items)) return resData.data.items;
+        if (Array.isArray(resData.items)) return resData.items;
+      }
+      return [];
+    } catch (error) {
+      console.warn('Error fetching my recipes:', error);
+      return [];
+    }
+  },
+
+  /**
    * Fetch a single recipe details
    */
   async getRecipeById(id: string): Promise<any> {

@@ -182,9 +182,64 @@ class MealPlanService {
         logged_at: plan.plan_date,
         created_at: new Date(),
       });
+
+      // Trigger Gamification: Tự động cập nhật chuỗi và cộng 10 điểm thưởng
+      try {
+        const gamificationService = require('./gamification.service');
+        await gamificationService.updateStreak(userId);
+        await gamificationService.awardPoints(userId, 10, 'Ghi nhận bữa ăn theo kế hoạch');
+      } catch (e) {
+        console.warn('Gamification meal plan trigger error:', e.message);
+      }
     }
 
     const populated = await MealPlan.findById(plan._id)
+      .populate('recipe_id')
+      .populate('food_item_id')
+      .lean();
+
+    return populated;
+  }
+
+  /**
+   * Bulk add meal plan items (e.g. from Chatbot confirmation)
+   * @param {string} userId
+   * @param {Array<Object>} items - Array of { plan_date, meal_type, recipe_id, food_item_id, source }
+   * @returns {Promise<Array>} Created meal plan documents
+   */
+  async bulkAddMealPlanItems(userId, items = []) {
+    if (!userId) throw new Error('userId is required');
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error('Items array must not be empty');
+    }
+
+    const docsToInsert = items.map((item) => {
+      let planDateObj;
+      if (typeof item.plan_date === 'string' && item.plan_date.includes('-')) {
+        const parts = item.plan_date.split('T')[0].split('-');
+        planDateObj = new Date(
+          Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 0, 0, 0, 0)
+        );
+      } else {
+        planDateObj = new Date(item.plan_date || Date.now());
+      }
+
+      return {
+        user_id: userId,
+        plan_date: planDateObj,
+        meal_type: item.meal_type || 'lunch',
+        recipe_id: item.recipe_id || null,
+        food_item_id: item.food_item_id || null,
+        source: item.source || (item.recipe_id ? 'recipe' : 'manual'),
+        is_logged: false,
+        created_at: new Date(),
+      };
+    });
+
+    const insertedDocs = await MealPlan.insertMany(docsToInsert);
+    const populated = await MealPlan.find({
+      _id: { $in: insertedDocs.map((d) => d._id) },
+    })
       .populate('recipe_id')
       .populate('food_item_id')
       .lean();

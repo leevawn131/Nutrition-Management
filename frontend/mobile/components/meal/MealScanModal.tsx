@@ -160,7 +160,7 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
                   <View style={styles.header}>
                     <Text style={styles.title}>Quét bữa ăn của bạn</Text>
                     <Text style={styles.subtitle}>
-                      Miu miu sẽ phân tích bữa ăn của bạn và tính toán dinh dưỡng giúp bạn!
+                      AI Assistant sẽ phân tích bữa ăn của bạn và tính toán dinh dưỡng giúp bạn!
                     </Text>
                   </View>
 

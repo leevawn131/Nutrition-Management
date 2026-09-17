@@ -80,7 +80,7 @@ export default function HomeScreen() {
         userService.getProfile(token),
         userService.getHealthMetrics(token),
         mealLogService.getDailySummary(),
-        mealService.getMealLogs(token, todayStr).catch(() => ({ success: false, data: [] })),
+        mealLogService.getMealLogs({ date: todayStr }),
       ]);
 
       if (profileData) {
@@ -92,9 +92,7 @@ export default function HomeScreen() {
       if (summaryData) {
         setSummary(summaryData);
       }
-      if (mealLogsData && mealLogsData.data) {
-        setTodayLogs(mealLogsData.data);
-      }
+      setTodayLogs(mealLogsData);
     }
 
     // 3. Load grocery items count
@@ -133,7 +131,24 @@ export default function HomeScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } catch {}
     }
-    Alert.alert('Trợ lý dinh dưỡng', `Chức năng "${action}" đang được chuẩn bị để kết nối trực tiếp!`);
+
+    const prompts: Record<string, string> = {
+      'Bắt đầu': 'Xin chào Miu! Bạn có thể giúp mình những gì?',
+      'Thiết lập mục tiêu': 'Thiết lập mục tiêu dinh dưỡng',
+      'Lên kế hoạch': 'Lập kế hoạch bữa ăn',
+      'Gợi ý món ăn': 'Tìm công thức nấu ăn',
+      'Lên lịch tập': 'Luyện tập & vận động',
+      'Hỏi về sức khỏe': 'Tôi muốn hỏi về sức khỏe và dinh dưỡng.',
+    };
+
+    router.push({
+      pathname: '/chatbot',
+      params: {
+        prompt: prompts[action] || action,
+        autoSend: '1',
+        newChat: '1',
+      },
+    });
   };
 
   return (
@@ -360,7 +375,10 @@ export default function HomeScreen() {
         })()}
 
         {/* 6. NUTRITION ASSISTANT CARD */}
-        <View style={styles.assistantCard}>
+        <TouchableOpacity
+          style={styles.assistantCard}
+          activeOpacity={0.92}
+          onPress={() => router.push('/assistant' as any)}>
           <View style={styles.assistantTopRow}>
             <View style={styles.assistantAvatar}>
               <MaterialCommunityIcons name="chef-hat" size={28} color="#10B981" />
@@ -368,6 +386,9 @@ export default function HomeScreen() {
             <View style={styles.assistantTextWrapper}>
               <Text style={styles.assistantTitle}>Mình là trợ lý dinh dưỡng</Text>
               <Text style={styles.assistantSubtitle}>Cần gì, cứ hỏi nha!</Text>
+            </View>
+            <View style={styles.assistantCardArrow}>
+              <Ionicons name="chevron-forward" size={16} color="#059669" />
             </View>
           </View>
 
@@ -398,8 +419,32 @@ export default function HomeScreen() {
               <Ionicons name="calendar-outline" size={15} color="#334155" />
               <Text style={styles.secondaryPillBtnText}>Lên kế hoạch</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryPillBtn}
+              onPress={() => handleAssistantAction('Gợi ý món ăn')}
+              activeOpacity={0.8}>
+              <Ionicons name="restaurant-outline" size={15} color="#334155" />
+              <Text style={styles.secondaryPillBtnText}>Gợi ý món ăn</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryPillBtn}
+              onPress={() => handleAssistantAction('Lên lịch tập')}
+              activeOpacity={0.8}>
+              <Ionicons name="barbell-outline" size={15} color="#334155" />
+              <Text style={styles.secondaryPillBtnText}>Lên lịch tập</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryPillBtn}
+              onPress={() => handleAssistantAction('Hỏi về sức khỏe')}
+              activeOpacity={0.8}>
+              <Ionicons name="help-circle-outline" size={15} color="#334155" />
+              <Text style={styles.secondaryPillBtnText}>Hỏi về sức khỏe</Text>
+            </TouchableOpacity>
           </ScrollView>
-        </View>
+        </TouchableOpacity>
 
         {/* 7. LOWER CONTENT CARDS */}
         <View style={styles.lowerCardsRow}>
@@ -818,6 +863,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#047857',
     marginTop: 2,
+  },
+  assistantCardArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   assistantBtnRow: {
     gap: 8,

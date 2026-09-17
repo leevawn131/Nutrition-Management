@@ -30,13 +30,13 @@ router.get('/collections/my', optionalAuth, recipeController.getUserCollections)
 router.get('/collections', optionalAuth, recipeController.getUserCollections);
 
 // POST /api/recipes
-router.post('/', authMiddleware, recipeController.createRecipe);
+router.post('/', optionalAuth, recipeController.createRecipe);
 
 // PUT /api/recipes/:id
-router.put('/:id', authMiddleware, recipeController.updateRecipe);
+router.put('/:id', optionalAuth, recipeController.updateRecipe);
 
 // DELETE /api/recipes/:id
-router.delete('/:id', authMiddleware, recipeController.deleteRecipe);
+router.delete('/:id', optionalAuth, recipeController.deleteRecipe);
 
 // POST /api/recipes/:id/toggle-save and /save
 router.post('/:id/toggle-save', optionalAuth, recipeController.toggleSaveRecipe);
@@ -46,8 +46,8 @@ router.post('/:id/save', optionalAuth, recipeController.toggleSaveRecipe);
 router.get('/:id/is-saved', optionalAuth, recipeController.checkRecipeSaved);
 
 // POST /api/recipes/:id/reviews and /comments
-router.post('/:id/reviews', authMiddleware, recipeController.addRecipeReview);
-router.post('/:id/comments', authMiddleware, recipeController.addRecipeReview);
+router.post('/:id/reviews', optionalAuth, recipeController.addRecipeReview);
+router.post('/:id/comments', optionalAuth, recipeController.addRecipeReview);
 
 // GET /api/recipes/:id
 router.get('/:id', optionalAuth, recipeController.getRecipeById);
