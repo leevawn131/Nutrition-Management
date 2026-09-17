@@ -7,6 +7,7 @@ node_modules/
 **/.env
 **/.env.local
 **/.env.*.local
+frontend/mobile/expo-env.d.ts
 # agent
 .agent/
 .agents/
