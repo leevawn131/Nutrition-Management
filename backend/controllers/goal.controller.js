@@ -198,7 +198,253 @@ const confirmGoal = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/goal/adherence
+ * Retrieve goal maintenance progress and suggested plan adjustment
+ */
+const getGoalAdherence = async (req, res) => {
+  try {
+    const userId = req.user && req.user.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Không tìm thấy thông tin xác thực',
+      });
+    }
+
+    const { days = 7 } = req.query;
+    const adherence = await goalService.calculateGoalAdherence(userId, { rangeDays: Number(days) });
+
+    return res.status(200).json({
+      success: true,
+      data: adherence,
+    });
+  } catch (error) {
+    console.error('Error in getGoalAdherence:', error.message);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Lỗi khi tải tiến độ duy trì mục tiêu',
+    });
+  }
+};
+
+/**
+ * POST /api/goal/apply-to-plan
+ * Save goal metrics and apply to meal plans
+ */
+const applyGoalToPlan = async (req, res) => {
+  try {
+    const userId = req.user && req.user.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Không tìm thấy thông tin xác thực',
+      });
+    }
+
+    const result = await goalService.applyGoalToMealPlan(userId, req.body || {});
+
+    return res.status(200).json({
+      success: true,
+      message: 'Áp dụng mục tiêu vào kế hoạch dinh dưỡng thành công',
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error in applyGoalToPlan:', error.message);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Lỗi khi áp dụng mục tiêu vào kế hoạch',
+    });
+  }
+};
+
+/**
+ * POST /api/goal/adherence/confirm-adjustment
+ * Confirm user choice when over 3 days off-track (accept suggestion or keep current)
+ */
+const confirmAdherenceAdjustment = async (req, res) => {
+  try {
+    const userId = req.user && req.user.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Không tìm thấy thông tin xác thực',
+      });
+    }
+
+    const { action, new_target_calories, template_id } = req.body || {};
+    const result = await goalService.confirmAdherenceAdjustment(userId, {
+      action: action || 'keep_current',
+      new_target_calories,
+      template_id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error in confirmAdherenceAdjustment:', error.message);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Lỗi khi xác nhận điều chỉnh kế hoạch',
+    });
+  }
+};
+
+/**
+ * POST /api/goal/adherence/simulate
+ * Inject mock data to simulate different adherence scenarios
+ */
+const simulateAdherenceScenario = async (req, res) => {
+  try {
+    const userId = req.user && req.user.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Không tìm thấy thông tin xác thực',
+      });
+    }
+
+    const { scenario = 'consecutive_over' } = req.body || {};
+    const result = await goalService.simulateGoalAdherenceScenario(userId, scenario);
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error in simulateAdherenceScenario:', error.message);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Lỗi khi mô phỏng kịch bản tuân thủ',
+    });
+  }
+};
+
+/**
+ * POST /api/goal/meal-analysis/ai
+ * Generate on-demand clinical AI nutrition advice for a specific day using Gemini 3.5 Flash
+ */
+const getAIMealAnalysis = async (req, res) => {
+  try {
+    const userId = req.user && req.user.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Không tìm thấy thông tin xác thực',
+      });
+    }
+
+    const { date } = req.body || {};
+    const result = await goalService.generateAIMealAnalysis(userId, date);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Đã tạo phân tích dinh dưỡng AI thành công',
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error in getAIMealAnalysis:', error.message);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Lỗi khi tạo phân tích dinh dưỡng AI',
+    });
+  }
+};
+
+/**
+ * POST /api/goal/ai-chat
+ * Pure Conversational AI Consultation for goal setting / adjustment using Gemini 3.5 Flash
+ */
+const chatGoalConsultation = async (req, res) => {
+  try {
+    const userId = req.user && req.user.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Không tìm thấy thông tin xác thực',
+      });
+    }
+
+    const User = require('../models/user.model');
+    const geminiService = require('../services/gemini.service');
+    const healthService = require('../services/health.service');
+    const goalService = require('../services/goal.service');
+
+    const user = await User.findById(userId).lean();
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy thông tin người dùng',
+      });
+    }
+
+    // Health metrics
+    let healthMetrics = {};
+    try {
+      healthMetrics = healthService.calculateHealthMetrics({
+        gender: user.gender,
+        date_of_birth: user.date_of_birth,
+        height_cm: user.height_cm,
+        weight_kg: user.weight_kg,
+        activity_level: user.activity_level,
+      });
+    } catch (e) {
+      healthMetrics = {
+        bmi: 22,
+        bmr: 1500,
+        tdee: 2000,
+      };
+    }
+
+    // Recent adherence summary
+    let recentAdherence = { summary: 'Đang theo dõi' };
+    try {
+      const adherence = await goalService.calculateGoalAdherence(userId, { rangeDays: 7 });
+      recentAdherence = {
+        adherenceRate: adherence.adherenceRate,
+        currentStreak: adherence.currentOnTrackStreak,
+        deviatedDays: adherence.consecutiveDeviatedDays,
+        summary: `Tỷ lệ theo kế hoạch: ${adherence.adherenceRate}%. Chuỗi đúng hạn: ${adherence.currentOnTrackStreak} ngày. Lệch: ${adherence.consecutiveDeviatedDays} ngày liên tiếp.`,
+      };
+    } catch (e) {
+      // safe fallback
+    }
+
+    const { messages = [], userMessage = '' } = req.body || {};
+
+    const aiResult = await geminiService.chatGoalConsultation({
+      user,
+      healthMetrics,
+      recentAdherence,
+      conversationHistory: messages,
+      userMessage,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: aiResult,
+    });
+  } catch (error) {
+    console.error('Error in chatGoalConsultation:', error.message);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Lỗi khi trò chuyện với Trợ lý AI',
+    });
+  }
+};
+
 module.exports = {
   recommendGoal,
   confirmGoal,
+  getGoalAdherence,
+  applyGoalToPlan,
+  confirmAdherenceAdjustment,
+  simulateAdherenceScenario,
+  getAIMealAnalysis,
+  chatGoalConsultation,
 };
+

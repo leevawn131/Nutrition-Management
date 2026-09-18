@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
-import { Tabs } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Tabs } from 'expo-router';
+import { useState } from 'react';
+import { Alert, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { QuickActionsModal } from '@/components/home/quick-actions-modal';
-import { MealScanModal } from '@/components/meal/MealScanModal';
-import { PhotoConfirmModal } from '@/components/meal/PhotoConfirmModal';
 import { AnalysisLoadingModal } from '@/components/meal/AnalysisLoadingModal';
-import { NutritionAnalysisResultModal } from '@/components/meal/NutritionAnalysisResultModal';
 import { ManualMealLogModal } from '@/components/meal/ManualMealLogModal';
+import { MealScanModal } from '@/components/meal/MealScanModal';
+import { NutritionAnalysisResultModal } from '@/components/meal/NutritionAnalysisResultModal';
+import { PhotoConfirmModal } from '@/components/meal/PhotoConfirmModal';
 import { mealService } from '@/services/meal.service';
 import { getAuthToken } from '@/services/storage.service';
-import { AIRecognitionResult, MealType, IngredientInput } from '@/types/meal.types';
+import { AIRecognitionResult, IngredientInput, MealType } from '@/types/meal.types';
 
 export default function TabLayout() {
   const [quickActionsVisible, setQuickActionsVisible] = useState(false);
@@ -236,7 +236,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="health"
           options={{
-            title: 'Sức khỏe',
+            title: 'Mục tiêu',
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
                 name={focused ? 'pulse' : 'pulse-outline'}

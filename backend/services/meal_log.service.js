@@ -108,6 +108,43 @@ class MealLogService {
       recognition_summary: recognition_summary || null,
     });
 
+    // Check if daily total exceeds user target calories and create notification if appropriate
+    try {
+      const user = await User.findById(userId).lean();
+      if (user && user.target_calories) {
+        const { start: dStart, end: dEnd } = parseDateBounds(parsedLoggedAt.toISOString().split('T')[0]);
+        const dayLogs = await MealLog.find({
+          user_id: userId,
+          logged_at: { $gte: dStart, $lte: dEnd },
+        }).lean();
+        const totalDayCalories = dayLogs.reduce((sum, l) => sum + (l.calories || 0), 0);
+
+        if (totalDayCalories > user.target_calories * 1.15) {
+          const Notification = require('../models/notification.model');
+          const existingNotif = await Notification.findOne({
+            user_id: userId,
+            type: 'exceed_calories',
+            created_at: { $gte: dStart, $lte: dEnd },
+          });
+
+          if (!existingNotif) {
+            await Notification.create({
+              user_id: userId,
+              type: 'exceed_calories',
+              title: 'Cảnh báo: Vượt calo kế hoạch',
+              message: `Hôm nay bạn đã nạp ${Math.round(totalDayCalories)} kcal, vượt mục tiêu ${user.target_calories} kcal. Hãy cân đối lại các bữa tiếp theo nhé!`,
+              reference_type: 'meal_log',
+              reference_id: newLog._id,
+              is_read: false,
+              created_at: new Date(),
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Exceed calories notification error:', e.message);
+    }
+
     const populated = await MealLog.findById(newLog._id).populate('food_item_id').lean();
     return populated;
   }

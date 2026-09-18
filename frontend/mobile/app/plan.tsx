@@ -1,6 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     ActivityIndicator,
     Alert,
@@ -17,13 +18,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FoodDetailSheet } from '@/components/plan/food-detail-sheet';
+import { GoalAdherenceModal } from '@/components/plan/goal-adherence-modal';
 import { activityService } from '@/services/activity.service';
+import { GoalAdherenceData, goalService } from '@/services/goal.service';
 import { mealPlanService } from '@/services/meal_plan.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { userService } from '@/services/user.service';
 import { ActivityLog } from '@/types/activity.types';
 import { User } from '@/types/auth.types';
 import { FoodItem, MealPlanItem, MealType, Recipe } from '@/types/plan.types';
+
 
 type Section = 'meals' | 'activities';
 type ViewMode = 'day' | 'week';
@@ -164,6 +168,20 @@ export default function PlanScreen() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
 
+  // Adherence tracking & adjustment state
+  const [adherenceData, setAdherenceData] = useState<GoalAdherenceData | null>(null);
+  const [adherenceModalVisible, setAdherenceModalVisible] = useState(false);
+  const [isAdjustingPlan, setIsAdjustingPlan] = useState(false);
+  const hasDismissedAdherenceModalRef = useRef(false);
+
+  const dismissAdherenceModal = useCallback(async () => {
+    hasDismissedAdherenceModalRef.current = true;
+    setAdherenceModalVisible(false);
+    try {
+      await AsyncStorage.setItem('@nutrition_app:adherence_dismissed_date', todayStr);
+    } catch {}
+  }, [todayStr]);
+
   const formattedDateStr = selectedFullDate;
   const currentWeek = weeksData[selectedWeek] || weeksData[1];
   const selectedDayInfo =
@@ -184,6 +202,21 @@ export default function PlanScreen() {
       const token = await getAuthToken();
       if (token) {
         userService.getProfile(token).then((p) => p && setUser(p));
+        goalService.getGoalAdherence(token, 7).then(async (adh) => {
+          if (adh) {
+            setAdherenceData(adh);
+            if (adh.needsAdjustmentConfirmation && !hasDismissedAdherenceModalRef.current) {
+              try {
+                const dismissed = await AsyncStorage.getItem('@nutrition_app:adherence_dismissed_date');
+                if (dismissed !== todayStr) {
+                  setAdherenceModalVisible(true);
+                }
+              } catch {
+                setAdherenceModalVisible(true);
+              }
+            }
+          }
+        });
       }
 
       if (section === 'meals') {
@@ -201,7 +234,59 @@ export default function PlanScreen() {
       setLoadingMeals(false);
       setLoadingActivities(false);
     }
-  }, [formattedDateStr, section]);
+  }, [formattedDateStr, section, todayStr]);
+
+  const handleAcceptAdherenceSuggestion = async () => {
+    if (!adherenceData?.suggestedPlan) return;
+    setIsAdjustingPlan(true);
+    try {
+      const token = await getAuthToken();
+      if (!token) return;
+
+      const res = await goalService.confirmAdherenceAdjustment(token, {
+        action: 'accept_suggestion',
+        new_target_calories: adherenceData.suggestedPlan.suggestedTargetCalories,
+        template_id: adherenceData.suggestedPlan.templates[0]?._id,
+      });
+
+      if (res.success) {
+        await dismissAdherenceModal();
+        Alert.alert(
+          'Đã cập nhật kế hoạch! 🎉',
+          `Mục tiêu mới ${adherenceData.suggestedPlan.suggestedTargetCalories} kcal đã được áp dụng.`
+        );
+        loadData();
+      }
+    } catch (e) {
+      Alert.alert('Lỗi', 'Không thể cập nhật kế hoạch lúc này.');
+    } finally {
+      setIsAdjustingPlan(false);
+    }
+  };
+
+  const handleKeepCurrentAdherence = async () => {
+    setIsAdjustingPlan(true);
+    try {
+      const token = await getAuthToken();
+      if (token) {
+        await goalService.confirmAdherenceAdjustment(token, { action: 'keep_current' });
+      }
+    } catch (e) {
+    } finally {
+      await dismissAdherenceModal();
+      setIsAdjustingPlan(false);
+    }
+  };
+
+  const handleViewAdherencePlanDetails = useCallback((templateId?: string) => {
+    setAdherenceModalVisible(false);
+    const id = templateId || adherenceData?.suggestedPlan?.templates?.[0]?._id;
+    if (id) {
+      router.push({ pathname: '/sample-plan-detail', params: { id } } as any);
+    } else {
+      router.push('/sample-plans' as any);
+    }
+  }, [adherenceData, router]);
 
   // Ensure data loads whenever dependencies change or screen is focused
   useEffect(() => {
@@ -383,6 +468,16 @@ export default function PlanScreen() {
     section === 'meals'
       ? [
           {
+            id: 'adherence',
+            title: 'Tiến độ mục tiêu',
+            onPress: () => router.push('/goal-adherence' as any),
+          },
+          {
+            id: 'goal-setup',
+            title: 'Đổi mục tiêu',
+            onPress: () => router.push('/goal-setting' as any),
+          },
+          {
             id: 'analysis',
             title: 'Phân tích bữa ăn',
             onPress: () => router.push('/habit-analysis'),
@@ -403,6 +498,11 @@ export default function PlanScreen() {
           },
         ]
       : [
+          {
+            id: 'adherence',
+            title: 'Tiến độ mục tiêu',
+            onPress: () => router.push('/goal-adherence' as any),
+          },
           {
             id: 'habits',
             title: 'Phân tích thói quen',
@@ -464,8 +564,26 @@ export default function PlanScreen() {
                   : `Thứ ${selectedDayInfo.dayName}, ${selectedDayInfo.date} tháng ${selectedDayInfo.month}, ${selectedDayInfo.year}`}
             </Text>
           </View>
-          <View style={styles.headerSpacer} />
+          <View style={styles.headerRightActions}>
+            <TouchableOpacity
+              style={styles.headerAdherenceBtn}
+              onPress={() => router.push('/goal-adherence' as any)}
+              activeOpacity={0.8}
+              accessibilityLabel="Tiến độ mục tiêu">
+              <Ionicons name="trending-up" size={15} color="#059669" />
+              <Text style={styles.headerAdherenceText}>Tiến độ</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.headerGoalSettingBtn}
+              onPress={() => router.push('/goal-setting' as any)}
+              activeOpacity={0.8}
+              accessibilityLabel="Thiết lập mục tiêu">
+              <Ionicons name="flag-outline" size={17} color="#334155" />
+            </TouchableOpacity>
+          </View>
         </View>
+
 
         {/* Section and View Mode Switcher */}
         <View style={styles.controlsRow}>
@@ -663,6 +781,18 @@ export default function PlanScreen() {
         onDelete={handleDeleteMealItem}
         onToggleLogged={handleToggleLogMeal}
       />
+
+      {/* 3-Day Deviation Adherence Adjustment Modal */}
+      <GoalAdherenceModal
+        visible={adherenceModalVisible}
+        onClose={dismissAdherenceModal}
+        consecutiveDays={adherenceData?.consecutiveDeviatedDays || 3}
+        suggestedPlan={adherenceData?.suggestedPlan}
+        onAcceptSuggestion={handleAcceptAdherenceSuggestion}
+        onKeepCurrent={handleKeepCurrentAdherence}
+        onViewPlanDetails={handleViewAdherencePlanDetails}
+        loading={isAdjustingPlan}
+      />
     </SafeAreaView>
   );
 }
@@ -858,6 +988,56 @@ function MealPlan({
               Đã hoàn thành {completedPlannedCount}/{totalPlannedCount} món đã lên thực đơn hôm nay
             </Text>
           </View>
+
+          {/* Adherence Alert Banner */}
+          {totalCalories > 0 && (() => {
+            const calorieRatio = targetCalories > 0 ? totalCalories / targetCalories : 1;
+            if (calorieRatio > 1.15) {
+              const diff = Math.round(totalCalories - targetCalories);
+              return (
+                <View style={[styles.alertBanner, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+                  <Ionicons name="alert-circle" size={20} color="#EF4444" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.alertBannerTitle, { color: '#B91C1C' }]}>
+                      Cảnh báo: Thực đơn vượt calo (+{diff} kcal)
+                    </Text>
+                    <Text style={[styles.alertBannerText, { color: '#7F1D1D' }]}>
+                      Tổng calo đã lên vượt {Math.round((calorieRatio - 1) * 100)}% mục tiêu. Hãy giảm bớt khẩu phần hoặc vận động thêm!
+                    </Text>
+                  </View>
+                </View>
+              );
+            } else if (calorieRatio < 0.70) {
+              const diff = Math.round(targetCalories - totalCalories);
+              return (
+                <View style={[styles.alertBanner, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
+                  <Ionicons name="warning-outline" size={20} color="#F59E0B" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.alertBannerTitle, { color: '#B45309' }]}>
+                      Cảnh báo: Thực đơn thiếu calo (-{diff} kcal)
+                    </Text>
+                    <Text style={[styles.alertBannerText, { color: '#78350F' }]}>
+                      Nạp quá ít năng lượng có thể làm chậm trao đổi chất và gây suy nhược. Hãy thêm món ăn bổ dưỡng!
+                    </Text>
+                  </View>
+                </View>
+              );
+            } else {
+              return (
+                <View style={[styles.alertBanner, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
+                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.alertBannerTitle, { color: '#047857' }]}>
+                      Kế hoạch chuẩn mục tiêu
+                    </Text>
+                    <Text style={[styles.alertBannerText, { color: '#065F46' }]}>
+                      Mức calo hôm nay đạt chuẩn mục tiêu ({Math.round(totalCalories)}/{targetCalories} kcal). Chúc bạn ăn ngon miệng!
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
+          })()}
         </>
       ) : (
         <>
@@ -898,14 +1078,24 @@ function MealPlan({
       {/* Menu Header */}
       <View style={styles.planHeader}>
         <Text style={styles.sectionTitle}>Thực đơn của bạn</Text>
-        <TouchableOpacity
-          style={styles.exploreButton}
-          onPress={() => router.push('/sample-plans' as any)}
-          activeOpacity={0.8}>
-          <MaterialCommunityIcons name="auto-fix" size={18} color="#FFFFFF" />
-          <Text style={styles.exploreText}>Khám phá thực đơn mẫu</Text>
-        </TouchableOpacity>
+        <View style={styles.planHeaderRightBtns}>
+          <TouchableOpacity
+            style={styles.adherenceMiniBtn}
+            onPress={() => router.push('/goal-adherence' as any)}
+            activeOpacity={0.8}>
+            <Ionicons name="trending-up" size={15} color="#059669" />
+            <Text style={styles.adherenceMiniBtnText}>Tiến độ mục tiêu</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.exploreButton}
+            onPress={() => router.push('/sample-plans' as any)}
+            activeOpacity={0.8}>
+            <MaterialCommunityIcons name="auto-fix" size={16} color="#FFFFFF" />
+            <Text style={styles.exploreText}>Thực đơn mẫu</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
 
       {/* When in Week mode: Horizontal Day Picker Strip */}
       {viewMode === 'week' && (
@@ -1746,4 +1936,74 @@ const styles = StyleSheet.create({
   mealSheetText: { fontSize: 22, fontWeight: '700' },
   sheetCancel: { height: 86, marginTop: 16, borderRadius: 22, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   sheetCancelText: { fontSize: 22, color: '#EF5555', fontWeight: '600' },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerAdherenceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  headerAdherenceText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  headerGoalSettingBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planHeaderRightBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  adherenceMiniBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  adherenceMiniBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  alertBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 14,
+    marginBottom: 4,
+    borderWidth: 1,
+  },
+  alertBannerTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  alertBannerText: {
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
 });
+
