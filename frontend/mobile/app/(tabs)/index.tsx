@@ -19,7 +19,6 @@ import { GroceryBagModal } from '@/components/home/grocery-bag-modal';
 import { QuickActionsModal } from '@/components/home/quick-actions-modal';
 import { AppLogo } from '@/components/ui/app-logo';
 import { groceryService } from '@/services/grocery.service';
-import { mealService } from '@/services/meal.service';
 import { mealLogService } from '@/services/meal_log.service';
 import { getAuthToken, getCachedUser } from '@/services/storage.service';
 import { HealthMetrics, userService } from '@/services/user.service';
@@ -151,6 +150,7 @@ export default function HomeScreen() {
     });
   };
 
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView
@@ -280,6 +280,20 @@ export default function HomeScreen() {
 
           return (
             <>
+              {/* Adherence Alert for Today if exceeded */}
+              {consumedCalories > targetCalories * 1.15 && (
+                <TouchableOpacity
+                  style={styles.homeWarningBanner}
+                  onPress={() => router.push('/goal-adherence' as any)}
+                  activeOpacity={0.85}>
+                  <Ionicons name="alert-circle" size={18} color="#EF4444" />
+                  <Text style={styles.homeWarningText} numberOfLines={1}>
+                    Đã nạp vượt {Math.round(consumedCalories - targetCalories)} kcal so với mục tiêu hôm nay!
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color="#EF4444" />
+                </TouchableOpacity>
+              )}
+
               <View style={styles.calorieCard}>
                 {/* Left Circular Ring */}
                 <View style={styles.calorieRingContainer}>
@@ -406,6 +420,14 @@ export default function HomeScreen() {
 
             <TouchableOpacity
               style={styles.secondaryPillBtn}
+              onPress={() => handleAssistantAction('Tiến độ mục tiêu')}
+              activeOpacity={0.8}>
+              <Ionicons name="trending-up" size={15} color="#059669" />
+              <Text style={styles.secondaryPillBtnText}>Tiến độ mục tiêu</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryPillBtn}
               onPress={() => handleAssistantAction('Thiết lập mục tiêu')}
               activeOpacity={0.8}>
               <Ionicons name="calculator-outline" size={15} color="#334155" />
@@ -445,6 +467,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </ScrollView>
         </TouchableOpacity>
+
 
         {/* 7. LOWER CONTENT CARDS */}
         <View style={styles.lowerCardsRow}>
@@ -1018,4 +1041,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#10B981',
   },
+  homeWarningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  homeWarningText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#B91C1C',
+  },
 });
+

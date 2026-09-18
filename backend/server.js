@@ -87,6 +87,8 @@ const adminRecipeRoutes = require('./routes/admin/recipe.admin.routes');
 const adminMealPlanTemplateRoutes = require('./routes/admin/meal_plan_template.admin.routes');
 const adminReportRoutes = require('./routes/admin/report.admin.routes');
 const adminUnidentifiedFoodRoutes = require('./routes/admin/unidentified_food.admin.routes');
+const adminActivityRoutes = require('./routes/admin/activity.admin.routes');
+const adminAchievementRoutes = require('./routes/admin/achievement.admin.routes');
 
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/admin/foods', adminFoodRoutes);
@@ -94,6 +96,8 @@ app.use('/api/admin/recipes', adminRecipeRoutes);
 app.use('/api/admin/meal-plan-templates', adminMealPlanTemplateRoutes);
 app.use('/api/admin/reports', adminReportRoutes);
 app.use('/api/admin/unidentified-foods', adminUnidentifiedFoodRoutes);
+app.use('/api/admin/activities', adminActivityRoutes);
+app.use('/api/admin/achievements', adminAchievementRoutes);
 
 // Middleware xử lý lỗi tập trung trả về JSON
 app.use((err, req, res, next) => {

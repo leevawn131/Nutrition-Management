@@ -37,14 +37,16 @@ import {
 } from 'lucide-react';
 
 const COMMON_CATEGORIES = [
-  'Món nước',
-  'Món cơm',
+  'Món nước / Bún phở',
+  'Món cơm & Xôi',
   'Salad & Eat Clean',
-  'Thịt & Gia cầm',
-  'Món nước / Bún',
-  'Hải sản',
-  'Tráng miệng & Ăn vặt',
-  'Đồ uống',
+  'Món xào & Kho',
+  'Đồ uống & Tráng miệng',
+  'Nguyên liệu: Thịt & Trứng',
+  'Nguyên liệu: Hải sản tươi',
+  'Nguyên liệu: Rau củ & Quả',
+  'Nguyên liệu: Tinh bột & Hạt ngũ cốc',
+  'Nguyên liệu: Gia vị, Dầu ăn & Sốt',
   'Khác',
 ];
 

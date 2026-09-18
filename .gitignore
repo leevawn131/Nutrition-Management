@@ -50,10 +50,14 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
-*.doc
-*.doc 
+
 *.docx
-*.txt
+*.doc
+*.pdf
+*.pptx
+*.ppt
+*.jpg
+
 
 # generated native folders
 /ios

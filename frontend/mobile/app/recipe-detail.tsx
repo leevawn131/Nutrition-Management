@@ -112,7 +112,7 @@ export default function RecipeDetailScreen() {
   const handleToggleSave = async () => {
     try {
       const result = await recipeService.toggleSaveRecipe({
-        _id: params.id,
+        _id: params.id || '',
         title: itemName,
         image_url: itemImage,
         prep_time_minutes: prepTime,

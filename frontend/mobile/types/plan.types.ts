@@ -54,8 +54,8 @@ export interface Recipe {
   fat_g?: number | null;
   avg_rating?: number | null;
   comment_count?: number | null;
-  source_type: 'system' | 'community';
-  status?: 'pending' | 'approved' | 'rejected';
+  source_type?: 'system' | 'community';
+  status?: 'pending' | 'approved' | 'rejected' | string;
   ingredients: RecipeIngredient[];
   steps?: RecipeStep[];
   nutrition_facts?: RecipeNutritionFacts | null;

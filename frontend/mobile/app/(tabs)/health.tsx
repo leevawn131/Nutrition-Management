@@ -220,7 +220,27 @@ export default function HealthScreen() {
               <Text style={styles.metricItemVal}>{age} <Text style={styles.unit}>tuổi</Text></Text>
             </View>
           </View>
+
+          {/* Goal Action Buttons */}
+          <View style={styles.heroGoalButtonsRow}>
+            <TouchableOpacity
+              style={styles.heroGoalBtnPrimary}
+              onPress={() => router.push('/goal-adherence' as any)}
+              activeOpacity={0.85}>
+              <Ionicons name="trending-up" size={16} color="#FFFFFF" />
+              <Text style={styles.heroGoalBtnPrimaryText}>Xem tiến độ mục tiêu</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.heroGoalBtnSecondary}
+              onPress={() => router.push('/goal-setting' as any)}
+              activeOpacity={0.85}>
+              <Ionicons name="options-outline" size={16} color="#059669" />
+              <Text style={styles.heroGoalBtnSecondaryText}>Thiết lập mục tiêu</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
 
         {/* BMI Card */}
         <View style={styles.card}>
@@ -483,6 +503,49 @@ const styles = StyleSheet.create({
   metricItemVal: { fontSize: 17, fontWeight: '800', color: '#10294B' },
   unit: { fontSize: 12, fontWeight: '500', color: '#64748B' },
   metricDivider: { width: 1, backgroundColor: '#F1F5F9' },
+  heroGoalButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  heroGoalBtnPrimary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#10B981',
+    paddingVertical: 10,
+    borderRadius: 14,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  heroGoalBtnPrimaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  heroGoalBtnSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  heroGoalBtnSecondaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#059669',
+  },
+
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,

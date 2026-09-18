@@ -217,7 +217,7 @@ export const recipeService = {
   /**
    * Toggle save/bookmark recipe
    */
-  async toggleSaveRecipe(recipe: Recipe, collectionName = 'Món ăn yêu thích'): Promise<{ isSaved: boolean; allSaved: Recipe[] }> {
+  async toggleSaveRecipe(recipe: Recipe | SangRecipe | any, collectionName = 'Món ăn yêu thích'): Promise<{ isSaved: boolean; allSaved: Recipe[] }> {
     try {
       const saved = await this.getSavedRecipes();
       const existsIndex = saved.findIndex(
