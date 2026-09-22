@@ -20,8 +20,10 @@ interface MealScanModalProps {
   visible: boolean;
   onClose: () => void;
   onImageSelected: (imageUri: string, mimeType: string) => void;
+  onImagesSelected?: (images: Array<{ uri: string; mimeType: string }>) => void;
   onTextDescriptionSelected: (description: string) => void;
   onManualCookingSelected: () => void;
+  onVoiceSelected?: () => void;
   onViewGuide?: () => void;
 }
 
@@ -29,8 +31,10 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
   visible,
   onClose,
   onImageSelected,
+  onImagesSelected,
   onTextDescriptionSelected,
   onManualCookingSelected,
+  onVoiceSelected,
   onViewGuide,
 }) => {
   const [showTextInput, setShowTextInput] = useState(false);
@@ -59,7 +63,11 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
           const asset = result.assets[0];
           // Give camera activity time to cleanly dismiss before opening PhotoConfirmModal
           setTimeout(() => {
-            onImageSelected(asset.uri, asset.mimeType || 'image/jpeg');
+            if (onImagesSelected) {
+              onImagesSelected([{ uri: asset.uri, mimeType: asset.mimeType || 'image/jpeg' }]);
+            } else {
+              onImageSelected(asset.uri, asset.mimeType || 'image/jpeg');
+            }
           }, 250);
         }
       } catch (err: any) {
@@ -83,15 +91,23 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
       try {
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ['images'],
-          allowsEditing: true,
+          allowsMultipleSelection: true,
+          selectionLimit: 5,
           quality: 0.8,
         });
 
         if (!result.canceled && result.assets && result.assets.length > 0) {
-          const asset = result.assets[0];
+          const selectedPhotos = result.assets.map((a) => ({
+            uri: a.uri,
+            mimeType: a.mimeType || 'image/jpeg',
+          }));
           // Give gallery activity time to cleanly dismiss before opening PhotoConfirmModal
           setTimeout(() => {
-            onImageSelected(asset.uri, asset.mimeType || 'image/jpeg');
+            if (onImagesSelected) {
+              onImagesSelected(selectedPhotos);
+            } else {
+              onImageSelected(selectedPhotos[0].uri, selectedPhotos[0].mimeType);
+            }
           }, 250);
         }
       } catch (err: any) {
@@ -192,8 +208,23 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.optionRow} onPress={handleChooseFromLibrary}>
-                      <Ionicons name="image-outline" size={22} color="#D97706" style={styles.optionIcon} />
-                      <Text style={[styles.optionText, { color: '#D97706', fontWeight: '600' }]}>Chọn từ thư viện</Text>
+                      <Ionicons name="images-outline" size={22} color="#D97706" style={styles.optionIcon} />
+                      <Text style={[styles.optionText, { color: '#D97706', fontWeight: '600' }]}>
+                        Chọn từ thư viện (Tối đa 5 ảnh)
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.optionRow}
+                      onPress={() => {
+                        onClose();
+                        if (onVoiceSelected) onVoiceSelected();
+                      }}
+                    >
+                      <Ionicons name="mic-outline" size={22} color="#10B981" style={styles.optionIcon} />
+                      <Text style={[styles.optionText, { color: '#10B981', fontWeight: '700' }]}>
+                        Ghi âm giọng nói (AI Voice 🎙️)
+                      </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.optionRow} onPress={() => setShowTextInput(true)}>
@@ -244,6 +275,18 @@ export const MealScanModal: React.FC<MealScanModalProps> = ({
                     onChangeText={setTextInput}
                     autoFocus
                   />
+
+                  <TouchableOpacity
+                    style={styles.voiceSwitchBtn}
+                    onPress={() => {
+                      setShowTextInput(false);
+                      onClose();
+                      if (onVoiceSelected) onVoiceSelected();
+                    }}
+                  >
+                    <Ionicons name="mic" size={16} color="#059669" />
+                    <Text style={styles.voiceSwitchText}>Hoặc nói bằng giọng nói</Text>
+                  </TouchableOpacity>
 
                   <View style={styles.popupActions}>
                     <TouchableOpacity
@@ -361,9 +404,26 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   cancelBtnText: {
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  voiceSwitchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    alignSelf: 'center',
+    marginBottom: 16,
+    gap: 6,
+  },
+  voiceSwitchText: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#EF4444',
+    color: '#059669',
   },
   centeredInputContent: {
     width: '100%',

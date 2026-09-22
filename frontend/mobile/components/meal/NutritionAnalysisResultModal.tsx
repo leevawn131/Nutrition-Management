@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -18,93 +19,180 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AIRecognitionResult, MealType, DishItem, DishIngredient, MicronutrientInfo } from '@/types/meal.types';
 import { foodService } from '@/services/food.service';
 import { FoodItem } from '@/types/food.types';
+import {
+  getVerifiedFoodNutrition,
+  getStandardDishRecipe,
+  expandCompoundIngredient,
+} from '@/constants/foodDatabase';
+import { CalendarDatePickerModal } from '@/components/common/CalendarDatePickerModal';
+import { WheelTimePickerModal } from '@/components/common/WheelTimePickerModal';
+import { PortionAdjuster } from '@/components/meal/PortionAdjuster';
+import { ShareMealModal } from '@/components/meal/ShareMealModal';
 
-export const calculateIngredientMicronutrients = (ingName: string, portionG: number): MicronutrientInfo => {
-  const nameLower = (ingName || '').toLowerCase();
-  const ratio = portionG / 100;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const BANNER_WIDTH = SCREEN_WIDTH - 32;
 
-  let baseFiber = 1.2;
-  let baseSodium = 350;
-  let basePotassium = 220;
-  let baseCalcium = 25;
-  let baseIron = 1.2;
-  let baseVitA = 40;
-  let baseVitC = 8;
-  let baseVitD = 0.2;
-  let baseZinc = 0.8;
+const normalizeText = (s: string) =>
+  (s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s]/g, ' ')
+    .trim();
 
-  if (
-    nameLower.includes('rau') ||
-    nameLower.includes('củ') ||
-    nameLower.includes('canh') ||
-    nameLower.includes('xào') ||
-    nameLower.includes('salad') ||
-    nameLower.includes('nộm') ||
-    nameLower.includes('cải') ||
-    nameLower.includes('cà rốt') ||
-    nameLower.includes('cà chua')
-  ) {
-    baseFiber = 2.8;
-    baseVitC = 25;
-    baseVitA = 180;
-    basePotassium = 320;
-    baseCalcium = 45;
+export const distributeIngredientsToDishes = (
+  dishes: DishItem[],
+  allIngredients: DishIngredient[]
+): DishItem[] => {
+  if (!dishes || dishes.length === 0) return [];
+
+  // Step 1: Expand any compound parenthetical strings in allIngredients
+  const expandedAllIngredients: DishIngredient[] = [];
+  (allIngredients || []).forEach(ing => {
+    const expanded = expandCompoundIngredient(ing.name, ing.portion_g || 100);
+    if (expanded && expanded.length > 0) {
+      expandedAllIngredients.push(...expanded);
+    } else {
+      expandedAllIngredients.push(ing);
+    }
+  });
+
+  // Step 2: Clone dishes and expand any compound ingredients inside dishes
+  const resultDishes: DishItem[] = dishes.map(d => {
+    const currentIngs = d.ingredients ? [...d.ingredients] : [];
+    const expandedIngs: DishIngredient[] = [];
+    currentIngs.forEach(ing => {
+      const expanded = expandCompoundIngredient(ing.name, ing.portion_g || 100);
+      if (expanded && expanded.length > 0) {
+        expandedIngs.push(...expanded);
+      } else {
+        expandedIngs.push(ing);
+      }
+    });
+    return {
+      ...d,
+      ingredients: expandedIngs,
+    };
+  });
+
+  // If only 1 dish and it has no ingredients, all ingredients belong to it
+  if (resultDishes.length === 1 && resultDishes[0].ingredients.length === 0) {
+    resultDishes[0].ingredients = [...expandedAllIngredients];
+  } else if (resultDishes.length > 1) {
+    // Multiple dishes: Match ingredients to dishes using keyword scoring
+    const unassignedIngs: DishIngredient[] = [];
+
+    expandedAllIngredients.forEach(ing => {
+      // Check if ingredient already exists in any dish
+      const alreadyInDish = resultDishes.some(d =>
+        d.ingredients.some(existing => existing.name.toLowerCase() === ing.name.toLowerCase())
+      );
+      if (alreadyInDish) return;
+
+      const normIng = normalizeText(ing.name);
+      let bestIdx = -1;
+      let bestScore = 0;
+
+      resultDishes.forEach((dish, dIdx) => {
+        const normDish = normalizeText(dish.name);
+        const dishWords = normDish.split(/\s+/).filter(w => w.length > 1);
+        const ingWords = normIng.split(/\s+/).filter(w => w.length > 1);
+
+        let score = 0;
+        if (normIng.includes(normDish) || normDish.includes(normIng)) score += 10;
+        dishWords.forEach(dw => {
+          if (normIng.includes(dw)) score += 3;
+        });
+        ingWords.forEach(iw => {
+          if (normDish.includes(iw)) score += 3;
+        });
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestIdx = dIdx;
+        }
+      });
+
+      if (bestScore > 0 && bestIdx >= 0) {
+        resultDishes[bestIdx].ingredients.push(ing);
+      } else {
+        unassignedIngs.push(ing);
+      }
+    });
+
+    // If some dishes still have 0 ingredients, distribute any unassigned ingredients
+    resultDishes.forEach(d => {
+      if (d.ingredients.length === 0 && unassignedIngs.length > 0) {
+        d.ingredients.push(unassignedIngs.shift()!);
+      }
+    });
   }
 
-  if (
-    nameLower.includes('thịt') ||
-    nameLower.includes('bò') ||
-    nameLower.includes('lợn') ||
-    nameLower.includes('gà') ||
-    nameLower.includes('sườn') ||
-    nameLower.includes('heo')
-  ) {
-    baseIron = 2.5;
-    baseZinc = 3.2;
-    basePotassium = 280;
-    baseSodium = 420;
-    baseVitD = 0.4;
-  }
+  // Step 3: For dishes that have 0 ingredients or only generic single-dish-name ingredient,
+  // look up the authentic culinary standard recipe from National Institute of Nutrition & USDA
+  return resultDishes.map(d => {
+    const weightG = d.estimated_weight_g || 150;
+    const hasGenericOnly = d.ingredients.length === 1 && (
+      d.ingredients[0].name.includes('(Phần chính)') ||
+      d.ingredients[0].name.includes('(Thành phần chính)') ||
+      d.ingredients[0].name.toLowerCase().trim() === d.name.toLowerCase().trim()
+    );
 
-  if (
-    nameLower.includes('cá') ||
-    nameLower.includes('tôm') ||
-    nameLower.includes('hải sản') ||
-    nameLower.includes('mực') ||
-    nameLower.includes('cua') ||
-    nameLower.includes('ngao') ||
-    nameLower.includes('sò')
-  ) {
-    baseVitD = 2.5;
-    baseCalcium = 65;
-    baseZinc = 2.1;
-    baseSodium = 480;
-    baseVitA = 60;
-  }
+    if (d.ingredients.length === 0 || hasGenericOnly) {
+      const standardRecipe = getStandardDishRecipe(d.name, weightG);
+      if (standardRecipe && standardRecipe.length > 0) {
+        return {
+          ...d,
+          ingredients: standardRecipe,
+        };
+      }
+    }
 
-  if (nameLower.includes('trứng') || nameLower.includes('opla')) {
-    baseVitA = 140;
-    baseVitD = 1.8;
-    baseCalcium = 50;
-    baseIron = 1.8;
-  }
+    // If still 0 ingredients, lookup verified nutrition from 100g database (NEVER fabricate numbers)
+    if (d.ingredients.length === 0) {
+      const verified = getVerifiedFoodNutrition(d.name, weightG);
+      return {
+        ...d,
+        ingredients: [
+          {
+            name: d.name,
+            portion_g: weightG,
+            calories: verified.is_verified ? verified.calories : (d.calories || 0),
+            protein_g: verified.is_verified ? verified.protein_g : (d.protein_g || 0),
+            carb_g: verified.is_verified ? verified.carb_g : (d.carb_g || 0),
+            fat_g: verified.is_verified ? verified.fat_g : (d.fat_g || 0),
+            micronutrients: verified.micronutrients || undefined,
+            source: 'visible' as const,
+          },
+        ],
+      };
+    }
+    return d;
+  });
+};
 
-  if (nameLower.includes('nấm')) {
-    baseVitD = 3.5;
-    basePotassium = 350;
-    baseFiber = 2.2;
-  }
+export const checkIsIngredientVerified = (ingName: string): boolean => {
+  return getVerifiedFoodNutrition(ingName, 100).is_verified;
+};
 
+export const calculateIngredientMicronutrients = (
+  ingName: string,
+  portionG: number
+): MicronutrientInfo => {
+  const verified = getVerifiedFoodNutrition(ingName, portionG);
+  if (verified.is_verified && verified.micronutrients) {
+    return verified.micronutrients;
+  }
   return {
-    fiber_g: Number((baseFiber * ratio).toFixed(1)),
-    sodium_mg: Math.round(baseSodium * ratio),
-    potassium_mg: Math.round(basePotassium * ratio),
-    calcium_mg: Math.round(baseCalcium * ratio),
-    iron_mg: Number((baseIron * ratio).toFixed(1)),
-    vitamin_a_mcg: Math.round(baseVitA * ratio),
-    vitamin_c_mg: Math.round(baseVitC * ratio),
-    vitamin_d_mcg: Number((baseVitD * ratio).toFixed(1)),
-    zinc_mg: Number((baseZinc * ratio).toFixed(1)),
+    fiber_g: 0,
+    sodium_mg: 0,
+    potassium_mg: 0,
+    calcium_mg: 0,
+    iron_mg: 0,
+    vitamin_a_mcg: 0,
+    vitamin_c_mg: 0,
+    vitamin_d_mcg: 0,
+    zinc_mg: 0,
   };
 };
 
@@ -131,10 +219,13 @@ export const calculateDishMicronutrients = (
     return true;
   });
 
+  const unverifiedItems: string[] = [];
+  let hasVerifiedData = false;
+
   if (activeIngs.length > 0) {
-    activeIngs.forEach(ing => {
+    activeIngs.forEach((ing) => {
       const ingPortion = (ing.portion_g || ing.estimated_weight_g || 50) * scale;
-      if (ing.micronutrients) {
+      if (ing.micronutrients && ing.micronutrients.fiber_g !== undefined) {
         const ratio = ingPortion / (ing.portion_g || 50);
         fiberG += (ing.micronutrients.fiber_g || 0) * ratio;
         sodiumMg += (ing.micronutrients.sodium_mg || 0) * ratio;
@@ -145,31 +236,44 @@ export const calculateDishMicronutrients = (
         vitCMg += (ing.micronutrients.vitamin_c_mg || 0) * ratio;
         vitDMcg += (ing.micronutrients.vitamin_d_mcg || 0) * ratio;
         zincMg += (ing.micronutrients.zinc_mg || 0) * ratio;
+        hasVerifiedData = true;
       } else {
-        const ingMicro = calculateIngredientMicronutrients(ing.name, ingPortion);
-        fiberG += ingMicro.fiber_g || 0;
-        sodiumMg += ingMicro.sodium_mg || 0;
-        potassiumMg += ingMicro.potassium_mg || 0;
-        calciumMg += ingMicro.calcium_mg || 0;
-        ironMg += ingMicro.iron_mg || 0;
-        vitAMcg += ingMicro.vitamin_a_mcg || 0;
-        vitCMg += ingMicro.vitamin_c_mg || 0;
-        vitDMcg += ingMicro.vitamin_d_mcg || 0;
-        zincMg += ingMicro.zinc_mg || 0;
+        const isVer = checkIsIngredientVerified(ing.name);
+        if (isVer) {
+          const micro = calculateIngredientMicronutrients(ing.name, ingPortion);
+          fiberG += micro.fiber_g || 0;
+          sodiumMg += micro.sodium_mg || 0;
+          potassiumMg += micro.potassium_mg || 0;
+          calciumMg += micro.calcium_mg || 0;
+          ironMg += micro.iron_mg || 0;
+          vitAMcg += micro.vitamin_a_mcg || 0;
+          vitCMg += micro.vitamin_c_mg || 0;
+          vitDMcg += micro.vitamin_d_mcg || 0;
+          zincMg += micro.zinc_mg || 0;
+          hasVerifiedData = true;
+        } else {
+          unverifiedItems.push(ing.name);
+        }
       }
     });
   } else {
     const dishPortion = (dish.estimated_weight_g || 150) * scale;
-    const dishMicro = calculateIngredientMicronutrients(dish.name, dishPortion);
-    fiberG = dishMicro.fiber_g || 0;
-    sodiumMg = dishMicro.sodium_mg || 0;
-    potassiumMg = dishMicro.potassium_mg || 0;
-    calciumMg = dishMicro.calcium_mg || 0;
-    ironMg = dishMicro.iron_mg || 0;
-    vitAMcg = dishMicro.vitamin_a_mcg || 0;
-    vitCMg = dishMicro.vitamin_c_mg || 0;
-    vitDMcg = dishMicro.vitamin_d_mcg || 0;
-    zincMg = dishMicro.zinc_mg || 0;
+    const isVer = checkIsIngredientVerified(dish.name);
+    if (isVer) {
+      const micro = calculateIngredientMicronutrients(dish.name, dishPortion);
+      fiberG = micro.fiber_g || 0;
+      sodiumMg = micro.sodium_mg || 0;
+      potassiumMg = micro.potassium_mg || 0;
+      calciumMg = micro.calcium_mg || 0;
+      ironMg = micro.iron_mg || 0;
+      vitAMcg = micro.vitamin_a_mcg || 0;
+      vitCMg = micro.vitamin_c_mg || 0;
+      vitDMcg = micro.vitamin_d_mcg || 0;
+      zincMg = micro.zinc_mg || 0;
+      hasVerifiedData = true;
+    } else {
+      unverifiedItems.push(dish.name);
+    }
   }
 
   return {
@@ -182,12 +286,15 @@ export const calculateDishMicronutrients = (
     vitCMg: Math.round(vitCMg),
     vitDMcg: Number(vitDMcg.toFixed(1)),
     zincMg: Number(zincMg.toFixed(1)),
+    unverifiedItems,
+    hasVerifiedData,
   };
 };
 
 interface NutritionAnalysisResultModalProps {
   visible: boolean;
   imageUri?: string | null;
+  imageUris?: string[] | null;
   result?: AIRecognitionResult | null;
   onClose: () => void;
   onConfirmSave: (data: {
@@ -206,6 +313,7 @@ interface NutritionAnalysisResultModalProps {
 export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModalProps> = ({
   visible,
   imageUri,
+  imageUris,
   result,
   onClose,
   onConfirmSave,
@@ -228,18 +336,20 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
   // Full ingredients list modal & inline expansion state
   const [showFullIngredientsModal, setShowFullIngredientsModal] = useState<boolean>(false);
   const [expandedIngKeys, setExpandedIngKeys] = useState<string[]>([]);
-  const [expandedDishMicroIndexes, setExpandedDishMicroIndexes] = useState<number[]>([]);
+
+  // Quick edit ingredient weight modal state
+  const [editingIngWeightTarget, setEditingIngWeightTarget] = useState<{
+    dIdx: number;
+    iIdx: number;
+    name: string;
+    currentGrams: number;
+  } | null>(null);
+  const [customIngWeightInput, setCustomIngWeightInput] = useState<string>('');
 
   const toggleExpandIngName = (dIdx: number, iIdx: number) => {
     const key = `${dIdx}_${iIdx}`;
     setExpandedIngKeys(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    );
-  };
-
-  const toggleExpandDishMicro = (dIdx: number) => {
-    setExpandedDishMicroIndexes(prev =>
-      prev.includes(dIdx) ? prev.filter(i => i !== dIdx) : [...prev, dIdx]
     );
   };
 
@@ -250,6 +360,9 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
 
   // Date picker state
   const [selectedDateOffset, setSelectedDateOffset] = useState<number>(0); // 0 = Hôm nay, -1 = Hôm qua, -2 = 2 ngày trước
+  const [showCalendarPickerModal, setShowCalendarPickerModal] = useState<boolean>(false);
+  const [showTimePickerModal, setShowTimePickerModal] = useState<boolean>(false);
+  const [showShareModal, setShowShareModal] = useState<boolean>(false);
 
   // Add custom ingredient modal state
   const [showAddIngModal, setShowAddIngModal] = useState<boolean>(false);
@@ -306,7 +419,8 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
           },
         ];
       }
-      setDishesList(initialDishes);
+      const populatedDishes = distributeIngredientsToDishes(initialDishes, result.ingredients || []);
+      setDishesList(populatedDishes);
       setIcePercentage(result.is_beverage ? 50 : 0);
       setDeductBones(Boolean(result.has_bones));
       setEatenRatio(1.0);
@@ -406,6 +520,34 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
             if (iIndex === iIdx) {
               const currentPortion = ing.portion_g || ing.estimated_weight_g || 50;
               const newPortion = Math.max(5, currentPortion + deltaGrams);
+              const ratio = currentPortion > 0 ? newPortion / currentPortion : 1;
+              return {
+                ...ing,
+                portion_g: newPortion,
+                calories: Math.round((ing.calories || 0) * ratio),
+                protein_g: Number(((ing.protein_g || 0) * ratio).toFixed(1)),
+                carb_g: Number(((ing.carb_g || 0) * ratio).toFixed(1)),
+                fat_g: Number(((ing.fat_g || 0) * ratio).toFixed(1)),
+              };
+            }
+            return ing;
+          });
+          return { ...dish, ingredients: updatedIngs };
+        }
+        return dish;
+      })
+    );
+  };
+
+  // Set explicit ingredient portion weight (g)
+  const handleSetIngredientWeight = (dIdx: number, iIdx: number, targetGrams: number) => {
+    const newPortion = Math.max(5, targetGrams);
+    setDishesList(prev =>
+      prev.map((dish, dIndex) => {
+        if (dIndex === dIdx) {
+          const updatedIngs = (dish.ingredients || []).map((ing, iIndex) => {
+            if (iIndex === iIdx) {
+              const currentPortion = ing.portion_g || ing.estimated_weight_g || 50;
               const ratio = currentPortion > 0 ? newPortion / currentPortion : 1;
               return {
                 ...ing,
@@ -569,172 +711,71 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
   };
 
   const generatePresetIngredientsForDish = (foodName: string, portionG: number): DishIngredient[] => {
-    const nameLower = foodName.toLowerCase();
+    // 1. Try authentic standard culinary recipe first
+    const recipe = getStandardDishRecipe(foodName, portionG);
+    if (recipe && recipe.length > 0) {
+      return recipe.map(r => ({
+        ...r,
+        micronutrients: calculateIngredientMicronutrients(r.name, r.portion_g),
+      }));
+    }
 
+    // 2. Beverage recipe checks
+    const nameLower = foodName.toLowerCase();
     if (
       nameLower.includes('cacao') ||
       nameLower.includes('cocoa') ||
       nameLower.includes('chocolate') ||
       nameLower.includes('socola')
     ) {
+      const wCacao = Math.max(10, Math.round(portionG * 0.15));
+      const wMilk = Math.max(50, Math.round(portionG * 0.65));
+      const wSugar = Math.max(10, Math.round(portionG * 0.2));
       return [
         {
           name: 'Bột cacao nguyên chất',
-          portion_g: Math.max(10, Math.round(portionG * 0.15)),
-          calories: 90,
-          protein_g: 4.5,
-          carb_g: 12,
-          fat_g: 3.0,
-          micronutrients: calculateIngredientMicronutrients('Bột cacao nguyên chất', Math.max(10, Math.round(portionG * 0.15))),
+          portion_g: wCacao,
+          calories: Math.round(wCacao * 3.5),
+          protein_g: Number((wCacao * 0.2).toFixed(1)),
+          carb_g: Number((wCacao * 0.55).toFixed(1)),
+          fat_g: Number((wCacao * 0.14).toFixed(1)),
+          micronutrients: calculateIngredientMicronutrients('Bột cacao nguyên chất', wCacao),
           source: 'inferred',
         },
         {
           name: 'Sữa tươi đánh nóng',
-          portion_g: Math.max(50, Math.round(portionG * 0.65)),
-          calories: 85,
-          protein_g: 4.2,
-          carb_g: 6.5,
-          fat_g: 4.5,
-          micronutrients: calculateIngredientMicronutrients('Sữa tươi đánh nóng', Math.max(50, Math.round(portionG * 0.65))),
+          portion_g: wMilk,
+          calories: Math.round(wMilk * 0.65),
+          protein_g: Number((wMilk * 0.032).toFixed(1)),
+          carb_g: Number((wMilk * 0.048).toFixed(1)),
+          fat_g: Number((wMilk * 0.036).toFixed(1)),
+          micronutrients: calculateIngredientMicronutrients('Sữa tươi thanh trùng', wMilk),
           source: 'inferred',
         },
-        {
-          name: 'Sữa đặc / Đường',
-          portion_g: Math.max(15, Math.round(portionG * 0.2)),
-          calories: 65,
-          protein_g: 1.0,
-          carb_g: 15,
-          fat_g: 0.5,
-          micronutrients: calculateIngredientMicronutrients('Sữa đặc / Đường', Math.max(15, Math.round(portionG * 0.2))),
-          source: 'inferred',
-        },
-      ];
-    }
-
-    if (nameLower.includes('bạc xỉu') || nameLower.includes('bac xiu')) {
-      return [
         {
           name: 'Sữa đặc có đường',
-          portion_g: Math.max(20, Math.round(portionG * 0.25)),
-          calories: 120,
-          protein_g: 2.5,
-          carb_g: 20,
-          fat_g: 3.2,
-          micronutrients: calculateIngredientMicronutrients('Sữa đặc có đường', Math.max(20, Math.round(portionG * 0.25))),
-          source: 'inferred',
-        },
-        {
-          name: 'Sữa tươi thanh trùng',
-          portion_g: Math.max(50, Math.round(portionG * 0.55)),
-          calories: 70,
-          protein_g: 3.5,
-          carb_g: 5.5,
-          fat_g: 3.8,
-          micronutrients: calculateIngredientMicronutrients('Sữa tươi thanh trùng', Math.max(50, Math.round(portionG * 0.55))),
-          source: 'inferred',
-        },
-        {
-          name: 'Cà phê nguyên chất',
-          portion_g: Math.max(20, Math.round(portionG * 0.2)),
-          calories: 10,
-          protein_g: 0.5,
-          carb_g: 1.2,
-          fat_g: 0.1,
-          micronutrients: calculateIngredientMicronutrients('Cà phê nguyên chất', Math.max(20, Math.round(portionG * 0.2))),
+          portion_g: wSugar,
+          calories: Math.round(wSugar * 3.25),
+          protein_g: Number((wSugar * 0.08).toFixed(1)),
+          carb_g: Number((wSugar * 0.55).toFixed(1)),
+          fat_g: Number((wSugar * 0.085).toFixed(1)),
+          micronutrients: calculateIngredientMicronutrients('Sữa đặc có đường', wSugar),
           source: 'inferred',
         },
       ];
     }
 
-    if (nameLower.includes('cappuccino') || nameLower.includes('latte') || nameLower.includes('espresso')) {
-      return [
-        {
-          name: 'Cà phê Espresso',
-          portion_g: Math.max(20, Math.round(portionG * 0.25)),
-          calories: 10,
-          protein_g: 0.6,
-          carb_g: 1.5,
-          fat_g: 0.1,
-          micronutrients: calculateIngredientMicronutrients('Cà phê Espresso', Math.max(20, Math.round(portionG * 0.25))),
-          source: 'inferred',
-        },
-        {
-          name: 'Sữa tươi đánh bọt',
-          portion_g: Math.max(60, Math.round(portionG * 0.6)),
-          calories: 75,
-          protein_g: 4.0,
-          carb_g: 6.0,
-          fat_g: 3.8,
-          micronutrients: calculateIngredientMicronutrients('Sữa tươi đánh bọt', Math.max(60, Math.round(portionG * 0.6))),
-          source: 'inferred',
-        },
-        {
-          name: 'Bọt sữa & Đường nhẹ',
-          portion_g: Math.max(10, Math.round(portionG * 0.15)),
-          calories: 35,
-          protein_g: 0.5,
-          carb_g: 8.0,
-          fat_g: 0.2,
-          micronutrients: calculateIngredientMicronutrients('Bọt sữa & Đường nhẹ', Math.max(10, Math.round(portionG * 0.15))),
-          source: 'inferred',
-        },
-      ];
-    }
-
-    if (nameLower.includes('trà sữa') || nameLower.includes('milk tea')) {
-      return [
-        {
-          name: 'Cốt trà đen / Oolong',
-          portion_g: Math.max(50, Math.round(portionG * 0.5)),
-          calories: 15,
-          protein_g: 0.5,
-          carb_g: 3.0,
-          fat_g: 0.1,
-          micronutrients: calculateIngredientMicronutrients('Cốt trà đen / Oolong', Math.max(50, Math.round(portionG * 0.5))),
-          source: 'inferred',
-        },
-        {
-          name: 'Bột béo / Sữa tươi',
-          portion_g: Math.max(30, Math.round(portionG * 0.3)),
-          calories: 140,
-          protein_g: 2.0,
-          carb_g: 12.0,
-          fat_g: 9.5,
-          micronutrients: calculateIngredientMicronutrients('Bột béo / Sữa tươi', Math.max(30, Math.round(portionG * 0.3))),
-          source: 'inferred',
-        },
-        {
-          name: 'Trân châu / Topping',
-          portion_g: Math.max(20, Math.round(portionG * 0.2)),
-          calories: 90,
-          protein_g: 0.3,
-          carb_g: 22.0,
-          fat_g: 0.1,
-          micronutrients: calculateIngredientMicronutrients('Trân châu / Topping', Math.max(20, Math.round(portionG * 0.2))),
-          source: 'inferred',
-        },
-      ];
-    }
-
+    // 3. Fallback to verified food nutrition from National Institute of Nutrition / USDA (NO arbitrary fake numbers)
+    const verified = getVerifiedFoodNutrition(foodName, portionG);
     return [
       {
-        name: `${foodName} (Thành phần chính)`,
-        portion_g: Math.max(50, Math.round(portionG * 0.8)),
-        calories: 160,
-        protein_g: 5.0,
-        carb_g: 20.0,
-        fat_g: 6.0,
-        micronutrients: calculateIngredientMicronutrients(foodName, Math.max(50, Math.round(portionG * 0.8))),
-        source: 'inferred',
-      },
-      {
-        name: 'Gia vị & Phụ gia kèm theo',
-        portion_g: Math.max(10, Math.round(portionG * 0.2)),
-        calories: 40,
-        protein_g: 1.0,
-        carb_g: 5.0,
-        fat_g: 2.0,
-        micronutrients: calculateIngredientMicronutrients('Gia vị', Math.max(10, Math.round(portionG * 0.2))),
+        name: foodName,
+        portion_g: portionG,
+        calories: verified.calories,
+        protein_g: verified.protein_g,
+        carb_g: verified.carb_g,
+        fat_g: verified.fat_g,
+        micronutrients: (verified.micronutrients || calculateIngredientMicronutrients(foodName, portionG)) || undefined,
         source: 'inferred',
       },
     ];
@@ -841,16 +882,55 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
             <Ionicons name="close" size={20} color="#1E293B" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Phân tích dinh dưỡng</Text>
-          <TouchableOpacity style={styles.headerShareBtn}>
+          <TouchableOpacity style={styles.headerShareBtn} onPress={() => setShowShareModal(true)}>
             <Ionicons name="paper-plane-outline" size={18} color="#1E293B" />
           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-          {/* Top Banner Image */}
-          {imageUri ? (
+          {/* Top Banner Image(s) */}
+          {imageUris && imageUris.length > 1 ? (
+            <View style={styles.multiBannerContainer}>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                style={styles.multiBannerScroll}
+              >
+                {imageUris.map((uri, idx) => (
+                  <View key={idx} style={[styles.multiBannerSlide, { width: BANNER_WIDTH }]}>
+                    <Image source={{ uri }} style={styles.bannerImage} resizeMode="cover" />
+                    <View style={styles.multiBannerBadge}>
+                      <Ionicons name="images" size={12} color="#FFFFFF" />
+                      <Text style={styles.multiBannerBadgeText}>
+                        {idx + 1}/{imageUris.length}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          ) : (imageUris && imageUris.length === 1) || imageUri ? (
             <View style={styles.bannerImageContainer}>
-              <Image source={{ uri: imageUri }} style={styles.bannerImage} contentFit="cover" />
+              <Image
+                source={{ uri: (imageUris && imageUris[0]) || imageUri! }}
+                style={styles.bannerImage}
+                contentFit="cover"
+              />
+            </View>
+          ) : null}
+
+          {/* Voice Transcript Banner */}
+          {result?.transcription ? (
+            <View style={styles.voiceTranscriptCard}>
+              <View style={styles.voiceTranscriptHeader}>
+                <View style={styles.voiceBadge}>
+                  <Ionicons name="mic" size={14} color="#059669" />
+                  <Text style={styles.voiceBadgeText}>Ghi âm giọng nói</Text>
+                </View>
+                <Text style={styles.voiceHintText}>Lời nói được nhận diện</Text>
+              </View>
+              <Text style={styles.voiceTranscriptQuote}>"{result.transcription}"</Text>
             </View>
           ) : null}
 
@@ -1040,19 +1120,19 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
             </View>
 
             {/* 2. Logged Date (Ngày ghi nhận) */}
-            <Text style={[styles.pickerSubLabel, { marginTop: 14 }]}>2. Ngày ghi nhận (YYYY-MM-DD):</Text>
+            <Text style={[styles.pickerSubLabel, { marginTop: 14 }]}>2. Ngày ghi nhận (Lịch chọn trực quan):</Text>
             <View style={styles.inputWithShortcutsRow}>
-              <View style={styles.manualTextInputBox}>
-                <Ionicons name="calendar-outline" size={18} color="#10B981" style={{ marginRight: 6 }} />
-                <TextInput
-                  style={styles.manualTextInput}
-                  value={manualDateStr}
-                  onChangeText={setManualDateStr}
-                  placeholder="YYYY-MM-DD"
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={10}
-                />
-              </View>
+              <TouchableOpacity
+                style={styles.datePickerDisplayCard}
+                onPress={() => setShowCalendarPickerModal(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="calendar" size={18} color="#059669" style={{ marginRight: 6 }} />
+                <Text style={styles.datePickerDisplayText}>{manualDateStr}</Text>
+                <View style={styles.pickerTapBadge}>
+                  <Text style={styles.pickerTapBadgeText}>Xem lịch 📅</Text>
+                </View>
+              </TouchableOpacity>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcutPillsRow}>
                 {[
                   { label: 'Hôm nay', offset: 0 },
@@ -1082,19 +1162,19 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
             </View>
 
             {/* 3. Meal Time (Giờ ăn) */}
-            <Text style={[styles.pickerSubLabel, { marginTop: 14 }]}>3. Giờ ăn (HH:mm):</Text>
+            <Text style={[styles.pickerSubLabel, { marginTop: 14 }]}>3. Giờ ăn (Cuộn dạng báo thức):</Text>
             <View style={styles.inputWithShortcutsRow}>
-              <View style={styles.manualTextInputBox}>
-                <Ionicons name="time-outline" size={18} color="#10B981" style={{ marginRight: 6 }} />
-                <TextInput
-                  style={styles.manualTextInput}
-                  value={manualTimeStr}
-                  onChangeText={setManualTimeStr}
-                  placeholder="HH:mm"
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={5}
-                />
-              </View>
+              <TouchableOpacity
+                style={styles.datePickerDisplayCard}
+                onPress={() => setShowTimePickerModal(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="time" size={18} color="#059669" style={{ marginRight: 6 }} />
+                <Text style={styles.datePickerDisplayText}>{manualTimeStr}</Text>
+                <View style={styles.pickerTapBadge}>
+                  <Text style={styles.pickerTapBadgeText}>Cuộn giờ ⏰</Text>
+                </View>
+              </TouchableOpacity>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcutPillsRow}>
                 <TouchableOpacity style={styles.shortcutPill} onPress={setCurrentTimeNow}>
                   <Text style={styles.shortcutPillText}>Bây giờ</Text>
@@ -1211,284 +1291,276 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
                 {/* Per-Dish Portion Control Bar */}
                 {!isDishExcluded && (
                   <View style={styles.dishPortionControlBar}>
-                    <Text style={styles.dishPortionLabel}>Khẩu phần ước tính tổng lượng bữa ăn (gram):</Text>
-                    <View style={styles.dishPortionStepRow}>
-                      <TouchableOpacity
-                        style={styles.dishStepBtn}
-                        onPress={() => handleAdjustDishWeight(dIdx, -50)}
-                      >
-                        <Text style={styles.dishStepBtnText}>-50g</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.dishStepBtn}
-                        onPress={() => handleAdjustDishWeight(dIdx, -10)}
-                      >
-                        <Text style={styles.dishStepBtnText}>-10g</Text>
-                      </TouchableOpacity>
-
-                      <View style={styles.dishPortionBadge}>
-                        <Text style={styles.dishPortionBadgeText}>{dishWeight}g</Text>
+                    <Text style={styles.dishPortionLabel}>
+                      Khẩu phần (Bấm +/- 1g, giữ chạy liên tục hoặc gõ tay):
+                    </Text>
+                    <View style={styles.portionAdjusterRow}>
+                      <PortionAdjuster
+                        weight={dishWeight}
+                        onChangeWeight={(newW) => {
+                          const delta = newW - dishWeight;
+                          handleAdjustDishWeight(dIdx, delta);
+                        }}
+                        step={1}
+                        min={1}
+                        max={5000}
+                      />
+                      <View style={styles.quickStepBtnRow}>
+                        <TouchableOpacity
+                          style={styles.dishStepBtn}
+                          onPress={() => handleAdjustDishWeight(dIdx, -50)}
+                        >
+                          <Text style={styles.dishStepBtnText}>-50g</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.dishStepBtn}
+                          onPress={() => handleAdjustDishWeight(dIdx, 50)}
+                        >
+                          <Text style={styles.dishStepBtnText}>+50g</Text>
+                        </TouchableOpacity>
                       </View>
-
-                      <TouchableOpacity
-                        style={styles.dishStepBtn}
-                        onPress={() => handleAdjustDishWeight(dIdx, 10)}
-                      >
-                        <Text style={styles.dishStepBtnText}>+10g</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.dishStepBtn}
-                        onPress={() => handleAdjustDishWeight(dIdx, 50)}
-                      >
-                        <Text style={styles.dishStepBtnText}>+50g</Text>
-                      </TouchableOpacity>
                     </View>
                   </View>
                 )}
 
-                {/* Vitamin & Mineral Micronutrient Breakdown for this Dish */}
-                {!isDishExcluded && (() => {
-                  const dishMicro = calculateDishMicronutrients(dish, totalScale, dIdx, excludedIngKeys);
-                  const isMicroExpanded = expandedDishMicroIndexes.includes(dIdx);
-                  return (
-                    <View style={styles.dishMicroContainer}>
-                      <TouchableOpacity
-                        style={styles.microHeaderToggle}
-                        onPress={() => toggleExpandDishMicro(dIdx)}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Ionicons name="sparkles" size={15} color="#8B5CF6" />
-                          <Text style={styles.dishMicroHeaderTitle}>
-                            Chi tiết Vitamin & Khoáng chất theo dõi:
-                          </Text>
-                        </View>
-                        <Ionicons
-                          name={isMicroExpanded ? 'chevron-up' : 'chevron-down'}
-                          size={16}
-                          color="#64748B"
-                        />
-                      </TouchableOpacity>
-
-                      <View style={styles.microGridRow}>
-                        <View style={styles.microBadgePill}>
-                          <Text style={styles.microBadgeLabel}>🥬 Chất xơ:</Text>
-                          <Text style={styles.microBadgeValue}>{dishMicro.fiberG}g</Text>
-                        </View>
-                        <View style={styles.microBadgePill}>
-                          <Text style={styles.microBadgeLabel}>🧂 Natri:</Text>
-                          <Text style={styles.microBadgeValue}>{dishMicro.sodiumMg}mg</Text>
-                        </View>
-                        <View style={styles.microBadgePill}>
-                          <Text style={styles.microBadgeLabel}>🍌 Kali:</Text>
-                          <Text style={styles.microBadgeValue}>{dishMicro.potassiumMg}mg</Text>
-                        </View>
-                        <View style={styles.microBadgePill}>
-                          <Text style={styles.microBadgeLabel}>🥛 Canxi:</Text>
-                          <Text style={styles.microBadgeValue}>{dishMicro.calciumMg}mg</Text>
-                        </View>
-                        <View style={styles.microBadgePill}>
-                          <Text style={styles.microBadgeLabel}>🥩 Sắt:</Text>
-                          <Text style={styles.microBadgeValue}>{dishMicro.ironMg}mg</Text>
-                        </View>
-
-                        {isMicroExpanded && (
-                          <>
-                            <View style={styles.microBadgePill}>
-                              <Text style={styles.microBadgeLabel}>🥕 Vit A:</Text>
-                              <Text style={styles.microBadgeValue}>{dishMicro.vitAMcg}µg</Text>
-                            </View>
-                            <View style={styles.microBadgePill}>
-                              <Text style={styles.microBadgeLabel}>🍊 Vit C:</Text>
-                              <Text style={styles.microBadgeValue}>{dishMicro.vitCMg}mg</Text>
-                            </View>
-                            <View style={styles.microBadgePill}>
-                              <Text style={styles.microBadgeLabel}>☀️ Vit D:</Text>
-                              <Text style={styles.microBadgeValue}>{dishMicro.vitDMcg}µg</Text>
-                            </View>
-                            <View style={styles.microBadgePill}>
-                              <Text style={styles.microBadgeLabel}>🛡️ Kẽm:</Text>
-                              <Text style={styles.microBadgeValue}>{dishMicro.zincMg}mg</Text>
-                            </View>
-                          </>
-                        )}
-                      </View>
-                    </View>
-                  );
-                })()}
-
-                {/* Header for Ingredients of this specific Dish Frame */}
+                {/* Header & Vertical List for Ingredients of this specific Dish Frame */}
                 {!isDishExcluded && (
-                  <View style={styles.dishIngSubHeaderRow}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.dishIngSubHeader}>
-                        Nguyên liệu Món {dIdx + 1}:
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.ellipsisBtn}
-                        onPress={() => setShowFullIngredientsModal(true)}
-                      >
-                        <Ionicons name="ellipsis-horizontal-circle" size={20} color="#10B981" />
-                      </TouchableOpacity>
-                    </View>
-
-                    <TouchableOpacity
-                      style={styles.addIngToDishBtn}
-                      onPress={() => {
-                        setTargetDishIndex(dIdx);
-                        setShowAddIngModal(true);
-                      }}
-                    >
-                      <Ionicons name="add-circle" size={14} color="#059669" />
-                      <Text style={styles.addIngToDishBtnText}>Thêm nguyên liệu</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* Horizontal Scroll of Ingredients belonging to THIS DISH */}
-                {!isDishExcluded && (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.ingredientsScroll}
-                  >
-                    {dish.ingredients && dish.ingredients.length > 0 ? (
-                      dish.ingredients.map((ing, iIdx) => {
-                        const isIngExcluded = excludedIngKeys.includes(`${dIdx}_${iIdx}`);
-                        const isIngExpanded = expandedIngKeys.includes(`${dIdx}_${iIdx}`);
-                        const ingPortion = Math.round(
-                          (ing.portion_g || ing.estimated_weight_g || 50) * totalScale
-                        );
-                        const ingCal = Math.round((ing.calories || 0) * totalScale);
-                        const isInf = ing.source === 'inferred';
-                        const isUser = ing.source === 'user_added';
-                        return (
-                          <View
-                            key={iIdx}
-                            style={[
-                              styles.ingredientCard,
-                              isIngExcluded && styles.ingredientCardExcluded,
-                            ]}
-                          >
-                            <TouchableOpacity
-                              style={styles.removeIngBtn}
-                              onPress={() => toggleExcludeIngredient(dIdx, iIdx)}
-                            >
-                              <Ionicons
-                                name={isIngExcluded ? 'add-circle' : 'remove-circle'}
-                                size={18}
-                                color={isIngExcluded ? '#10B981' : '#EF4444'}
-                              />
-                            </TouchableOpacity>
-
-                            <View style={styles.ingredientImagePlaceholder}>
-                              <MaterialCommunityIcons
-                                name="silverware-fork-knife"
-                                size={18}
-                                color="#D97706"
-                              />
-                            </View>
-
-                            <TouchableOpacity
-                              onPress={() => toggleExpandIngName(dIdx, iIdx)}
-                              style={styles.ingNameTouchRow}
-                            >
-                              <Text
-                                style={[
-                                  styles.ingredientName,
-                                  isIngExcluded && styles.ingredientNameExcluded,
-                                ]}
-                                numberOfLines={isIngExpanded ? undefined : 1}
-                              >
-                                {ing.name}
-                              </Text>
-                              {!isIngExpanded && (
-                                <Ionicons name="ellipsis-horizontal" size={10} color="#94A3B8" />
-                              )}
-                            </TouchableOpacity>
-
-                            {/* Step buttons for individual ingredient portion adjustment */}
-                            <View style={styles.ingPortionAdjustRow}>
-                              <TouchableOpacity
-                                style={styles.ingStepBtn}
-                                onPress={() =>
-                                  handleAdjustIngredientWeight(dIdx, iIdx, -10)
-                                }
-                                disabled={isIngExcluded}
-                              >
-                                <Text style={styles.ingStepBtnText}>-</Text>
-                              </TouchableOpacity>
-                              <Text style={styles.ingredientWeight}>{ingPortion}g</Text>
-                              <TouchableOpacity
-                                style={styles.ingStepBtn}
-                                onPress={() => handleAdjustIngredientWeight(dIdx, iIdx, 10)}
-                                disabled={isIngExcluded}
-                              >
-                                <Text style={styles.ingStepBtnText}>+</Text>
-                              </TouchableOpacity>
-                            </View>
-
-                            {ingCal > 0 ? (
-                              <Text style={styles.ingredientCalText}>{ingCal} kcal</Text>
-                            ) : null}
-
-                            <View
-                              style={[
-                                styles.sourceBadge,
-                                isUser
-                                  ? styles.sourceUserAdded
-                                  : isInf
-                                  ? styles.sourceInferred
-                                  : styles.sourceVisible,
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.sourceBadgeText,
-                                  isUser
-                                    ? styles.sourceUserAddedText
-                                    : isInf
-                                    ? styles.sourceInferredText
-                                    : styles.sourceVisibleText,
-                                ]}
-                              >
-                                {isUser ? '🔵 Tự thêm' : isInf ? '🟡 Suy luận' : '🟢 Thấy rõ'}
-                              </Text>
-                            </View>
-                          </View>
-                        );
-                      })
-                    ) : (
-                      <View style={styles.ingredientCardSingle}>
-                        <Text style={styles.ingredientName}>{dish.name}</Text>
-                        <Text style={styles.ingredientWeight}>
-                          {dishWeight}g - {dishCal} kCal
+                  <View style={styles.dishIngSectionContainer}>
+                    <View style={styles.dishIngSubHeaderRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <MaterialCommunityIcons name="format-list-bulleted" size={16} color="#059669" />
+                        <Text style={styles.dishIngSubHeader}>
+                          Nguyên liệu Món {dIdx + 1} ({dish.ingredients?.length || 0}):
                         </Text>
                       </View>
-                    )}
+                      <TouchableOpacity
+                        style={styles.addIngToDishBtn}
+                        onPress={() => {
+                          setTargetDishIndex(dIdx);
+                          setShowAddIngModal(true);
+                        }}
+                      >
+                        <Ionicons name="add-circle" size={15} color="#059669" />
+                        <Text style={styles.addIngToDishBtnText}>Thêm nguyên liệu</Text>
+                      </TouchableOpacity>
+                    </View>
 
-                    {/* Card to Add Ingredient into this dish */}
-                    <TouchableOpacity
-                      style={styles.addIngredientCard}
-                      onPress={() => {
-                        setTargetDishIndex(dIdx);
-                        setShowAddIngModal(true);
-                      }}
-                    >
-                      <Ionicons name="add-circle-outline" size={24} color="#10B981" />
-                      <Text style={styles.addIngredientCardText}>Thêm vị</Text>
-                    </TouchableOpacity>
-                  </ScrollView>
+                    {/* Vertical List of Ingredients */}
+                    <View style={styles.dishIngredientsVerticalList}>
+                      {dish.ingredients && dish.ingredients.length > 0 ? (
+                        dish.ingredients.map((ing, iIdx) => {
+                          const isIngExcluded = excludedIngKeys.includes(`${dIdx}_${iIdx}`);
+                          const ingPortion = Math.round(
+                            (ing.portion_g || ing.estimated_weight_g || 50) * totalScale
+                          );
+                          const ingCal = Math.round((ing.calories || 0) * totalScale);
+                          const ingProtein = Number(((ing.protein_g || 0) * totalScale).toFixed(1));
+                          const ingCarb = Number(((ing.carb_g || 0) * totalScale).toFixed(1));
+                          const ingFat = Number(((ing.fat_g || 0) * totalScale).toFixed(1));
+                          const isInf = ing.source === 'inferred';
+                          const isUser = ing.source === 'user_added';
+
+                          return (
+                            <View
+                              key={iIdx}
+                              style={[
+                                styles.verticalIngCard,
+                                isIngExcluded && styles.verticalIngCardExcluded,
+                              ]}
+                            >
+                              {/* Row 1: Icon, Full Name, Source Badge, Delete/Restore Button */}
+                              <View style={styles.verticalIngHeaderRow}>
+                                <View style={styles.verticalIngIconWrap}>
+                                  <MaterialCommunityIcons
+                                    name="food-apple-outline"
+                                    size={18}
+                                    color={isIngExcluded ? '#94A3B8' : '#10B981'}
+                                  />
+                                </View>
+                                <View style={styles.verticalIngNameCol}>
+                                  <Text
+                                    style={[
+                                      styles.verticalIngName,
+                                      isIngExcluded && styles.verticalIngNameExcluded,
+                                    ]}
+                                  >
+                                    {ing.name}
+                                  </Text>
+                                  <View style={styles.verticalIngMetaRow}>
+                                    <View
+                                      style={[
+                                        styles.sourceBadge,
+                                        isUser
+                                          ? styles.sourceUserAdded
+                                          : isInf
+                                          ? styles.sourceInferred
+                                          : styles.sourceVisible,
+                                      ]}
+                                    >
+                                      <Text
+                                        style={[
+                                          styles.sourceBadgeText,
+                                          isUser
+                                            ? styles.sourceUserAddedText
+                                            : isInf
+                                            ? styles.sourceInferredText
+                                            : styles.sourceVisibleText,
+                                        ]}
+                                      >
+                                        {isUser ? '🔵 Tự thêm' : isInf ? '🟡 Ước lượng' : '🟢 Thấy rõ'}
+                                      </Text>
+                                    </View>
+                                    {isIngExcluded && (
+                                      <View style={styles.excludedStatusBadge}>
+                                        <Text style={styles.excludedStatusBadgeText}>Đã loại trừ</Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                </View>
+
+                                {/* Exclude / Restore Button */}
+                                <TouchableOpacity
+                                  style={[
+                                    styles.verticalIngActionBtn,
+                                    isIngExcluded && styles.verticalIngRestoreBtn,
+                                  ]}
+                                  onPress={() => toggleExcludeIngredient(dIdx, iIdx)}
+                                >
+                                  <Ionicons
+                                    name={isIngExcluded ? 'refresh-circle' : 'trash-outline'}
+                                    size={isIngExcluded ? 18 : 16}
+                                    color={isIngExcluded ? '#059669' : '#EF4444'}
+                                  />
+                                  {isIngExcluded && (
+                                    <Text style={styles.restoreBtnText}>Khôi phục</Text>
+                                  )}
+                                </TouchableOpacity>
+                              </View>
+
+                              {/* Row 2: Macros & Calories Pill */}
+                              {!isIngExcluded && (
+                                <View style={styles.verticalIngMacrosRow}>
+                                  <View style={styles.verticalIngCalBadge}>
+                                    <Ionicons name="flame" size={13} color="#D97706" />
+                                    <Text style={styles.verticalIngCalText}>{ingCal} kcal</Text>
+                                  </View>
+                                  <View style={styles.verticalIngMacroPill}>
+                                    <Text style={styles.macroPillLabel}>Đạm:</Text>
+                                    <Text style={styles.macroPillValue}>{ingProtein}g</Text>
+                                  </View>
+                                  <View style={styles.verticalIngMacroPill}>
+                                    <Text style={styles.macroPillLabel}>Carb:</Text>
+                                    <Text style={styles.macroPillValue}>{ingCarb}g</Text>
+                                  </View>
+                                  <View style={styles.verticalIngMacroPill}>
+                                    <Text style={styles.macroPillLabel}>Béo:</Text>
+                                    <Text style={styles.macroPillValue}>{ingFat}g</Text>
+                                  </View>
+                                </View>
+                              )}
+
+                              {/* Row 3: Touch-friendly Controls: Steppers, Tappable Weight Badge, Quick Presets */}
+                              {!isIngExcluded && (
+                                <View style={styles.verticalIngControlsRow}>
+                                  {/* Stepper with Tappable Weight Badge */}
+                                  <View style={styles.verticalIngStepperBox}>
+                                    <TouchableOpacity
+                                      style={styles.verticalIngStepBtn}
+                                      onPress={() => handleAdjustIngredientWeight(dIdx, iIdx, -10)}
+                                    >
+                                      <Ionicons name="remove" size={16} color="#334155" />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                      style={styles.verticalIngWeightPill}
+                                      onPress={() => {
+                                        setEditingIngWeightTarget({
+                                          dIdx,
+                                          iIdx,
+                                          name: ing.name,
+                                          currentGrams: ingPortion,
+                                        });
+                                        setCustomIngWeightInput(String(ingPortion));
+                                      }}
+                                    >
+                                      <Text style={styles.verticalIngWeightText}>{ingPortion}g</Text>
+                                      <Ionicons
+                                        name="pencil"
+                                        size={11}
+                                        color="#64748B"
+                                        style={{ marginLeft: 3 }}
+                                      />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                      style={styles.verticalIngStepBtn}
+                                      onPress={() => handleAdjustIngredientWeight(dIdx, iIdx, 10)}
+                                    >
+                                      <Ionicons name="add" size={16} color="#334155" />
+                                    </TouchableOpacity>
+                                  </View>
+
+                                  {/* Quick Preset Buttons */}
+                                  <View style={styles.verticalIngQuickPresets}>
+                                    <TouchableOpacity
+                                      style={styles.verticalIngQuickBtn}
+                                      onPress={() => handleAdjustIngredientWeight(dIdx, iIdx, 25)}
+                                    >
+                                      <Text style={styles.verticalIngQuickBtnText}>+25g</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                      style={styles.verticalIngQuickBtn}
+                                      onPress={() => handleAdjustIngredientWeight(dIdx, iIdx, 50)}
+                                    >
+                                      <Text style={styles.verticalIngQuickBtnText}>+50g</Text>
+                                    </TouchableOpacity>
+                                  </View>
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })
+                      ) : (
+                        <View style={styles.verticalIngEmptyCard}>
+                          <Text style={styles.verticalIngEmptyText}>
+                            Chưa có nguyên liệu chi tiết cho món này.
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Prominent Wide Add Ingredient Button at the bottom of the list */}
+                      <TouchableOpacity
+                        style={styles.addIngToDishWideBtn}
+                        onPress={() => {
+                          setTargetDishIndex(dIdx);
+                          setShowAddIngModal(true);
+                        }}
+                      >
+                        <Ionicons name="add-circle-outline" size={18} color="#059669" />
+                        <Text style={styles.addIngToDishWideBtnText}>
+                          + Thêm nguyên liệu vào {dish.name}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 )}
               </View>
             );
           })}
         </ScrollView>
 
-        {/* Bottom Floating Save Button */}
+        {/* Bottom Floating Save & Share Buttons */}
         <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={styles.shareQuickBtn}
+            onPress={() => setShowShareModal(true)}
+          >
+            <Ionicons name="share-social" size={18} color="#059669" style={{ marginRight: 6 }} />
+            <Text style={styles.shareQuickBtnText}>Chia sẻ MXH</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
             <Ionicons name="bookmark" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <Text style={styles.saveBtnText}>Lưu vào nhật ký bữa ăn</Text>
+            <Text style={styles.saveBtnText}>Lưu bữa ăn</Text>
           </TouchableOpacity>
         </View>
 
@@ -1650,6 +1722,131 @@ export const NutritionAnalysisResultModal: React.FC<NutritionAnalysisResultModal
             </View>
           </View>
         </Modal>
+
+        {/* Calendar Picker Modal */}
+        <CalendarDatePickerModal
+          visible={showCalendarPickerModal}
+          currentDateStr={manualDateStr}
+          onClose={() => setShowCalendarPickerModal(false)}
+          onSelectDate={(newDate) => {
+            setManualDateStr(newDate);
+          }}
+        />
+
+        {/* Wheel Scroll Time Picker Modal (Báo thức) */}
+        <WheelTimePickerModal
+          visible={showTimePickerModal}
+          currentTimeStr={manualTimeStr}
+          onClose={() => setShowTimePickerModal(false)}
+          onSelectTime={(newTime) => {
+            setManualTimeStr(newTime);
+          }}
+        />
+
+        {/* Share Meal to Social Feed Modal */}
+        <ShareMealModal
+          visible={showShareModal}
+          meal={{
+            foodName: editedFoodName || result?.food_name || 'Bữa ăn',
+            calories,
+            protein_g: proteinG,
+            carb_g: carbG,
+            fat_g: fatG,
+            source_image_url: imageUri || undefined,
+            meal_type: mealType,
+          }}
+          onClose={() => setShowShareModal(false)}
+        />
+
+        {/* Quick Edit Ingredient Weight Modal */}
+        <Modal
+          visible={!!editingIngWeightTarget}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setEditingIngWeightTarget(null)}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <View style={styles.editWeightModalContent}>
+              <View style={styles.addIngModalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.addIngModalTitle}>Chỉnh trọng lượng</Text>
+                  <Text style={styles.editWeightSubtitle} numberOfLines={1}>
+                    {editingIngWeightTarget?.name}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setEditingIngWeightTarget(null)}>
+                  <Ionicons name="close" size={22} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.editWeightInputRow}>
+                <TextInput
+                  style={styles.editWeightInput}
+                  keyboardType="numeric"
+                  value={customIngWeightInput}
+                  onChangeText={setCustomIngWeightInput}
+                  selectTextOnFocus
+                  autoFocus
+                />
+                <Text style={styles.editWeightUnit}>gam (g)</Text>
+              </View>
+
+              {/* Quick Preset Chips */}
+              <View style={styles.editWeightPresetsRow}>
+                {[20, 50, 100, 150, 200, 300].map(preset => (
+                  <TouchableOpacity
+                    key={preset}
+                    style={[
+                      styles.editWeightPresetChip,
+                      customIngWeightInput === String(preset) && styles.editWeightPresetChipActive,
+                    ]}
+                    onPress={() => setCustomIngWeightInput(String(preset))}
+                  >
+                    <Text
+                      style={[
+                        styles.editWeightPresetText,
+                        customIngWeightInput === String(preset) && styles.editWeightPresetTextActive,
+                      ]}
+                    >
+                      {preset}g
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.editWeightActionsRow}>
+                <TouchableOpacity
+                  style={styles.cancelModalBtn}
+                  onPress={() => setEditingIngWeightTarget(null)}
+                >
+                  <Text style={styles.cancelModalBtnText}>Huỷ</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.saveWeightModalBtn}
+                  onPress={() => {
+                    if (!editingIngWeightTarget) return;
+                    const parsed = parseInt(customIngWeightInput, 10);
+                    if (isNaN(parsed) || parsed <= 0) {
+                      Alert.alert('Thông báo', 'Vui lòng nhập số gram hợp lệ (> 0)');
+                      return;
+                    }
+                    handleSetIngredientWeight(
+                      editingIngWeightTarget.dIdx,
+                      editingIngWeightTarget.iIdx,
+                      parsed
+                    );
+                    setEditingIngWeightTarget(null);
+                  }}
+                >
+                  <Text style={styles.saveWeightModalBtnText}>Xác nhận</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </SafeAreaView>
     </Modal>
   );
@@ -1704,6 +1901,38 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: 12,
     marginBottom: 16,
+  },
+  multiBannerContainer: {
+    height: 150,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 12,
+    marginBottom: 16,
+    backgroundColor: '#0F172A',
+  },
+  multiBannerScroll: {
+    flex: 1,
+  },
+  multiBannerSlide: {
+    height: 150,
+    position: 'relative',
+  },
+  multiBannerBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  multiBannerBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   bannerImage: {
     width: '100%',
@@ -2568,18 +2797,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#FFFFFF',
   },
-  dishIngSubHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  dishIngSubHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
-  },
   addIngToDishBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2651,49 +2868,434 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: '#94A3B8',
   },
-  dishMicroContainer: {
-    backgroundColor: '#F3E8FF',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#DDD6FE',
+  // Dish Ingredients Vertical Layout Styles
+  dishIngSectionContainer: {
+    marginTop: 12,
   },
-  microHeaderToggle: {
+  dishIngSubHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  dishIngSubHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  dishIngredientsVerticalList: {
+    gap: 10,
+  },
+  verticalIngCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  verticalIngCardExcluded: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CBD5E1',
+    opacity: 0.6,
+  },
+  verticalIngHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  verticalIngIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  verticalIngNameCol: {
+    flex: 1,
+    marginRight: 8,
+  },
+  verticalIngName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    lineHeight: 18,
+  },
+  verticalIngNameExcluded: {
+    textDecorationLine: 'line-through',
+    color: '#94A3B8',
+  },
+  verticalIngMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 3,
+  },
+  excludedStatusBadge: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  excludedStatusBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  verticalIngActionBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verticalIngRestoreBtn: {
+    backgroundColor: '#ECFDF5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    gap: 4,
+  },
+  restoreBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  verticalIngMacrosRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  verticalIngCalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 3,
+  },
+  verticalIngCalText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#B45309',
+  },
+  verticalIngMacroPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 3,
+  },
+  macroPillLabel: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  macroPillValue: {
+    fontSize: 11,
+    color: '#1E293B',
+    fontWeight: '700',
+  },
+  verticalIngControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  verticalIngStepperBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 2,
+  },
+  verticalIngStepBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  verticalIngWeightPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  verticalIngWeightText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  verticalIngQuickPresets: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  verticalIngQuickBtn: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  verticalIngQuickBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  verticalIngEmptyCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+  },
+  verticalIngEmptyText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontStyle: 'italic',
+  },
+  addIngToDishWideBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingVertical: 10,
+    marginTop: 4,
+    gap: 6,
+  },
+  addIngToDishWideBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  datePickerDisplayCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minWidth: 160,
+  },
+  datePickerDisplayText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    flex: 1,
+  },
+  pickerTapBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: 6,
+  },
+  pickerTapBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  portionAdjusterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  quickStepBtnRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  // Quick Edit Weight Modal Styles
+  editWeightModalContent: {
+    width: '88%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  editWeightSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  editWeightInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginVertical: 16,
+  },
+  editWeightInput: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#0F172A',
+    textAlign: 'center',
+    minWidth: 80,
+    padding: 0,
+  },
+  editWeightUnit: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#64748B',
+    marginLeft: 8,
+  },
+  editWeightPresetsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  editWeightPresetChip: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  editWeightPresetChipActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#10B981',
+  },
+  editWeightPresetText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  editWeightPresetTextActive: {
+    color: '#059669',
+  },
+  editWeightActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  cancelModalBtn: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelModalBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  saveWeightModalBtn: {
+    flex: 1,
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  saveWeightModalBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  shareQuickBtn: {
+    flex: 1,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 14,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  shareQuickBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#059669',
+    marginLeft: 4,
+  },
+  voiceTranscriptCard: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+  },
+  voiceTranscriptHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  dishMicroHeaderTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#6B21A8',
-  },
-  microGridRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  microBadgePill: {
+  voiceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
     gap: 4,
   },
-  microBadgeLabel: {
-    fontSize: 11,
+  voiceBadgeText: {
+    fontSize: 11.5,
     fontWeight: '700',
-    color: '#581C87',
+    color: '#15803D',
   },
-  microBadgeValue: {
+  voiceHintText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#7E22CE',
+    color: '#16A34A',
+    fontWeight: '500',
+  },
+  voiceTranscriptQuote: {
+    fontSize: 14,
+    color: '#166534',
+    fontWeight: '600',
+    fontStyle: 'italic',
+    lineHeight: 20,
   },
 });

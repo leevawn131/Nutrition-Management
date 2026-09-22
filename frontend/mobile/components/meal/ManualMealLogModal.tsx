@@ -16,6 +16,9 @@ import { useFoodSearch } from '@/hooks/useFoodSearch';
 import { FoodItemCard } from './FoodItemCard';
 import { FoodItem } from '@/types/food.types';
 import { IngredientInput, MealType } from '@/types/meal.types';
+import { CalendarDatePickerModal } from '@/components/common/CalendarDatePickerModal';
+import { WheelTimePickerModal } from '@/components/common/WheelTimePickerModal';
+import { PortionAdjuster } from './PortionAdjuster';
 
 interface SelectedIngredient extends IngredientInput {
   item: FoodItem;
@@ -31,6 +34,7 @@ interface ManualMealLogModalProps {
     totalProtein: number;
     totalCarb: number;
     totalFat: number;
+    logged_at?: string;
   }) => Promise<void> | void;
 }
 
@@ -43,6 +47,17 @@ export const ManualMealLogModal: React.FC<ManualMealLogModalProps> = ({
   const [selectedIngredients, setSelectedIngredients] = useState<SelectedIngredient[]>([]);
   const [mealType, setMealType] = useState<MealType>('lunch');
   const [submitting, setSubmitting] = useState(false);
+
+  const [manualDateStr, setManualDateStr] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+  const [manualTimeStr, setManualTimeStr] = useState<string>(() => {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  });
+  const [showCalendarModal, setShowCalendarModal] = useState<boolean>(false);
+  const [showTimeModal, setShowTimeModal] = useState<boolean>(false);
 
   // Toggle selection of food item
   const handleToggleSelectFood = (item: FoodItem) => {
@@ -115,6 +130,16 @@ export const ManualMealLogModal: React.FC<ManualMealLogModalProps> = ({
 
     try {
       setSubmitting(true);
+      let logged_at: string | undefined;
+      try {
+        const [yyyy, mm, dd] = manualDateStr.split('-');
+        const [hh, min] = manualTimeStr.split(':');
+        const logDate = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, parseInt(dd, 10), parseInt(hh, 10), parseInt(min, 10));
+        logged_at = logDate.toISOString();
+      } catch {
+        logged_at = new Date().toISOString();
+      }
+
       await onConfirmSave({
         meal_type: mealType,
         ingredients: selectedIngredients.map((ing) => ({
@@ -125,6 +150,7 @@ export const ManualMealLogModal: React.FC<ManualMealLogModalProps> = ({
         totalProtein: totals.protein,
         totalCarb: totals.carb,
         totalFat: totals.fat,
+        logged_at,
       });
     } catch (err: any) {
       console.error('Lỗi khi nhấn lưu bữa ăn:', err);
@@ -185,11 +211,32 @@ export const ManualMealLogModal: React.FC<ManualMealLogModalProps> = ({
             ))}
           </View>
 
+          {/* Date & Time Picker Row */}
+          <View style={styles.dateTimePickerRow}>
+            <TouchableOpacity
+              style={styles.pickerButton}
+              onPress={() => setShowCalendarModal(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="calendar-outline" size={16} color="#059669" style={{ marginRight: 6 }} />
+              <Text style={styles.pickerButtonText}>Ngày: {manualDateStr} 📅</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.pickerButton}
+              onPress={() => setShowTimeModal(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="time-outline" size={16} color="#059669" style={{ marginRight: 6 }} />
+              <Text style={styles.pickerButtonText}>Giờ: {manualTimeStr} ⏰</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Selected Ingredients Gram Inputs */}
           {selectedIngredients.length > 0 && (
             <View style={styles.selectedSection}>
               <Text style={styles.selectedTitle}>
-                Đã chọn ({selectedIngredients.length} nguyên liệu):
+                Đã chọn ({selectedIngredients.length} nguyên liệu - Bấm +/- hoặc gõ tay):
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedScroll}>
                 {selectedIngredients.map((ing) => (
@@ -197,14 +244,13 @@ export const ManualMealLogModal: React.FC<ManualMealLogModalProps> = ({
                     <Text style={styles.selectedName} numberOfLines={1}>
                       {ing.name}
                     </Text>
-                    <View style={styles.gramInputWrapper}>
-                      <TextInput
-                        style={styles.gramInput}
-                        keyboardType="numeric"
-                        value={ing.weight_g.toString()}
-                        onChangeText={(val) => handleUpdateWeight(ing.food_item_id, val)}
+                    <View style={{ marginTop: 4 }}>
+                      <PortionAdjuster
+                        weight={ing.weight_g}
+                        onChangeWeight={(val) => handleUpdateWeight(ing.food_item_id, val.toString())}
+                        step={1}
+                        compact={true}
                       />
-                      <Text style={styles.gramUnit}>g</Text>
                     </View>
                     <TouchableOpacity
                       onPress={() => handleToggleSelectFood(ing.item)}
@@ -263,6 +309,22 @@ export const ManualMealLogModal: React.FC<ManualMealLogModalProps> = ({
           </View>
         </View>
       </View>
+
+      {/* Calendar Picker Modal */}
+      <CalendarDatePickerModal
+        visible={showCalendarModal}
+        currentDateStr={manualDateStr}
+        onClose={() => setShowCalendarModal(false)}
+        onSelectDate={setManualDateStr}
+      />
+
+      {/* Wheel Time Picker Modal */}
+      <WheelTimePickerModal
+        visible={showTimeModal}
+        currentTimeStr={manualTimeStr}
+        onClose={() => setShowTimeModal(false)}
+        onSelectTime={setManualTimeStr}
+      />
     </Modal>
   );
 };
@@ -332,6 +394,27 @@ const styles = StyleSheet.create({
   mealTypeChipTextActive: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  dateTimePickerRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  pickerButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ECFDF5',
+    borderRadius: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  pickerButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
   },
   selectedSection: {
     backgroundColor: '#F8FAFC',

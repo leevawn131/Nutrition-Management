@@ -10,6 +10,7 @@ import { ManualMealLogModal } from '@/components/meal/ManualMealLogModal';
 import { MealScanModal } from '@/components/meal/MealScanModal';
 import { NutritionAnalysisResultModal } from '@/components/meal/NutritionAnalysisResultModal';
 import { PhotoConfirmModal } from '@/components/meal/PhotoConfirmModal';
+import { VoiceMealRecordModal } from '@/components/meal/VoiceMealRecordModal';
 import { mealService } from '@/services/meal.service';
 import { getAuthToken } from '@/services/storage.service';
 import { AIRecognitionResult, IngredientInput, MealType } from '@/types/meal.types';
@@ -21,9 +22,12 @@ export default function TabLayout() {
   const [analysisLoadingVisible, setAnalysisLoadingVisible] = useState(false);
   const [nutritionResultVisible, setNutritionResultVisible] = useState(false);
   const [manualLogVisible, setManualLogVisible] = useState(false);
+  const [voiceModalVisible, setVoiceModalVisible] = useState(false);
+  const [isVoiceInput, setIsVoiceInput] = useState(false);
 
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [selectedMimeType, setSelectedMimeType] = useState<string>('image/jpeg');
+  const [selectedImages, setSelectedImages] = useState<Array<{ uri: string; mimeType: string }>>([]);
   const [aiResult, setAiResult] = useState<AIRecognitionResult | null>(null);
 
   const handleOpenQuickActions = () => {
@@ -42,16 +46,42 @@ export default function TabLayout() {
     }, 250);
   };
 
-  // Step 1: Image selected from Camera or Gallery -> Open PhotoConfirmModal (Screenshot 3)
+  // Step 1: Single Image selected from Camera -> Open PhotoConfirmModal
   const handleImageSelected = (imageUri: string, mimeType: string) => {
     setSelectedImageUri(imageUri);
     setSelectedMimeType(mimeType);
+    setSelectedImages([{ uri: imageUri, mimeType }]);
     setPhotoConfirmVisible(true);
   };
 
-  // Step 2: User confirms photo & description -> Start Analysis Loading (Screenshot 4) -> Call Gemini API
+  // Step 1 (Multi): Multiple Images selected from Gallery
+  const handleImagesSelected = (images: Array<{ uri: string; mimeType: string }>) => {
+    if (images && images.length > 0) {
+      setSelectedImageUri(images[0].uri);
+      setSelectedMimeType(images[0].mimeType);
+      setSelectedImages(images);
+      setPhotoConfirmVisible(true);
+    }
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setSelectedImages((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) {
+        setPhotoConfirmVisible(false);
+        setSelectedImageUri(null);
+      } else {
+        setSelectedImageUri(next[0].uri);
+        setSelectedMimeType(next[0].mimeType);
+      }
+      return next;
+    });
+  };
+
+  // Step 2: User confirms photo(s) & description -> Start Analysis Loading -> Call Gemini API
   const handleAnalyzePhoto = async (descriptionText: string) => {
-    if (!selectedImageUri) return;
+    if (selectedImages.length === 0 && !selectedImageUri) return;
+    setIsVoiceInput(false);
     setPhotoConfirmVisible(false);
 
     // Wait for PhotoConfirmModal to cleanly dismiss before opening AnalysisLoadingModal
@@ -67,9 +97,10 @@ export default function TabLayout() {
           return;
         }
 
+        const inputToSend = selectedImages.length > 0 ? selectedImages : selectedImageUri!;
         const response = await mealService.analyzeImage(
           token,
-          selectedImageUri,
+          inputToSend,
           selectedMimeType,
           descriptionText
         );
@@ -91,6 +122,7 @@ export default function TabLayout() {
   // Handle direct text description analysis
   const handleTextDescriptionSelected = async (descriptionText: string) => {
     setSelectedImageUri(null);
+    setIsVoiceInput(false);
     setAnalysisLoadingVisible(true);
     setAiResult(null);
 
@@ -109,6 +141,36 @@ export default function TabLayout() {
     } catch (error: any) {
       setAnalysisLoadingVisible(false);
       Alert.alert('Lỗi phân tích AI', error.message || 'Không thể phân tích mô tả bữa ăn.');
+    }
+  };
+
+  // Handle voice analysis
+  const handleAnalyzeVoice = async (params: {
+    audioUri?: string;
+    audioBase64?: string;
+    mimeType?: string;
+    transcriptText?: string;
+  }) => {
+    setSelectedImageUri(null);
+    setIsVoiceInput(true);
+    setAnalysisLoadingVisible(true);
+    setAiResult(null);
+
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        Alert.alert('Chưa đăng nhập', 'Vui lòng đăng nhập để sử dụng tính năng phân tích giọng nói.');
+        setAnalysisLoadingVisible(false);
+        return;
+      }
+
+      const response = await mealService.analyzeVoice(token, params);
+      setAiResult(response.data);
+      setAnalysisLoadingVisible(false);
+      setNutritionResultVisible(true);
+    } catch (error: any) {
+      setAnalysisLoadingVisible(false);
+      Alert.alert('Lỗi phân tích giọng nói AI', error.message || 'Không thể phân tích bữa ăn từ giọng nói.');
     }
   };
 
@@ -132,7 +194,7 @@ export default function TabLayout() {
       }
 
       await mealService.logMeal(token, {
-        input_method: selectedImageUri ? 'photo' : 'text',
+        input_method: isVoiceInput ? 'voice' : selectedImageUri ? 'photo' : 'text',
         source_image_url: selectedImageUri || undefined,
         description_text: data.food_name,
         portion_grams: data.portion_grams,
@@ -317,16 +379,28 @@ export default function TabLayout() {
         visible={mealScanVisible}
         onClose={() => setMealScanVisible(false)}
         onImageSelected={handleImageSelected}
+        onImagesSelected={handleImagesSelected}
         onTextDescriptionSelected={handleTextDescriptionSelected}
         onManualCookingSelected={() => setManualLogVisible(true)}
+        onVoiceSelected={() => setVoiceModalVisible(true)}
       />
 
-      {/* STEP 1: PHOTO CONFIRMATION MODAL (Screenshot 3) */}
+      {/* VOICE RECORDING MEAL MODAL */}
+      <VoiceMealRecordModal
+        visible={voiceModalVisible}
+        onClose={() => setVoiceModalVisible(false)}
+        onAnalyzeVoice={handleAnalyzeVoice}
+      />
+
+      {/* STEP 1: PHOTO CONFIRMATION MODAL */}
       <PhotoConfirmModal
         visible={photoConfirmVisible}
         imageUri={selectedImageUri}
+        images={selectedImages}
         onClose={() => setPhotoConfirmVisible(false)}
         onAnalyze={handleAnalyzePhoto}
+        onRemoveImage={handleRemovePhoto}
+        onAddMoreImages={() => setMealScanVisible(true)}
       />
 
       {/* STEP 2: ANALYSIS LOADING POPUP (Screenshot 4) */}
@@ -336,6 +410,7 @@ export default function TabLayout() {
       <NutritionAnalysisResultModal
         visible={nutritionResultVisible}
         imageUri={selectedImageUri}
+        imageUris={selectedImages.map((img) => img.uri)}
         result={aiResult}
         onClose={() => setNutritionResultVisible(false)}
         onConfirmSave={handleSaveAISuggestedMeal}

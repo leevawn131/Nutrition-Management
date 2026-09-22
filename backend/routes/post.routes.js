@@ -4,10 +4,16 @@ const postController = require('../controllers/post.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 const optionalAuth = require('../middlewares/optional_auth.middleware');
 
-// GET /api/posts/feed (bảng tin bài viết cộng đồng)
+// GET /api/posts & /api/posts/feed (bảng tin bài viết cộng đồng)
+router.get('/', optionalAuth, (req, res) => {
+  if (typeof postController.getPosts === 'function') {
+    return postController.getPosts(req, res);
+  }
+  return postController.getFeed(req, res);
+});
 router.get('/feed', optionalAuth, postController.getFeed);
 
-// POST /api/posts (tạo bài viết mới)
+// POST /api/posts (tạo bài viết mới / chia sẻ bữa ăn)
 router.post('/', optionalAuth, postController.createPost);
 
 // GET /api/posts/my-posts (lấy danh sách bài viết của chính mình)

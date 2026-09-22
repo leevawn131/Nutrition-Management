@@ -1,10 +1,16 @@
 import { API_BASE_URL } from '@/constants/api';
 import { getAuthToken } from './storage.service';
-import { PostItem, PostComment, SearchTab } from '@/types/post.types';
+import {
+  PostItem,
+  PostComment,
+  SearchTab,
+  Post,
+  CreatePostPayload,
+} from '@/types/post.types';
 
 class PostService {
-  private async getAuthHeaders(): Promise<HeadersInit> {
-    const token = await getAuthToken();
+  private async getAuthHeaders(explicitToken?: string): Promise<HeadersInit> {
+    const token = explicitToken || (await getAuthToken());
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -35,6 +41,31 @@ class PostService {
   }
 
   /**
+   * Lấy danh sách bài viết trên Bảng tin Cộng đồng (Explore) - Alias/compatible with Sang
+   */
+  async getPosts(
+    token?: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<{ success: boolean; data: any[]; pagination?: any }> {
+    try {
+      const headers = await this.getAuthHeaders(token);
+      const response = await fetch(`${API_BASE_URL}/posts?page=${page}&limit=${limit}`, {
+        method: 'GET',
+        headers,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Không thể tải danh sách bài viết');
+      }
+      return data;
+    } catch (error: any) {
+      console.error('Lỗi postService getPosts:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Fetch My Posts or Specific User's Posts
    */
   async getMyPosts(userId?: string): Promise<PostItem[]> {
@@ -57,18 +88,34 @@ class PostService {
 
   /**
    * Create New Post
+   * Hỗ trợ 2 dạng:
+   * 1. createPost(payload)
+   * 2. createPost(token, payload)
    */
-  async createPost(payload: { content?: string; recipe_id?: string; images?: string[] }): Promise<PostItem | null> {
+  async createPost(
+    arg1: string | (CreatePostPayload & { recipeId?: string }),
+    arg2?: CreatePostPayload
+  ): Promise<any> {
     try {
-      const headers = await this.getAuthHeaders();
+      let explicitToken: string | undefined;
+      let bodyData: any;
+
+      if (typeof arg1 === 'string') {
+        explicitToken = arg1;
+        bodyData = arg2 || {};
+      } else {
+        bodyData = arg1 || {};
+      }
+
+      const headers = await this.getAuthHeaders(explicitToken);
       const res = await fetch(`${API_BASE_URL}/posts`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(payload),
+        body: JSON.stringify(bodyData),
       });
       const data = await res.json();
       if (data.success) {
-        return data.data;
+        return typeof arg1 === 'string' ? data : data.data;
       }
       throw new Error(data.message || 'Lỗi tạo bài viết');
     } catch (err: any) {

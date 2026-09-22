@@ -14,7 +14,7 @@ const mealLogSchema = new mongoose.Schema(
     },
     input_method: {
       type: String,
-      enum: ['photo', 'gallery', 'text', 'manual'],
+      enum: ['photo', 'gallery', 'text', 'manual', 'voice'],
       required: [true, 'input_method là bắt buộc'],
       default: 'text',
     },

@@ -18,13 +18,13 @@ const getLocalHostIp = (): string => {
 
   if (hostUri) {
     const ip = hostUri.split(':')[0];
-    // Filter out virtual network adapters (VirtualBox 192.168.56.x, Hyper-V 172.25.x.x)
+    // Filter out virtual network adapters (VirtualBox 192.168.56.x, Hyper-V 172.x.x.x)
     if (
       ip &&
       ip !== 'localhost' &&
       ip !== '127.0.0.1' &&
       !ip.startsWith('192.168.56.') &&
-      !ip.startsWith('172.25.')
+      !ip.startsWith('172.')
     ) {
       return ip;
     }

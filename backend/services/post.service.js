@@ -96,6 +96,30 @@ class PostService {
   }
 
   /**
+   * Lấy danh sách bài viết trên bảng tin cộng đồng (Explore feed) với pagination
+   */
+  async getPosts({ page = 1, limit = 20, userId = null } = {}) {
+    const pageNum = Math.max(1, parseInt(page, 10));
+    const pageSize = Math.min(50, Math.max(1, parseInt(limit, 10)));
+    const skip = (pageNum - 1) * pageSize;
+
+    const [posts, total] = await Promise.all([
+      this.getFeed({ userId, page: pageNum, limit: pageSize }),
+      Post.countDocuments({ status: 'visible' }),
+    ]);
+
+    return {
+      posts,
+      pagination: {
+        total,
+        page: pageNum,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      },
+    };
+  }
+
+  /**
    * Fetch Posts by User (My Posts or Profile Posts)
    */
   async getUserPosts({ targetUserId, currentUserId, page = 1, limit = 20 }) {
@@ -119,9 +143,32 @@ class PostService {
   }
 
   /**
-   * Create New Post
+   * Create New Post - hỗ trợ cả 2 dạng tham số:
+   * 1. createPost({ userId, content, recipeId, images, status })
+   * 2. createPost(userId, { content, images, recipe_id, status })
    */
-  async createPost({ userId, content, recipeId, images = [] }) {
+  async createPost(param1, param2) {
+    let userId;
+    let content;
+    let recipeId;
+    let images = [];
+    let status = 'visible';
+
+    if (typeof param1 === 'object' && param1 !== null) {
+      userId = param1.userId;
+      content = param1.content;
+      recipeId = param1.recipeId || param1.recipe_id;
+      images = param1.images || [];
+      status = param1.status || 'visible';
+    } else {
+      userId = param1;
+      const data = param2 || {};
+      content = data.content;
+      recipeId = data.recipe_id || data.recipeId;
+      images = data.images || [];
+      status = data.status || 'visible';
+    }
+
     if (!content && (!images || images.length === 0)) {
       throw new Error('Nội dung bài viết hoặc hình ảnh không được để trống');
     }
@@ -140,16 +187,21 @@ class PostService {
 
     const formattedImages = (images || [])
       .filter((img) => img && (typeof img === 'string' ? img.trim() : img.image_url))
-      .map((imgUrl, index) => ({
-        image_url: typeof imgUrl === 'string' ? imgUrl.trim() : imgUrl.image_url,
-        display_order: index + 1,
-      }));
+      .map((img, index) => {
+        if (typeof img === 'string') {
+          return { image_url: img.trim(), display_order: index + 1 };
+        }
+        return {
+          image_url: img.image_url,
+          display_order: img.display_order || index + 1,
+        };
+      });
 
     const newPost = new Post({
       user_id: userId,
       content: content || '',
       recipe_id: validRecipeId,
-      status: 'visible',
+      status: status || 'visible',
       images: formattedImages,
       created_at: new Date(),
     });
@@ -168,9 +220,19 @@ class PostService {
   }
 
   /**
-   * Fetch Single Post Details
+   * Fetch Single Post Details - hỗ trợ cả getPostById(postId) và getPostById({ postId, userId })
    */
-  async getPostById({ postId, userId }) {
+  async getPostById(arg) {
+    let postId;
+    let userId = null;
+
+    if (typeof arg === 'object' && arg !== null) {
+      postId = arg.postId || arg.id;
+      userId = arg.userId || null;
+    } else {
+      postId = arg;
+    }
+
     const post = await Post.findById(postId)
       .populate('user_id', 'full_name avatar_url email')
       .populate('recipe_id', 'title image_url prep_time_minutes cook_time_minutes ingredients steps calories_per_serving protein_g carb_g fat_g')

@@ -18,8 +18,8 @@ class PostController {
   async getFeed(req, res) {
     try {
       const userId = req.user ? req.user.id || req.user._id : await getEffectiveUserId(req);
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 20;
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.limit, 10) || 20;
 
       const posts = await postService.getFeed({ userId, page, limit });
       return res.json({
@@ -36,29 +36,59 @@ class PostController {
   }
 
   /**
-   * POST /api/posts
+   * GET /api/posts - Lấy danh sách bài viết cộng đồng (alias)
+   */
+  async getPosts(req, res) {
+    try {
+      const userId = req.user ? req.user.id || req.user._id : await getEffectiveUserId(req);
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.limit, 10) || 20;
+
+      const posts = await postService.getFeed({ userId, page, limit });
+      return res.status(200).json({
+        success: true,
+        data: posts,
+      });
+    } catch (error) {
+      console.error('Lỗi controller getPosts:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Lỗi hệ thống khi tải danh sách bài viết',
+      });
+    }
+  }
+
+  /**
+   * POST /api/posts - Đăng bài viết / Chia sẻ bữa ăn lên MXH
    */
   async createPost(req, res) {
     try {
-      const userId = await getEffectiveUserId(req);
+      const userId = (req.user && (req.user.id || req.user._id)) || (await getEffectiveUserId(req));
       if (!userId) {
         return res.status(401).json({
           success: false,
           message: 'Vui lòng đăng nhập để đăng bài viết',
         });
       }
-      const { content, recipe_id, images } = req.body;
+      const { content, recipe_id, recipeId, images } = req.body;
+
+      if (!content && (!images || images.length === 0)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng cung cấp nội dung hoặc hình ảnh bài viết',
+        });
+      }
 
       const post = await postService.createPost({
         userId,
         content,
-        recipeId: recipe_id,
+        recipeId: recipe_id || recipeId,
         images,
       });
 
       return res.status(201).json({
         success: true,
-        message: 'Đã đăng bài viết thành công',
+        message: 'Đăng bài viết lên mạng xã hội thành công',
         data: post,
       });
     } catch (err) {
@@ -79,6 +109,12 @@ class PostController {
       const postId = req.params.id;
 
       const post = await postService.getPostById({ postId, userId });
+      if (!post) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy bài viết',
+        });
+      }
       return res.json({
         success: true,
         data: post,

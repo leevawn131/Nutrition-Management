@@ -582,6 +582,259 @@ BẮT BUỘC: Bạn PHẢI trả về ĐÚNG MỘT OBJECT JSON thuần túy (kh�
       };
     }
   }
+
+  /**
+   * Transcribe audio to Vietnamese text using Gemini API
+   * @param {Buffer} audioBuffer
+   * @param {string} mimeType
+   * @returns {Promise<{ transcription: string }>}
+   */
+  async transcribeAudio(audioBuffer, mimeType = 'audio/m4a') {
+    try {
+      const genAI = this.getGenAIInstance();
+
+      const prompt = `Bạn là trợ lý chuyển giọng nói thành văn bản tiếng Việt cực kỳ chính xác.
+Hãy lắng nghe đoạn âm thanh được cung cấp (người dùng đang nói về bữa ăn của họ).
+Hãy chuyển đổi toàn bộ lời nói trong đoạn ghi âm thành văn bản tiếng Việt chuẩn, giữ nguyên tên các món ăn, đồ uống và số lượng/khẩu lượng.
+
+Bạn PHẢI trả về ĐÚNG MỘT OBJECT JSON thuần túy (không kèm markdown code block):
+{
+  "transcription": "Nội dung người dùng nói bằng tiếng Việt chính xác..."
+}`;
+
+      const audioPart = {
+        inlineData: {
+          data: audioBuffer.toString('base64'),
+          mimeType: mimeType || 'audio/m4a',
+        },
+      };
+
+      const result = await this.generateContentWithFallback(genAI, [prompt, audioPart]);
+      const responseText = result.response.text();
+
+      let cleanedText = responseText.trim();
+      if (cleanedText.startsWith('```json')) {
+        cleanedText = cleanedText.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
+      } else if (cleanedText.startsWith('```')) {
+        cleanedText = cleanedText.replace(/^```\s*/i, '').replace(/\s*```$/, '');
+      }
+
+      try {
+        const parsed = JSON.parse(cleanedText);
+        return {
+          transcription: parsed.transcription || cleanedText,
+        };
+      } catch (err) {
+        return {
+          transcription: cleanedText,
+        };
+      }
+    } catch (error) {
+      console.error('Lỗi GeminiService transcribeAudio:', error);
+      throw new Error(`Lỗi nhận dạng giọng nói: ${error.message}`);
+    }
+  }
+
+  /**
+   * Analyze food from voice recording audio and/or transcript text using Gemini API
+   * @param {Buffer|null} audioBuffer
+   * @param {string} mimeType
+   * @param {string} [transcriptText]
+   * @returns {Promise<Object>} Formatted JSON analysis result
+   */
+  async analyzeFoodVoice(audioBuffer, mimeType = 'audio/m4a', transcriptText = '') {
+    try {
+      const genAI = this.getGenAIInstance();
+
+      const prompt = `Bạn là chuyên gia dinh dưỡng hàng đầu với am hiểu sâu sắc về ẩm thực Việt Nam và quốc tế.
+Dựa trên ${audioBuffer ? 'đoạn âm thanh ghi âm bữa ăn của người dùng' : ''} ${transcriptText ? `và văn bản mô tả: "${transcriptText}"` : ''}, hãy phân tích toàn diện và ước lượng dinh dưỡng chính xác nhất.
+
+NGUYÊN TẮC QUAN TRỌNG VỀ NGUYÊN LIỆU VÀ ĐỘ CHÍNH XÁC:
+1. Chuyển đổi lời nói thành văn bản tiếng Việt chính xác vào trường "transcription"${transcriptText ? ` (hoặc chuẩn hóa từ văn bản đã có: "${transcriptText}")` : ''}.
+2. Xác định tên bữa ăn / các món ăn chính và trả về trong "food_name".
+3. Ước lượng tổng khối lượng (estimated_weight_g), tổng Calories, Protein (g), Carb (g), Fat (g) và Tải lượng đường huyết Glycemic Load (glycemic_load).
+4. BẮT BUỘC: TUYỆT ĐỐI KHÔNG BỊA ĐẶT NGUYÊN LIỆU HOẶC SỐ LIỆU CALO/MACRO. Mọi số liệu dinh dưỡng phải bám sát định lượng thực tế theo Bảng thành phần thực phẩm Việt Nam (Viện Dinh Dưỡng) và USDA.
+5. TUYỆT ĐỐI KHÔNG GỘP TÊN MÓN VỚI NGOẶC ĐƠN LÀM 1 NGUYÊN LIỆU (CẤM ghi dạng: "Chè thập cẩm (đậu, thạch, cốt dừa, đường)" hay "Cà phê sữa đá (cà phê và sữa đặc)").
+6. BẮT BUỘC: Mỗi món trong "dishes" PHẢI BÓC TÁCH THÀNH CÁC NGUYÊN LIỆU NẤU ĂN ĐỘC LẬP THỰC TẾ cấu thành món đó (Ví dụ:
+   - Phở bò -> Bánh phở tươi, Thịt bò, Nước dùng hầm xương bò, Hành lá & rau thơm.
+   - Chè thập cẩm -> Đậu đỏ ninh mềm, Thạch sương sáo, Nước cốt dừa béo, Trân châu, Nước đường hoa bưởi.
+   - Cà phê sữa đá -> Cà phê phin nguyên chất, Sữa đặc có đường, Đá viên tinh khiết.
+   - Bún chả -> Bún tươi, Chả thịt heo nướng, Nước mắm chua ngọt, Đu đủ chua & rau sống.
+   - Cơm tấm -> Cơm tấm, Sườn heo nướng, Chả trứng hấp, Bì heo, Mỡ hành & dưa leo).
+   Mỗi nguyên liệu phải có tên độc lập, portion_g, calories, protein_g, carb_g, fat_g chính xác tuyệt đối.
+
+Bạn PHẢI trả về ĐÚNG MỘT OBJECT JSON thuần túy (không kèm markdown code block) có cấu trúc như sau:
+{
+  "transcription": "Đoạn lời nói tiếng Việt đầy đủ...",
+  "food_name": "Tên món ăn / Bữa ăn",
+  "confidence": 0.9,
+  "nutrition_source": "voice_ai",
+  "estimated_weight_g": 350,
+  "calories": 480,
+  "protein_g": 28,
+  "carb_g": 52,
+  "fat_g": 14,
+  "glycemic_load": 22,
+  "ingredients": [
+    {
+      "name": "Tên thành phần 1",
+      "portion_g": 150,
+      "calories": 250,
+      "protein_g": 15,
+      "carb_g": 30,
+      "fat_g": 6
+    }
+  ],
+  "dishes": [
+    {
+      "name": "Tên món 1 (Ví dụ: Phở bò)",
+      "portion_g": 650,
+      "calories": 450,
+      "protein_g": 20,
+      "carb_g": 55,
+      "fat_g": 15,
+      "ingredients": [
+        {
+          "name": "Bánh phở",
+          "portion_g": 150,
+          "calories": 160,
+          "protein_g": 3,
+          "carb_g": 35,
+          "fat_g": 0.5
+        },
+        {
+          "name": "Thịt bò",
+          "portion_g": 50,
+          "calories": 120,
+          "protein_g": 11,
+          "carb_g": 0,
+          "fat_g": 8
+        },
+        {
+          "name": "Nước dùng phở & rau thơm",
+          "portion_g": 450,
+          "calories": 170,
+          "protein_g": 6,
+          "carb_g": 20,
+          "fat_g": 6.5
+        }
+      ]
+    }
+  ]
+}`;
+
+      const contents = [prompt];
+      if (audioBuffer) {
+        contents.push({
+          inlineData: {
+            data: audioBuffer.toString('base64'),
+            mimeType: mimeType || 'audio/m4a',
+          },
+        });
+      }
+
+      const result = await this.generateContentWithFallback(genAI, contents);
+      const responseText = result.response.text();
+
+      let cleanedText = responseText.trim();
+      if (cleanedText.startsWith('```json')) {
+        cleanedText = cleanedText.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
+      } else if (cleanedText.startsWith('```')) {
+        cleanedText = cleanedText.replace(/^```\s*/i, '').replace(/\s*```$/, '');
+      }
+
+      let parsedResult;
+      try {
+        parsedResult = JSON.parse(cleanedText);
+      } catch (parseError) {
+        console.error('Lỗi parse JSON từ Gemini analyzeFoodVoice:', responseText);
+        parsedResult = {
+          transcription: transcriptText || 'Đoạn ghi âm bữa ăn',
+          food_name: transcriptText || 'Bữa ăn từ giọng nói',
+          estimated_weight_g: 300,
+          calories: 400,
+          protein_g: 20,
+          carb_g: 45,
+          fat_g: 12,
+          confidence: 0.8,
+          ingredients: [],
+        };
+      }
+
+      const carbG = Number(parsedResult.carb_g) || 0;
+      const estimatedGL = parsedResult.glycemic_load !== undefined
+        ? Number(parsedResult.glycemic_load)
+        : Math.round(((carbG * 55) / 100) * 10) / 10;
+
+      const formattedIngredients = Array.isArray(parsedResult.ingredients)
+        ? parsedResult.ingredients.map(ing => ({
+            name: ing.name || ing.ingredient_name || 'Thành phần',
+            quantity: Number(ing.quantity) || 1,
+            portion_g: Number(ing.portion_g || ing.quantity || ing.amount) || 0,
+            calories: Number(ing.calories) || 0,
+            protein_g: Number(ing.protein_g) || 0,
+            carb_g: Number(ing.carb_g) || 0,
+            fat_g: Number(ing.fat_g) || 0,
+            source: 'visible',
+          }))
+        : [];
+
+      const formattedDishes = Array.isArray(parsedResult.dishes) && parsedResult.dishes.length > 0
+        ? parsedResult.dishes.map((dish, dIdx) => ({
+            id: `dish_voice_${dIdx}_${Date.now()}`,
+            name: dish.name || dish.food_name || `Món ${dIdx + 1}`,
+            estimated_weight_g: Number(dish.estimated_weight_g || dish.portion_g) || 0,
+            calories: Number(dish.calories) || 0,
+            protein_g: Number(dish.protein_g) || 0,
+            carb_g: Number(dish.carb_g) || 0,
+            fat_g: Number(dish.fat_g) || 0,
+            ingredients: Array.isArray(dish.ingredients)
+              ? dish.ingredients.map(ing => ({
+                  name: ing.name || 'Thành phần',
+                  portion_g: Number(ing.portion_g || ing.amount) || 0,
+                  calories: Number(ing.calories) || 0,
+                  protein_g: Number(ing.protein_g) || 0,
+                  carb_g: Number(ing.carb_g) || 0,
+                  fat_g: Number(ing.fat_g) || 0,
+                }))
+              : [],
+          }))
+        : [];
+
+      return {
+        raw_response: parsedResult,
+        transcription: parsedResult.transcription || transcriptText || 'Ghi âm bữa ăn',
+        food_name: parsedResult.food_name || transcriptText || 'Món ăn từ giọng nói',
+        estimated_weight_g: Number(parsedResult.estimated_weight_g) || 0,
+        estimated_eaten_weight_g: Number(parsedResult.estimated_weight_g) || 0,
+        consumption_pct: 100,
+        container_size: 'medium',
+        calories: Number(parsedResult.calories) || 0,
+        protein_g: Number(parsedResult.protein_g) || 0,
+        carb_g: Number(parsedResult.carb_g) || 0,
+        fat_g: Number(parsedResult.fat_g) || 0,
+        glycemic_load: estimatedGL,
+        confidence: Number(parsedResult.confidence) || 0.85,
+        image_quality: 'good',
+        quality_warning: '',
+        nutrition_source: 'voice_ai',
+        quantity_uncertain: false,
+        hidden_base_food: false,
+        fried_food: false,
+        is_beverage: false,
+        has_bones: false,
+        sugar_level: 'unknown',
+        default_ice_pct: 0,
+        dishes: this.distributeIngredientsToDishes(formattedDishes, formattedIngredients),
+        ingredients: formattedIngredients,
+        toppings: [],
+        alternatives: [],
+      };
+    } catch (error) {
+      console.error('Lỗi GeminiService analyzeFoodVoice:', error);
+      throw new Error(`Lỗi phân tích giọng nói AI: ${error.message}`);
+    }
+  }
 }
 
 module.exports = new GeminiService();
