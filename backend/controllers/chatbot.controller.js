@@ -49,10 +49,18 @@ exports.applyProposedGoal = async (req, res) => {
 
     const { targetCalories, macros, targetWeight, goalType, waterIntakeMl, recommendationSummary } = req.body;
 
+    const normalizedGoal =
+      goalType === 'GAIN_MUSCLE' ? 'gain' : goalType === 'LOSE_WEIGHT' ? 'lose' : 'maintain';
+
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       {
         $set: {
+          target_calories: targetCalories,
+          target_protein_g: macros?.protein || 0,
+          target_carb_g: macros?.carb || 0,
+          target_fat_g: macros?.fat || 0,
+          goal: normalizedGoal,
           'nutritionGoal.calories': targetCalories,
           'nutritionGoal.protein': macros?.protein || 0,
           'nutritionGoal.carbs': macros?.carb || 0,
@@ -61,7 +69,7 @@ exports.applyProposedGoal = async (req, res) => {
           'nutritionGoal.targetWeight': targetWeight,
           'nutritionGoal.goalType': goalType,
           'nutritionGoal.summary': recommendationSummary,
-          updatedAt: new Date(),
+          updated_at: new Date(),
         },
       },
       { new: true }
